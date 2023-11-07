@@ -12,6 +12,7 @@ Listed in order of importance.
 - [ ] Parametric polymorphism
 - [ ] Hindley-Milner type inference
 - [ ] Newtypes
+- [ ] Parallelism
 - [ ] C# interop
 
 ### Milestones
@@ -31,5 +32,6 @@ Listed in order of importance.
         - [ ] Lexer
         - [ ] Parser
     - [ ] Translation to the core language
+        - [ ] `do`-notation
     - [ ] CLI
 
