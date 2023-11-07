@@ -1,7 +1,5 @@
 package rlp;
 /*------------------------------------------------------------------------------*/
-import java.util.function.BiFunction;
-/*------------------------------------------------------------------------------*/
 
 public class Core
 {
@@ -13,10 +11,11 @@ public class Core
     public record TyAbs(Name n, Expr m)     implements Expr {}
     public record Var(Name n)               implements Expr {}
 
-    sealed interface Ty permits TyVar, Forall, TyFunc {}
-    public record TyVar(Name n)         implements Ty {}
-    public record Forall(Name n, Ty t)  implements Ty {}
-    public record TyFunc(Ty a, Ty b)    implements Ty {}
+    sealed interface Ty permits VarTy, Forall, FuncTy, AppTy {}
+    public record VarTy(Name n)         implements Ty {}
+    public record Forall(Name n, Ty m)  implements Ty {}
+    public record FuncTy(Ty a, Ty b)    implements Ty {}
+    public record AppTy(Ty f, Ty x)     implements Ty {}
 
     public final static class Name
     {
@@ -74,9 +73,14 @@ public class Core
     {
         return switch(t)
         {
-            case TyVar a   -> a.n.s;
-            case Forall a  -> "";
-            case TyFunc a  -> "";
+            case VarTy a ->
+                a.n.s;
+            case Forall a ->
+                wrap(p, 0, "∀" + a.n.s + "." + showTyP(0, a.m));
+            case FuncTy a ->
+                "";
+            case AppTy a ->
+                showTyP(2, a.f) + " " + showTyP(2, a.x);
         };
     }
 

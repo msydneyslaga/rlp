@@ -20,7 +20,7 @@ Listed in order of importance.
 
 - [ ] Backend
     - [ ] Core language
-        - [x] AST
+        - [ ] AST
     - [ ] Emitter
         - [ ] MSIL Codegen module
         - [ ] Core language emitter
