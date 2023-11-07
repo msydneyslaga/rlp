@@ -22,7 +22,7 @@ Listed in order of importance.
     - [ ] Core language
         - [ ] AST
     - [ ] Emitter
-        - [ ] MSIL Codegen module
+        - [ ] Cutesy MSIL Codegen API
         - [ ] Core language emitter
     - [ ] Core linter (Type-checker)
     - [ ] Optimiser
