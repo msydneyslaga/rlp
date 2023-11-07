@@ -20,6 +20,7 @@ Listed in order of importance.
 
 - [ ] Backend
     - [ ] Core language
+        - [x] AST
     - [ ] Emitter
         - [ ] MSIL Codegen module
         - [ ] Core language emitter
@@ -29,6 +30,7 @@ Listed in order of importance.
         - [ ] TCO
 - [ ] Frontend
     - [ ] High-level language
+        - [ ] AST
         - [ ] Lexer
         - [ ] Parser
     - [ ] Translation to the core language
