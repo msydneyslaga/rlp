@@ -7,7 +7,8 @@ project(
 
 rlpc_jar = jar(
   'rlpc',
-  'src/RLPC.java',
-  main_class: 'RLPC'
+  'rlp/RLPC.java',
+  'rlp/Core.java',
+  main_class: 'rlp.rlpc.RLPC'
 )
 
