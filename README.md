@@ -32,6 +32,7 @@ Listed in order of importance.
         - [ ] Lexer
         - [ ] Parser
     - [ ] Translation to the core language
+        - [ ] Constraint solver
         - [ ] `do`-notation
     - [ ] CLI
 
