@@ -1,5 +1,6 @@
-{-# LANGUAGE LambdaCase, BlockArguments #-}
-module TI where
+{-# LANGUAGE LambdaCase, BlockArguments, ViewPatterns #-}
+module TI
+    where
 ----------------------------------------------------------------------------------
 import Data.Map                 (Map, (!?), (!))
 import Data.Map qualified as M
@@ -58,42 +59,6 @@ buildInitialHeap (Program scdefs) = mapAccumL allocateSc mempty scdefs
             where
                 (h', addr) = alloc h (NSupercomb n a b)
 
-evalProgram :: Program -> Maybe TiState
-evalProgram p = last <$> evalDFA step <$> compile p
-
-step :: DFA TiState
-step = DFA \ st@(TiState stack _ heap _ _) -> do
-    case stack of
-        []    -> error "stack is empty"
-        [a]   -> case hLookup a heap of
-            Just (NNum n) -> Nothing
-            _             -> error "i don't wanna properly handle errors rn :3"
-        (a:_) -> case hLookup a heap of
-            Just node -> Just $ dispatch st node
-            Nothing   -> error "imaginary segfault oooh"
-    where
-        dispatch :: TiState -> Node -> TiState
-        dispatch st = \case
-            NNum n           -> numStep st n
-            NAp f x          -> apStep  st f x
-            NSupercomb n a b -> scStep  st n a b
-
-        numStep :: TiState -> Int -> TiState
-        numStep _ _ = error "number applied as a function"
-
-        apStep :: TiState -> Addr -> Addr -> TiState
-        apStep (TiState s d h g sts) f x =
-            TiState (f:s) d h g sts
-
-        scStep :: TiState -> Name -> [Name] -> Expr -> TiState
-        scStep (TiState s d h g sts) n as b =
-            TiState s' d h' g sts
-            where
-                s' = resAddr : drop (length as + 1) s
-                (h', resAddr) = instantiate b h env
-                env = argBinds ++ g
-                argBinds = as `zip` getArgs h s
-
 getArgs :: TiHeap -> [Addr] -> [Addr]
 getArgs h (sc:s) = fmap f s
     where
@@ -112,11 +77,45 @@ instantiate (Var k)    h g = (h, fromMaybe (error "variable not in scope") v)
 instantiate (Case _ _) _ _ = error "cannot instantiate case expressions"
 instantiate _          _ _ = error "unimplemented"
 
+----------------------------------------------------------------------------------
+
+eval :: TiState -> [TiState]
+eval st = st : sts
+    where
+        sts | isFinal st = []
+            | otherwise  = eval next
+        next = doAdmin (step st)
+
+step :: TiState -> TiState
+step st =
+    let TiState (top:_) _ h _ _ = st
+    in case fromMaybe (error "segfault!") (hLookup top h) of
+        NNum n            -> numStep n      st
+        NAp f x           -> apStep  f x    st
+        NSupercomb n as b -> ncStep  n as b st
+
+    where
+        numStep :: Int -> TiState -> TiState
+        numStep _ _ = error "number applied as function..."
+
+        apStep :: Addr -> Addr -> TiState -> TiState
+        apStep f x (TiState s d h g sts) =
+            TiState (f:s) d h g sts
+
+        ncStep :: Name -> [Name] -> Expr -> TiState -> TiState
+        ncStep n as b (TiState s d h g sts) =
+            TiState s' d h' g sts
+            where
+                s' = resAddr : drop (length as + 1) s
+                (h', resAddr) = instantiate b h env
+                env = argBinds ++ g
+                argBinds = as `zip` getArgs h s
+
 isFinal :: TiState -> Bool
 isFinal (TiState [addr] _ h _ _) =
     case hLookup addr h of
         Just a -> isDataNode a
-        _      -> error "i don't wanna properly handle errors rn :3"
+        _      -> error "isFinal: segfault!"
 isFinal (TiState [] _ _ _ _) = error "empty stack..."
 isFinal _ = False
 
@@ -127,4 +126,8 @@ isDataNode _        = False
 doAdmin :: TiState -> TiState
 doAdmin (TiState s d h g stats) = TiState s d h g (stats+1)
 
+testProg :: Program
+testProg = Program
+    [ ScDef "main" [] $ IntP 2
+    ]
 
