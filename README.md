@@ -11,9 +11,8 @@ Listed in order of importance.
 - [ ] Typeclasses
 - [ ] Parametric polymorphism
 - [ ] Hindley-Milner type inference
-- [ ] Newtypes
+- [ ] Newtype coercion
 - [ ] Parallelism
-- [ ] C# interop
 
 ### Milestones
 (This list is incomplete.)
