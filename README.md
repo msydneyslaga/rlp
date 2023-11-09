@@ -21,7 +21,7 @@ Listed in order of importance.
     - [x] Core language
         - [x] AST
     - [ ] Emitter
-        - [ ] Cutesy MSIL Codegen API
+        - [ ] Code-gen (target yet to be decided)
         - [ ] Core language emitter
     - [ ] Core linter (Type-checker)
     - [ ] Optimiser
