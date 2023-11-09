@@ -2,6 +2,7 @@
 module Core where
 ----------------------------------------------------------------------------------
 import Data.Coerce
+import Data.Pretty
 ----------------------------------------------------------------------------------
 
 data Expr = Var Name
@@ -36,6 +37,11 @@ type Name = String
 data ScDef = ScDef Name [Name] Expr
 
 newtype Program = Program [ScDef]
+
+----------------------------------------------------------------------------------
+
+instance Pretty Expr where
+    prettyPrec _ (Var k) = iStr k
 
 ----------------------------------------------------------------------------------
 

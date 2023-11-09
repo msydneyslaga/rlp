@@ -22,6 +22,7 @@ library
                     , TI
     other-modules:    Data.Heap
                     , Control.DFA
+                    , Data.Pretty
 
     -- other-extensions:
     build-depends:    base ^>=4.18.0.0
