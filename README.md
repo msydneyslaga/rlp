@@ -19,8 +19,8 @@ Listed in order of importance.
 (This list is incomplete.)
 
 - [ ] Backend
-    - [ ] Core language
-        - [ ] AST
+    - [x] Core language
+        - [x] AST
     - [ ] Emitter
         - [ ] Cutesy MSIL Codegen API
         - [ ] Core language emitter
