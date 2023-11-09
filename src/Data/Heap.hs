@@ -1,11 +1,12 @@
 module Data.Heap
     ( Heap
+    , Addr
     , alloc
     , update
     , free
-    , hlookup
+    , hLookup
     , addresses
-    , hsize
+    , hSize
     )
     where
 ----------------------------------------------------------------------------------
@@ -15,6 +16,7 @@ import Data.List                    (intersect)
 ----------------------------------------------------------------------------------
 
 data Heap a = Heap [Addr] (Map Addr a)
+    deriving Show
 
 type Addr = Int
 
@@ -50,12 +52,12 @@ update (Heap u m) k v = Heap u (M.adjust (const v) k m)
 free :: Heap a -> Addr -> Heap a
 free (Heap u m) k = Heap (k:u) (M.delete k m)
 
-hlookup :: Heap a -> Addr -> Maybe a
-hlookup (Heap _ m) k = m !? k
+hLookup :: Addr -> Heap a -> Maybe a
+hLookup k (Heap _ m) = m !? k
 
 addresses :: Heap a -> [Addr]
 addresses (Heap _ m) = M.keys m
 
-hsize :: Heap a -> Int
-hsize (Heap _ m) = M.size m
+hSize :: Heap a -> Int
+hSize (Heap _ m) = M.size m
 

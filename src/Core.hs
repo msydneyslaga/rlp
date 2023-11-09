@@ -11,12 +11,14 @@ data Expr = Var Name
           | Lam [Name] Expr
           | App Expr Expr
           | IntP Int
+          deriving Show
 
 infixl 2 :$
 pattern (:$) :: Expr -> Expr -> Expr
 pattern f :$ x = App f x
 
 data Binding = Binding Name Expr
+    deriving Show
 
 infixl 1 :=
 pattern (:=) :: Name -> Expr -> Binding
@@ -24,8 +26,10 @@ pattern k := v = Binding k v
 
 data Rec = Rec
          | NonRec
+         deriving Show
 
 data Alter = Alter Int [Name] Expr
+    deriving Show
 
 type Name = String
 
