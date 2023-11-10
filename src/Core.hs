@@ -4,6 +4,7 @@ module Core where
 import Data.Coerce
 import Data.Pretty
 import Data.List            (intersperse)
+import Data.Function        ((&))
 ----------------------------------------------------------------------------------
 
 data Expr = Var Name
@@ -50,9 +51,40 @@ instance Pretty Expr where
         <> binds <> IBreak
         <> "in " <> prettyPrec 0 e
         where
-            binds = mconcat (fmap f (init bs))
+            binds = mconcat (f <$> init bs)
                  <> IIndent (prettyPrec 0 $ last bs)
             f b = IIndent $ prettyPrec 0 b <> IBreak
+    prettyPrec p (Lam ns e)
+        | p > 0               = iBracket l
+        | otherwise           =          l
+        where
+            l = IStr "λ" <> binds <> " -> " <> prettyPrec 0 e
+            binds = fmap IStr ns & intersperse " " & mconcat
+    prettyPrec p (Case e as)
+        | p > 0               = iBracket c
+        | otherwise           =          c
+        where
+            c = "case " <> IIndent (prettyPrec 0 e <> " of" <> IBreak <> alts)
+            -- TODO: don't break on last alt
+            alts = mconcat $ fmap palt as
+            palt x = IIndent $ prettyPrec 0 x <> IBreak
+    prettyPrec p (App f x)
+        | p > 0               = iBracket a
+        | otherwise           =          a
+        where
+            a = case f of
+                -- application is left-associative; don't increase prec if the
+                -- expression being applied is itself an application
+                (_:$_) -> prettyPrec       p  f <> " " <> prettyPrec (succ p) x
+                _      -> prettyPrec (succ p) f <> " " <> prettyPrec (succ p) x
+
+instance Pretty Alter where
+    prettyPrec p (Alter t bs e)
+        | p > 0     = iBracket a
+        | otherwise =          a
+        where
+            a = "<" <> IStr (show t) <> "> " <> binds <> " -> " <> prettyPrec 0 e
+            binds = mconcat $ intersperse " " (fmap IStr bs)
 
 instance Pretty Binding where
     prettyPrec _ (k := v) = IStr k <> " = " <> prettyPrec 0 v
