@@ -10,6 +10,7 @@ import Data.Set qualified as S
 import Data.Maybe               (fromJust, fromMaybe)
 import Data.List                (mapAccumL)
 import Control.Monad            (guard)
+import Data.Foldable            (traverse_)
 import Data.Function            ((&))
 import Data.Pretty
 import Data.Heap
@@ -69,17 +70,32 @@ getArgs h (sc:s) = fmap f s
             _                -> error "glados yuri"
 
 instantiate :: Expr -> TiHeap -> [(Name, Addr)] -> (TiHeap, Addr)
-instantiate (App f x)  h g = alloc h'' (NAp f' x')
+instantiate (App f x)    h g = alloc h'' (NAp f' x')
     where
         (h', f') = instantiate f h g
         (h'', x') = instantiate x h' g
-instantiate (Var k)    h g = (h, fromMaybe (error "variable not in scope") v)
+instantiate (Var k)      h g =
+    (h, fromMaybe (error $ "variable `" <> k <> "' not in scope") v)
     where v = lookup k g
-instantiate (Case _ _) _ _ = error "cannot instantiate case expressions"
+instantiate (Case _ _)   _ _ = error "cannot instantiate case expressions"
+
+instantiate (Let NonRec bs e) h g = instantiate e h' (g' ++ g)
+    where
+        -- :t mapAccumL @[] @TiHeap @(Name, Expr) @(Name,Addr)
+        --    :: (TiHeap -> (Name, Expr) -> (TiHeap, (Name, Addr)))
+        --    -> TiHeap -> [(Name, Expr)] -> (TiHeap, [(Name, Addr)])
+        (h', g') = mapAccumL instBinder h bs
+        instBinder :: TiHeap -> Binding -> (TiHeap, (Name, Addr))
+        instBinder h (k := v) =
+            let (h',a) = instantiate v h g
+            in (h',(k,a))
+
+-- instantiate (Let Rec ((k:=v):bs) e) h g = instantiate e h' ((k,a):g)
+--     where (h',a) = instantiate v h g
 
 instantiate (Prim (IntP n)) h _ = alloc h (NNum n)
 
-instantiate _          _ _ = error "unimplemented"
+instantiate _ _ _ = error "unimplemented"
 
 ----------------------------------------------------------------------------------
 
@@ -130,10 +146,13 @@ isDataNode _        = False
 doAdmin :: TiState -> TiState
 doAdmin (TiState s d h g sts) = TiState s d h g (sts+1)
 
+dbgProg :: Program -> IO ()
+dbgProg p = prettyPrint `traverse_` eval (fromJust $ compile p)
+
 testProg :: Program
 testProg = Program
     -- [ ScDef "main" [] $ Prim IntAddP :$ Prim (IntP 2) :$ Prim (IntP 3)
-    [ ScDef "main" [] $ Var "id" :$ Prim (IntP 2)
+    [ ScDef "main" [] $ Let NonRec ["x" := Prim (IntP 2)] (Var "x")
     ]
 
 instance Pretty TiState where
