@@ -1,8 +1,9 @@
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PatternSynonyms, OverloadedStrings #-}
 module Core where
 ----------------------------------------------------------------------------------
 import Data.Coerce
 import Data.Pretty
+import Data.List            (intersperse)
 ----------------------------------------------------------------------------------
 
 data Expr = Var Name
@@ -27,7 +28,7 @@ pattern k := v = Binding k v
 
 data Rec = Rec
          | NonRec
-         deriving Show
+         deriving (Show, Eq)
 
 data Alter = Alter Int [Name] Expr
     deriving Show
@@ -41,7 +42,20 @@ newtype Program = Program [ScDef]
 ----------------------------------------------------------------------------------
 
 instance Pretty Expr where
-    prettyPrec _ (Var k) = iStr k
+    prettyPrec _ (Var k)      = IStr k
+    prettyPrec _ (IntP n)     = IStr $ show n
+    prettyPrec _ (Con _ _)    = undefined
+    prettyPrec _ (Let r bs e) =
+        IStr (if r == Rec then "letrec " else "let ")
+        <> binds <> IBreak
+        <> "in " <> prettyPrec 0 e
+        where
+            binds = mconcat (fmap f (init bs))
+                 <> IIndent (prettyPrec 0 $ last bs)
+            f b = IIndent $ prettyPrec 0 b <> IBreak
+
+instance Pretty Binding where
+    prettyPrec _ (k := v) = IStr k <> " = " <> prettyPrec 0 v
 
 ----------------------------------------------------------------------------------
 
