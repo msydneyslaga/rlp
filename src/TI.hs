@@ -90,8 +90,14 @@ instantiate (Let NonRec bs e) h g = instantiate e h' (g' ++ g)
             let (h',a) = instantiate v h g
             in (h',(k,a))
 
--- instantiate (Let Rec ((k:=v):bs) e) h g = instantiate e h' ((k,a):g)
---     where (h',a) = instantiate v h g
+instantiate (Let Rec bs e) h g = instantiate e h' env
+    where
+        env = g' ++ g
+        (h', g') = mapAccumL instBinder h bs
+        instBinder :: TiHeap -> Binding -> (TiHeap, (Name, Addr))
+        instBinder h (k := v) =
+            let (h',a) = instantiate v h env
+            in (h',(k,a))
 
 instantiate (Prim (IntP n)) h _ = alloc h (NNum n)
 
@@ -149,10 +155,19 @@ doAdmin (TiState s d h g sts) = TiState s d h g (sts+1)
 dbgProg :: Program -> IO ()
 dbgProg p = prettyPrint `traverse_` eval (fromJust $ compile p)
 
-testProg :: Program
-testProg = Program
+letrecExample :: Program
+letrecExample = Program
     -- [ ScDef "main" [] $ Prim IntAddP :$ Prim (IntP 2) :$ Prim (IntP 3)
-    [ ScDef "main" [] $ Let NonRec ["x" := Prim (IntP 2)] (Var "x")
+    [ ScDef "pair" ["x","y","f"] $ "f" :$ "x" :$ "y"
+    , ScDef "fst" ["p"] $ "p" :$ "K"
+    , ScDef "snd" ["p"] $ "p" :$ "K1"
+    , ScDef "f" ["x","y"] $
+        Let Rec
+            [ "a" := "pair" :$ "x" :$ "b"
+            , "b" := "pair" :$ "y" :$ "a"
+            ]
+            ("fst" :$ ("snd" :$ ("snd" :$ ("snd" :$ "a"))))
+    , ScDef "main" [] $ "f" :$ Prim (IntP 3) :$ Prim (IntP 4)
     ]
 
 instance Pretty TiState where

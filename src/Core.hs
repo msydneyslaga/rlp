@@ -5,6 +5,7 @@ import Data.Coerce
 import Data.Pretty
 import Data.List            (intersperse)
 import Data.Function        ((&))
+import Data.String
 ----------------------------------------------------------------------------------
 
 data Expr = Var Name
@@ -43,6 +44,9 @@ type Name = String
 data ScDef = ScDef Name [Name] Expr
 
 newtype Program = Program [ScDef]
+
+instance IsString Expr where
+    fromString = Var
 
 ----------------------------------------------------------------------------------
 
