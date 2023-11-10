@@ -1,7 +1,12 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Data.Pretty
     ( Pretty(..)
     , ISeq(..)
+    , precPretty
+    , prettyPrint
     , iBracket
+    , withPrec
+    , bracketPrec
     )
     where
 ----------------------------------------------------------------------------------
@@ -9,12 +14,18 @@ import Data.String      (IsString(..))
 ----------------------------------------------------------------------------------
 
 class Pretty a where
-    pretty :: a -> String
-    prettyPrec :: Int -> a -> ISeq
+    pretty :: a -> ISeq
+    prettyPrec :: a -> Int -> ISeq
 
-    pretty = squash . prettyPrec 0
-    prettyPrec _ a = iBracket (IStr $ pretty a)
     {-# MINIMAL pretty | prettyPrec #-}
+    pretty a = prettyPrec a 0
+    prettyPrec a _ = iBracket (pretty a)
+
+precPretty :: (Pretty a) => Int -> a -> ISeq
+precPretty = flip prettyPrec
+
+prettyPrint :: (Pretty a) => a -> IO ()
+prettyPrint = putStr . squash . pretty
 
 data ISeq where
     INil :: ISeq
@@ -46,3 +57,16 @@ flatten c ((IIndent s,   i) : ss) = flatten c ((s,c) : ss)
 iBracket :: ISeq -> ISeq
 iBracket s = IStr "(" <> s <> IStr ")"
 
+withPrec :: Int -> ISeq -> Int -> ISeq
+withPrec n s p
+    | p > n     = iBracket s
+    | otherwise =          s
+
+bracketPrec :: Int -> Int -> ISeq -> ISeq
+bracketPrec n p s = withPrec n s p
+
+----------------------------------------------------------------------------------
+
+instance (Pretty a) => Pretty (Maybe a) where
+    prettyPrec (Just a) p = prettyPrec a p
+    prettyPrec Nothing  p = "<Nothing>"

@@ -13,7 +13,11 @@ data Expr = Var Name
           | Case Expr [Alter]
           | Lam [Name] Expr
           | App Expr Expr
-          | IntP Int
+          | Prim Prim
+          deriving Show
+
+data Prim = IntP Int
+          | IntAddP
           deriving Show
 
 infixl 2 :$
@@ -43,51 +47,46 @@ newtype Program = Program [ScDef]
 ----------------------------------------------------------------------------------
 
 instance Pretty Expr where
-    prettyPrec _ (Var k)      = IStr k
-    prettyPrec _ (IntP n)     = IStr $ show n
-    prettyPrec _ (Con _ _)    = undefined
-    prettyPrec _ (Let r bs e) =
+    prettyPrec (Var k)      = withPrec maxBound $ IStr k
+    prettyPrec (Prim n)     = prettyPrec n
+    prettyPrec (Con _ _)    = undefined
+    prettyPrec (Let r bs e) = withPrec 0 $
         IStr (if r == Rec then "letrec " else "let ")
         <> binds <> IBreak
-        <> "in " <> prettyPrec 0 e
+        <> "in " <> pretty e
         where
             binds = mconcat (f <$> init bs)
-                 <> IIndent (prettyPrec 0 $ last bs)
-            f b = IIndent $ prettyPrec 0 b <> IBreak
-    prettyPrec p (Lam ns e)
-        | p > 0               = iBracket l
-        | otherwise           =          l
+                 <> IIndent (pretty $ last bs)
+            f b = IIndent $ pretty b <> IBreak
+    prettyPrec (Lam ns e)   = withPrec 0 $ 
+        IStr "λ" <> binds <> " -> " <> pretty e
         where
-            l = IStr "λ" <> binds <> " -> " <> prettyPrec 0 e
             binds = fmap IStr ns & intersperse " " & mconcat
-    prettyPrec p (Case e as)
-        | p > 0               = iBracket c
-        | otherwise           =          c
+    prettyPrec (Case e as)   = withPrec 0 $
+            "case " <> IIndent (pretty e <> " of" <> IBreak <> alts)
         where
-            c = "case " <> IIndent (prettyPrec 0 e <> " of" <> IBreak <> alts)
             -- TODO: don't break on last alt
             alts = mconcat $ fmap palt as
-            palt x = IIndent $ prettyPrec 0 x <> IBreak
-    prettyPrec p (App f x)
-        | p > 0               = iBracket a
-        | otherwise           =          a
-        where
-            a = case f of
-                -- application is left-associative; don't increase prec if the
-                -- expression being applied is itself an application
-                (_:$_) -> prettyPrec       p  f <> " " <> prettyPrec (succ p) x
-                _      -> prettyPrec (succ p) f <> " " <> prettyPrec (succ p) x
+            palt x = IIndent $ pretty x <> IBreak
+    prettyPrec (App f x) = \p -> bracketPrec 0 p $
+        case f of
+            -- application is left-associative; don't increase prec if the
+            -- expression being applied is itself an application
+            (_:$_) -> precPretty       p  f <> " " <> precPretty (succ p) x
+            _      -> precPretty (succ p) f <> " " <> precPretty (succ p) x
 
 instance Pretty Alter where
-    prettyPrec p (Alter t bs e)
-        | p > 0     = iBracket a
-        | otherwise =          a
+    prettyPrec (Alter t bs e) = withPrec 0 $
+            "<" <> IStr (show t) <> "> " <> binds <> " -> " <> pretty e
         where
-            a = "<" <> IStr (show t) <> "> " <> binds <> " -> " <> prettyPrec 0 e
             binds = mconcat $ intersperse " " (fmap IStr bs)
 
 instance Pretty Binding where
-    prettyPrec _ (k := v) = IStr k <> " = " <> prettyPrec 0 v
+    prettyPrec (k := v) = withPrec 0 $ IStr k <> " = " <> precPretty 0 v
+
+instance Pretty Prim where
+    prettyPrec (IntP n) = withPrec maxBound $ IStr $ show n ++ "#"
+    prettyPrec IntAddP  = withPrec maxBound $ "+#"
 
 ----------------------------------------------------------------------------------
 

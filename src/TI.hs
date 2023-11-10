@@ -1,4 +1,5 @@
-{-# LANGUAGE LambdaCase, BlockArguments, ViewPatterns #-}
+{-# LANGUAGE LambdaCase, BlockArguments #-}
+{-# LANGUAGE OverloadedStrings #-}
 module TI
     where
 ----------------------------------------------------------------------------------
@@ -10,6 +11,7 @@ import Data.Maybe               (fromJust, fromMaybe)
 import Data.List                (mapAccumL)
 import Control.Monad            (guard)
 import Data.Function            ((&))
+import Data.Pretty
 import Data.Heap
 import Control.DFA
 import Core
@@ -67,7 +69,6 @@ getArgs h (sc:s) = fmap f s
             _                -> error "glados yuri"
 
 instantiate :: Expr -> TiHeap -> [(Name, Addr)] -> (TiHeap, Addr)
-instantiate (IntP n)   h _ = alloc h (NNum n)
 instantiate (App f x)  h g = alloc h'' (NAp f' x')
     where
         (h', f') = instantiate f h g
@@ -75,6 +76,9 @@ instantiate (App f x)  h g = alloc h'' (NAp f' x')
 instantiate (Var k)    h g = (h, fromMaybe (error "variable not in scope") v)
     where v = lookup k g
 instantiate (Case _ _) _ _ = error "cannot instantiate case expressions"
+
+instantiate (Prim (IntP n)) h _ = alloc h (NNum n)
+
 instantiate _          _ _ = error "unimplemented"
 
 ----------------------------------------------------------------------------------
@@ -99,7 +103,7 @@ step st =
         numStep _ _ = error "number applied as function..."
 
         apStep :: Addr -> Addr -> TiState -> TiState
-        apStep f x (TiState s d h g sts) =
+        apStep f _ (TiState s d h g sts) =
             TiState (f:s) d h g sts
 
         ncStep :: Name -> [Name] -> Expr -> TiState -> TiState
@@ -124,10 +128,21 @@ isDataNode (NNum _) = True
 isDataNode _        = False
 
 doAdmin :: TiState -> TiState
-doAdmin (TiState s d h g stats) = TiState s d h g (stats+1)
+doAdmin (TiState s d h g sts) = TiState s d h g (sts+1)
 
 testProg :: Program
 testProg = Program
-    [ ScDef "main" [] $ IntP 2
+    -- [ ScDef "main" [] $ Prim IntAddP :$ Prim (IntP 2) :$ Prim (IntP 3)
+    [ ScDef "main" [] $ Var "id" :$ Prim (IntP 2)
     ]
+
+instance Pretty TiState where
+    prettyPrec (TiState s d h g sts) _ =
+        "==== TiState Stack ====" <> IBreak
+        <> mconcat (fmap ((<>IBreak) . showAddr) s)
+        where
+            showAddr a = IStr (show a) <> ": " <> precPretty 0 (hLookup a h)
+
+instance Pretty Node where
+    prettyPrec a _ = IStr $ show a
 
