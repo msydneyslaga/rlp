@@ -225,9 +225,6 @@ instance Pretty TiState where
 
             pnode (NSupercomb n _ _) _ = IStr n
 
-            pnodeRef :: Addr -> Int -> ISeq
-            pnodeRef a p = IStr (show a) <> "@" <> pnode (hLookupUnsafe a h) p
-
             -- pnoderef :: Addr -> Int -> ISeq
             -- pnoderef a p = bracketPrec 0 p $
             --     IStr (show a) <> " -> " <> pnode (hLookupUnsafe a h) 0
