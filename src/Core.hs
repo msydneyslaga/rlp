@@ -121,6 +121,6 @@ corePrelude = Program
     , ScDef "K1" ["x", "y"] (Var "y")
     , ScDef "S" ["f", "g", "x"] (Var "f" :$ Var "x" :$ (Var "g" :$ Var "x"))
     , ScDef "compose" ["f", "g", "x"] (Var "f" :$ (Var "g" :$ Var "x"))
-    , ScDef "twice" ["f", "g", "x"] (Var "f" :$ (Var "g" :$ Var "x"))
+    , ScDef "twice" ["f", "x"] (Var "f" :$ (Var "f" :$ Var "x"))
     ]
 

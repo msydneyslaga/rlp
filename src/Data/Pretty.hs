@@ -4,6 +4,7 @@ module Data.Pretty
     , ISeq(..)
     , precPretty
     , prettyPrint
+    , prettyShow
     , iBracket
     , withPrec
     , bracketPrec
@@ -26,6 +27,9 @@ precPretty = flip prettyPrec
 
 prettyPrint :: (Pretty a) => a -> IO ()
 prettyPrint = putStr . squash . pretty
+
+prettyShow :: (Pretty a) => a -> String
+prettyShow = squash . pretty
 
 data ISeq where
     INil :: ISeq

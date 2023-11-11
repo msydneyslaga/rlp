@@ -5,6 +5,7 @@ module Data.Heap
     , update
     , free
     , hLookup
+    , hLookupUnsafe
     , addresses
     , hSize
     )
@@ -54,6 +55,11 @@ free (Heap u m) k = Heap (k:u) (M.delete k m)
 
 hLookup :: Addr -> Heap a -> Maybe a
 hLookup k (Heap _ m) = m !? k
+
+hLookupUnsafe :: Addr -> Heap a -> a
+hLookupUnsafe k (Heap _ m) = case m !? k of
+    Just a  -> a
+    Nothing -> error "erm... segfault much?"
 
 addresses :: Heap a -> [Addr]
 addresses (Heap _ m) = M.keys m
