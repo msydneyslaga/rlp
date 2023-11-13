@@ -20,6 +20,7 @@ Listed in order of importance.
 - [ ] Backend
     - [x] Core language
         - [x] AST
+    - [ ] Low-level model (STG)
     - [ ] Emitter
         - [ ] Code-gen (target yet to be decided)
         - [ ] Core language emitter
