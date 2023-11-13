@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase, BlockArguments #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 module TI
     where
 ----------------------------------------------------------------------------------
@@ -26,12 +27,12 @@ type TiHeap = Heap Node
 
 data Node = NAp Addr Addr
           | NSupercomb Name [Name] Expr
+          | NPrim Name Prim
           | NNum Int
           | NInd Addr
           deriving Show
 
-data Dump = DumpTempDummy
-    deriving Show
+type Dump = [[Addr]]
 
 type Stats = Int
 
@@ -49,29 +50,46 @@ compile :: Program -> Maybe TiState
 compile prog = Just $ TiState s d h g stats
     where
         s = [mainAddr]
-        d = DumpTempDummy
+        d = []
         (h,g) = buildInitialHeap defs
-        defs = prog -- <> corePrelude
+        defs = prog <> corePrelude
         stats = 0
 
         mainAddr = fromJust $ lookup "main" g
 
 buildInitialHeap :: Program -> (TiHeap, [(Name, Addr)])
-buildInitialHeap (Program scdefs) = mapAccumL allocateSc mempty scdefs
+buildInitialHeap (Program scDefs) = (h'', scAddrs ++ primAddrs)
     where
+        h = mempty
+
+        (h', scAddrs) = mapAccumL allocateSc h scDefs
+        (h'', primAddrs) = mapAccumL allocatePrim h' primitives
+
         allocateSc :: TiHeap -> ScDef -> (TiHeap, (Name, Addr))
         allocateSc h (ScDef n a b) = (h', (n, addr))
             where
                 (h', addr) = alloc h (NSupercomb n a b)
+
+        allocatePrim :: TiHeap -> (Name, Prim) -> (TiHeap, (Name, Addr))
+        allocatePrim h (n, p) = (h', (n, addr))
+            where (h', addr) = alloc h (NPrim n p)
+
+primitives :: [(Name, Prim)]
+primitives =
+    [ ("negate#",   IntNegP)
+    , ("+#",        IntAddP)
+    ]
 
 instantiate :: Expr -> TiHeap -> [(Name, Addr)] -> (TiHeap, Addr)
 instantiate (App f x)    h g = alloc h'' (NAp f' x')
     where
         (h', f') = instantiate f h g
         (h'', x') = instantiate x h' g
+
 instantiate (Var k)      h g =
     (h, fromMaybe (error $ "variable `" <> k <> "' not in scope") v)
     where v = lookup k g
+
 instantiate (Case _ _)   _ _ = error "cannot instantiate case expressions"
 
 instantiate (Let NonRec bs e) h g = instantiate e h' (g' ++ g)
@@ -95,8 +113,41 @@ instantiate (Let Rec bs e) h g = instantiate e h' env
             in (h',(k,a))
 
 instantiate (Prim (IntP n)) h _ = alloc h (NNum n)
+instantiate (Prim p) h _ = alloc h (NPrim n p)
+    where
+        n = fromMaybe
+                (error $ "primitive `" <> show p <> "' has no associated name")
+                $ lookupV p primitives
+
+        lookupV v d = fmap (\ (a,b) -> (b,a)) d
+                    & lookup v
 
 instantiate _ _ _ = error "unimplemented"
+
+-- instantiate and update
+instantiateU :: Expr -> Addr -> TiHeap -> [(Name, Addr)] -> TiHeap
+instantiateU (App f x) root h g = update h'' root (NAp f' x')
+    where
+        (h',f') = instantiate f h g
+        (h'',x') = instantiate x h' g
+
+instantiateU (Case _ _) _ _ _ = error "cannot instantiate case expressions"
+
+instantiateU (Var k) root h g = update h' root (NInd a)
+    where (h',a) = instantiate (Var k) h g
+
+-- i don't really know if this is correct tbh i'm gonna cry
+instantiateU (Let NonRec bs e) root h g = h''
+    where
+        h'' = instantiateU e root h' (g' ++ g)
+        (h', g') = mapAccumL instBinder h bs
+
+        instBinder :: TiHeap -> Binding -> (TiHeap, (Name, Addr))
+        instBinder h (k := v) =
+            let (h',a) = instantiate v h g
+            in (h',(k,a))
+
+instantiateU (Prim (IntP n)) root h _ = update h root (NNum n)
 
 ----------------------------------------------------------------------------------
 
@@ -111,10 +162,11 @@ step :: TiState -> TiState
 step st =
     let TiState (top:_) _ h _ _ = st
     in case fromMaybe (error "segfault!") (hLookup top h) of
-        NNum n            -> numStep n      st
-        NAp f x           -> apStep  f x    st
-        NSupercomb n as b -> scStep  n as b st
-        NInd a            -> indStep a      st
+        NNum n            -> numStep  n      st
+        NAp f x           -> apStep   f x    st
+        NSupercomb n as b -> scStep   n as b st
+        NInd a            -> indStep  a      st
+        NPrim n p         -> primStep n p    st
 
     where
         numStep :: Int -> TiState -> TiState
@@ -140,12 +192,24 @@ step st =
         indStep a (TiState s d h g sts) =
             TiState (a:s) d h g sts
 
+        primStep :: Name -> Prim -> TiState -> TiState
+        primStep n IntNegP (TiState (neg:s) d h g sts) =
+            case s of
+                [view -> NAp _ (view -> NNum b)] ->
+                    TiState s' d h' g sts
+                    where
+                        h' = update h a1 (NNum (-b)) 
+                        s' = [a1]
+                        a1 = head s
+
+            where view = flip hLookupUnsafe h
+
 getArgs :: TiHeap -> [Addr] -> [Addr]
-getArgs h (sc:s) = fmap f s
+getArgs h (_:s) = fmap f s
     where
-        f addr = case hLookup addr h of
-            Just (NAp _ arg) -> arg
-            _                -> error "glados yuri"
+        f addr = case hLookupUnsafe addr h of
+            NAp _ arg -> arg
+            _         -> error "glados yuri"
 
 isFinal :: TiState -> Bool
 isFinal (TiState [addr] _ h _ _) =
@@ -162,8 +226,15 @@ isDataNode _        = False
 doAdmin :: TiState -> TiState
 doAdmin (TiState s d h g sts) = TiState s d h g (sts+1)
 
-dbgProg :: Program -> IO ()
-dbgProg p = prettyPrint `traverse_` eval (fromJust $ compile p)
+dbgProg :: Program -> IO Node
+dbgProg p = do
+    prettyPrint `traverse` p'
+    let TiState [a] _ h _ _ = last p'
+    pure res
+    where
+        p' = eval (fromJust $ compile p)
+        TiState [resAddr] _ h _ _ = last p'
+        res = hLookupUnsafe resAddr h
 
 hdbgProg :: Program -> Handle -> IO ()
 hdbgProg p h = (hPutStr h . prettyShow) `traverse_` eval (fromJust $ compile p)
@@ -189,6 +260,11 @@ indExample1 = Program
 
 indExample2 :: Program
 indExample2 = Program
+    [ ScDef "main" [] $ "twice" :$ "twice" :$ "twice" :$ "id" :$ Prim (IntP 3)
+    ]
+
+indExample3 :: Program
+indExample3 = Program
     [ ScDef "main" [] $
         Let Rec
             [ "x" := Prim (IntP 2)
@@ -197,6 +273,18 @@ indExample2 = Program
             ("g" :$ "y" :$ "y")
     , ScDef "f" ["a","b"] $ "b"
     , ScDef "g" ["a","b"] $ "a"
+    ]
+
+negExample :: Program
+negExample = Program
+    [ ScDef "main" [] $
+        Prim IntNegP :$ Prim (IntP 3)
+    ]
+
+t :: Program
+t = Program
+    [ ScDef "f" ["x"] $ "+" :$ ("id" :$ "x") :$ "x"
+    , ScDef "main" [] $ "f" :$ ("id" :$ Prim (IntP 4))
     ]
 
 instance Pretty TiState where
@@ -224,6 +312,8 @@ instance Pretty TiState where
                 IStr (show n) <> IStr "#"
 
             pnode (NSupercomb n _ _) _ = IStr n
+
+            pnode (NPrim n _) _ = IStr n
 
             -- pnoderef :: Addr -> Int -> ISeq
             -- pnoderef a p = bracketPrec 0 p $

@@ -19,7 +19,8 @@ data Expr = Var Name
 
 data Prim = IntP Int
           | IntAddP
-          deriving Show
+          | IntNegP
+          deriving (Show, Eq)
 
 infixl 2 :$
 pattern (:$) :: Expr -> Expr -> Expr
