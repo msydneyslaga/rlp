@@ -21,6 +21,8 @@ Listed in order of importance.
     - [x] Core language
         - [x] AST
     - [ ] Low-level model (STG)
+        - [x] Syntax
+        - [ ] Arithmetic
     - [ ] Emitter
         - [ ] Code-gen (target yet to be decided)
         - [ ] Core language emitter
