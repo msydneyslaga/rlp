@@ -320,6 +320,12 @@ negExample2 = Program
         Prim IntNegP :$ Prim (IntP 3)
     ]
 
+negExample3 :: Program
+negExample3 = Program
+    [ ScDef "main" [] $
+        "twice" :$ Prim IntNegP :$ Prim (IntP 3)
+    ]
+
 ----------------------------------------------------------------------------------
 
 instance Pretty TiState where
