@@ -183,11 +183,10 @@ step st =
         apStep f _ (TiState (ap:s) d h g sts) =
             case hLookupUnsafe ap h of
                 -- rule 2.8
-                NAp f (hViewUnsafe h -> NInd x') ->
-                    TiState (ap:s) d h' g sts
+                NAp f (hViewUnsafe h -> NInd a) ->
+                    TiState (ap:s) d h' g 666
                     where
-                        h' = (update h x $ NAp f x')
-                        NAp _ x = hLookupUnsafe ap h
+                        h' = (update h ap $ NAp f a)
                         -- this is bad rewrite later :3
 
                 _ ->
@@ -210,42 +209,35 @@ step st =
             TiState (a:s) d h g sts
 
         primStep :: Name -> Prim -> TiState -> TiState
-        primStep n IntNegP (TiState (a:s) d h g sts) =
-            case s of
-                -- (rule 2.5)
-                [hViewUnsafe h -> NAp _ (hViewUnsafe h -> NNum b)] ->
-                    TiState s' d h' g sts
+        primStep n IntNegP (TiState s d h g sts) =
+            case isDataNode arg of
+                True  -> TiState s'' d h' g sts
                     where
-                        h' = update h a1 (NNum (-b)) 
-                        s' = [a1]
-                        a1 = head s
+                        h' = update h rootAddr (NNum $ negate n)
+                        s'' = rootAddr : s'
+                        (_:rootAddr:s') = s
+                        NNum n = arg
 
-                -- (rule 2.6)
-                [hViewUnsafe h -> NAp a1@(hViewUnsafe h -> NPrim _ IntNegP) b] ->
-                    TiState s' d' h g sts
+                False -> TiState s'' d' h g sts
                     where
-                        s' = [b]
+                        s'' = b : s'
+                        NAp _ b = hLookupUnsafe a1 h
+                        -- a1 is an NAp
+                        (_:a1:s') = s
                         d' = [a1] : d
-
-                x -> error $ show x
-
-                -- -- (rule 2.6)
-                -- [view -> NAp (view -> NPrim _ IntNegP) b] ->
-                --     TiState s' d' h g sts
-                --     where
-                --         d' = [a,a1] : d
-                --         s' = [b]
-                --         a1 = head s
+            where
+                [argAddr] = getArgs h s
+                arg = hLookupUnsafe argAddr h
 
 getArgs :: TiHeap -> [Addr] -> [Addr]
 getArgs h (_:s) = fmap f s
     where
         f addr = case hLookupUnsafe addr h of
             NAp _ arg -> arg
-            _         -> error "glados yuri"
+            _         -> error $ "major uh-oh: " ++ show addr
 
 isFinal :: TiState -> Bool
-isFinal (TiState [addr] _ h _ _) =
+isFinal (TiState [addr] [] h _ _) =
     case hLookup addr h of
         Just a -> isDataNode a
         _      -> error "isFinal: segfault!"
