@@ -8,6 +8,8 @@ module Data.Heap
     , hLookupUnsafe
     , addresses
     , hSize
+    , hView
+    , hViewUnsafe
     )
     where
 ----------------------------------------------------------------------------------
@@ -66,4 +68,12 @@ addresses (Heap _ m) = M.keys m
 
 hSize :: Heap a -> Int
 hSize (Heap _ m) = M.size m
+
+-- | Intended for use with view patterns
+hView :: Heap a -> Addr -> Maybe a
+hView = flip hLookup
+
+-- | Intended for use with view patterns
+hViewUnsafe :: Heap a -> Addr -> a
+hViewUnsafe = flip hLookupUnsafe
 
