@@ -1,5 +1,20 @@
 {-# LANGUAGE PatternSynonyms, OverloadedStrings #-}
-module Core where
+module Core
+    ( Expr(..)
+    , pattern (:$)
+    , Binding(..)
+    , pattern (:=)
+    , Rec(..)
+    , Alter(..)
+    , Name
+    , ScDef(..)
+    , Program(..)
+    , corePrelude
+    , bindersOf
+    , rhssOf
+    , isAtomic
+    )
+    where
 ----------------------------------------------------------------------------------
 import Data.Coerce
 import Data.Pretty
