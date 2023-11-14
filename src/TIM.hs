@@ -9,7 +9,7 @@ import Data.Map qualified as M
 import Data.Set                 (Set)
 import Data.Set qualified as S
 import Data.Maybe               (fromJust, fromMaybe)
-import Data.List                (mapAccumL)
+import Data.List                (mapAccumL, intersperse)
 import Control.Monad            (guard)
 import Data.Foldable            (traverse_)
 import Data.Function            ((&))
@@ -30,6 +30,7 @@ data Node = NAp Addr Addr
           | NPrim Name Prim
           | NNum Int
           | NInd Addr
+          | NData Int [Addr] -- NData Tag [Component]
           deriving Show
 
 type Dump = [[Addr]]
@@ -38,7 +39,7 @@ type Stats = Int
 
 ----------------------------------------------------------------------------------
 
-data Prim = PrimConstr Int Int -- PrimConstr Tag Arity
+data Prim = ConP Int Int -- ConP Tag Arity
           | IntP Int
           | IntAddP
           | IntSubP
@@ -108,6 +109,8 @@ instantiate (Var k)      h g =
     (h, fromMaybe (error $ "variable `" <> k <> "' not in scope") v)
     where v = lookup k g
 
+instantiate (Con t a) h _ = alloc h $ NPrim "Pack" (ConP t a)
+
 instantiate (Case _ _)   _ _ = error "cannot instantiate case expressions"
 
 instantiate (Let NonRec bs e) h g = instantiate e h' (g' ++ g)
@@ -142,6 +145,10 @@ instantiateU (App f x) root h g = update h'' root (NAp f' x')
         (h'',x') = instantiate x h' g
 
 instantiateU (Case _ _) _ _ _ = error "cannot instantiate case expressions"
+
+instantiateU (Con t a) root h g = update h root c
+    where
+        c = NPrim "Pack" (ConP t a)
 
 instantiateU (Var k) root h g = update h' root (NInd a)
     where (h',a) = instantiate (Var k) h g
@@ -245,6 +252,8 @@ step st =
         primStep _ IntMulP st = primBinOp (*) st
         primStep _ IntDivP st = primBinOp (div) st
 
+        -- primStep _ 
+
 primBinOp :: (Int -> Int -> Int) -> TiState -> TiState
 primBinOp f (TiState s d h g sts) =
     case isDataNode xarg of
@@ -289,8 +298,9 @@ isFinal (TiState [] _ _ _ _) = error "empty stack..."
 isFinal _ = False
 
 isDataNode :: Node -> Bool
-isDataNode (NNum _) = True
-isDataNode _        = False
+isDataNode (NNum _)    = True
+isDataNode (NData _ _) = True
+isDataNode _           = False
 
 doAdmin :: TiState -> TiState
 doAdmin (TiState s d h g sts) = TiState s d h g (sts+1)
@@ -410,5 +420,14 @@ instance Pretty TiState where
 
             pnode (NSupercomb n _ _) _ = IStr n
 
+            pnode (NPrim n (ConP t a)) _ = IStr $ printf "%s{%d,%d}" n t a
+
             pnode (NPrim n _) _ = IStr n
+
+            pnode (NData t cs) p = "NData{" <> IStr (show t) <> "}" <> m
+                where
+                    m = cs
+                      & fmap (\a -> pnode (hLookupUnsafe a h) (succ p))
+                      & intersperse " "
+                      & mconcat
 

@@ -129,5 +129,7 @@ corePrelude = Program
     , ScDef "S" ["f", "g", "x"] (Var "f" :$ Var "x" :$ (Var "g" :$ Var "x"))
     , ScDef "compose" ["f", "g", "x"] (Var "f" :$ (Var "g" :$ Var "x"))
     , ScDef "twice" ["f", "x"] (Var "f" :$ (Var "f" :$ Var "x"))
+    , ScDef "False" [] $ Con 0 0
+    , ScDef "True" [] $ Con 1 0
     ]
 
