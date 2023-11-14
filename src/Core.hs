@@ -17,15 +17,6 @@ data Expr = Var Name
           | IntE Int
           deriving Show
 
-data Prim = PrimConstr Int Int -- PrimConstr Tag Arity
-          | IntP Int
-          | IntAddP
-          | IntSubP
-          | IntMulP
-          | IntDivP
-          | IntNegP
-          deriving (Show, Eq)
-
 infixl 2 :$
 pattern (:$) :: Expr -> Expr -> Expr
 pattern f :$ x = App f x
@@ -92,10 +83,6 @@ instance Pretty Alter where
 
 instance Pretty Binding where
     prettyPrec (k := v) = withPrec 0 $ IStr k <> " = " <> precPretty 0 v
-
-instance Pretty Prim where
-    prettyPrec (IntP n) = withPrec maxBound $ IStr $ show n ++ "#"
-    prettyPrec IntAddP  = withPrec maxBound $ "+#"
 
 ----------------------------------------------------------------------------------
 

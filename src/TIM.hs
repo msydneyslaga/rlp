@@ -38,6 +38,21 @@ type Stats = Int
 
 ----------------------------------------------------------------------------------
 
+data Prim = PrimConstr Int Int -- PrimConstr Tag Arity
+          | IntP Int
+          | IntAddP
+          | IntSubP
+          | IntMulP
+          | IntDivP
+          | IntNegP
+          deriving (Show, Eq)
+
+instance Pretty Prim where
+    prettyPrec (IntP n) = withPrec maxBound $ IStr $ show n ++ "#"
+    prettyPrec IntAddP  = withPrec maxBound $ "+#"
+
+----------------------------------------------------------------------------------
+
 tiStatIncSteps :: Stats -> Stats
 tiStatIncSteps = (+1)
 
