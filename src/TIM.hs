@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase, BlockArguments #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
-module TI
+module TIM
     where
 ----------------------------------------------------------------------------------
 import Data.Map                 (Map, (!?), (!))
