@@ -21,7 +21,6 @@ library
     exposed-modules:  Core
                     , TI
     other-modules:    Data.Heap
-                    , Control.DFA
                     , Data.Pretty
 
     -- other-extensions:

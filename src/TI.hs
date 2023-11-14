@@ -14,9 +14,9 @@ import Control.Monad            (guard)
 import Data.Foldable            (traverse_)
 import Data.Function            ((&))
 import System.IO                (Handle, hPutStr)
+import Text.Printf              (printf)
 import Data.Pretty
 import Data.Heap
-import Control.DFA
 import Core
 ----------------------------------------------------------------------------------
 
@@ -170,11 +170,28 @@ step st =
 
     where
         numStep :: Int -> TiState -> TiState
+
+        -- rule 2.7
+        numStep _ (TiState [a] (s:d) h g sts) =
+            case hLookupUnsafe a h of
+                NNum n -> TiState s d h g sts
+
         numStep _ _ = error "number applied as function..."
 
         apStep :: Addr -> Addr -> TiState -> TiState
-        apStep f _ (TiState s d h g sts) =
-            TiState (f:s) d h g sts
+
+        apStep f _ (TiState (ap:s) d h g sts) =
+            case hLookupUnsafe ap h of
+                -- rule 2.8
+                NAp f (hViewUnsafe h -> NInd x') ->
+                    TiState (ap:s) d h' g sts
+                    where
+                        h' = (update h x $ NAp f x')
+                        NAp _ x = hLookupUnsafe ap h
+                        -- this is bad rewrite later :3
+
+                _ ->
+                    TiState (f:ap:s) d h g sts
 
         scStep :: Name -> [Name] -> Expr -> TiState -> TiState
         scStep n as b (TiState s d h g sts) =
@@ -189,20 +206,36 @@ step st =
 
         -- dereference indirections
         indStep :: Addr -> TiState -> TiState
-        indStep a (TiState s d h g sts) =
+        indStep a (TiState (_:s) d h g sts) =
             TiState (a:s) d h g sts
 
         primStep :: Name -> Prim -> TiState -> TiState
-        primStep n IntNegP (TiState (neg:s) d h g sts) =
+        primStep n IntNegP (TiState (a:s) d h g sts) =
             case s of
-                [view -> NAp _ (view -> NNum b)] ->
+                -- (rule 2.5)
+                [hViewUnsafe h -> NAp _ (hViewUnsafe h -> NNum b)] ->
                     TiState s' d h' g sts
                     where
                         h' = update h a1 (NNum (-b)) 
                         s' = [a1]
                         a1 = head s
 
-            where view = flip hLookupUnsafe h
+                -- (rule 2.6)
+                [hViewUnsafe h -> NAp a1@(hViewUnsafe h -> NPrim _ IntNegP) b] ->
+                    TiState s' d' h g sts
+                    where
+                        s' = [b]
+                        d' = [a1] : d
+
+                x -> error $ show x
+
+                -- -- (rule 2.6)
+                -- [view -> NAp (view -> NPrim _ IntNegP) b] ->
+                --     TiState s' d' h g sts
+                --     where
+                --         d' = [a,a1] : d
+                --         s' = [b]
+                --         a1 = head s
 
 getArgs :: TiHeap -> [Addr] -> [Addr]
 getArgs h (_:s) = fmap f s
@@ -226,18 +259,26 @@ isDataNode _        = False
 doAdmin :: TiState -> TiState
 doAdmin (TiState s d h g sts) = TiState s d h g (sts+1)
 
+----------------------------------------------------------------------------------
+
 dbgProg :: Program -> IO Node
 dbgProg p = do
     prettyPrint `traverse` p'
-    let TiState [a] _ h _ _ = last p'
     pure res
     where
         p' = eval (fromJust $ compile p)
         TiState [resAddr] _ h _ _ = last p'
         res = hLookupUnsafe resAddr h
 
-hdbgProg :: Program -> Handle -> IO ()
-hdbgProg p h = (hPutStr h . prettyShow) `traverse_` eval (fromJust $ compile p)
+hdbgProg :: Program -> Handle -> IO Node
+hdbgProg p hio = do
+    (hPutStr hio . prettyShow) `traverse_` p'
+    let TiState [a] _ h _ _ = last p'
+    pure res
+    where
+        p' = eval (fromJust $ compile p)
+        TiState [resAddr] _ h _ _ = last p'
+        res = hLookupUnsafe resAddr h
 
 letrecExample :: Program
 letrecExample = Program
@@ -275,24 +316,26 @@ indExample3 = Program
     , ScDef "g" ["a","b"] $ "a"
     ]
 
-negExample :: Program
-negExample = Program
+negExample1 :: Program
+negExample1 = Program
+    [ ScDef "main" [] $
+        Prim IntNegP :$ ("id" :$ Prim (IntP 3))
+    ]
+
+negExample2 :: Program
+negExample2 = Program
     [ ScDef "main" [] $
         Prim IntNegP :$ Prim (IntP 3)
     ]
 
-t :: Program
-t = Program
-    [ ScDef "f" ["x"] $ "+" :$ ("id" :$ "x") :$ "x"
-    , ScDef "main" [] $ "f" :$ ("id" :$ Prim (IntP 4))
-    ]
+----------------------------------------------------------------------------------
 
 instance Pretty TiState where
     prettyPrec (TiState s d h g sts) _ =
-        "==== TiState Stack ====" <> IBreak
+        (IStr $ printf "==== TiState Stack %d ====" sts) <> IBreak
         <> mconcat (fmap ((<>IBreak) . showAddr) s)
-        <> "==== TiState Heap ====" <> IBreak
-        <> sheap
+        <> (IStr $ printf "==== TiState Heap %d ====" sts) <> IBreak
+        <> sheap <> IBreak
         where
             showAddr a = IStr (show a) <> ": " <> pnode (hLookupUnsafe a h) 0
             sheap = mconcat $ ((<>IBreak) . showAddr) <$> addresses h
@@ -306,7 +349,7 @@ instance Pretty TiState where
                         x           -> pnode x (succ p) 
 
             pnode (NInd a) p = bracketPrec 0 p $
-                "NInd -> " <> pnode (hLookupUnsafe a h) 0
+                "NInd (" <> IStr (show a) <> ") -> " <> pnode (hLookupUnsafe a h) 0
 
             pnode (NNum n) _ =
                 IStr (show n) <> IStr "#"
