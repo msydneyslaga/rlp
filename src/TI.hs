@@ -209,7 +209,7 @@ step st =
             TiState (a:s) d h g sts
 
         primStep :: Name -> Prim -> TiState -> TiState
-        primStep n IntNegP (TiState s d h g sts) =
+        primStep _ IntNegP (TiState s d h g sts) =
             case isDataNode arg of
                 True  -> TiState s'' d h' g sts
                     where
@@ -228,6 +228,27 @@ step st =
             where
                 [argAddr] = getArgs h s
                 arg = hLookupUnsafe argAddr h
+
+        primStep _ IntAddP st = primBinOp (+) st
+
+primBinOp :: (Int -> Int -> Int) -> TiState -> TiState
+primBinOp f (TiState s d h g sts) =
+    case isDataNode xarg of
+        True -> case isDataNode yarg of
+            True -> TiState s' d h' g sts
+                where
+                    h' = update h rootAddr (NNum $ x+y)
+                    rootAddr = head s'
+
+                    -- number of arguments
+                    s' = drop 2 s
+
+                    NNum x = xarg
+                    NNum y = xarg
+    where
+        [xAddr,yAddr] = getArgs h s
+        xarg = hLookupUnsafe xAddr h
+        yarg = hLookupUnsafe yAddr h
 
 getArgs :: TiHeap -> [Addr] -> [Addr]
 getArgs h (_:s) = fmap f s
