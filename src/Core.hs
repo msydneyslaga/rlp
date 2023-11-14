@@ -9,15 +9,16 @@ import Data.String
 ----------------------------------------------------------------------------------
 
 data Expr = Var Name
-          | Con Int Int 
+          | Con Int Int -- Con Tag Arity
           | Let Rec [Binding] Expr
           | Case Expr [Alter]
           | Lam [Name] Expr
           | App Expr Expr
-          | Prim Prim
+          | IntE Int
           deriving Show
 
-data Prim = IntP Int
+data Prim = PrimConstr Int Int -- PrimConstr Tag Arity
+          | IntP Int
           | IntAddP
           | IntSubP
           | IntMulP
@@ -56,7 +57,7 @@ instance IsString Expr where
 
 instance Pretty Expr where
     prettyPrec (Var k)      = withPrec maxBound $ IStr k
-    prettyPrec (Prim n)     = prettyPrec n
+    prettyPrec (IntE n)     = withPrec maxBound $ IStr (show n)
     prettyPrec (Con _ _)    = undefined
     prettyPrec (Let r bs e) = withPrec 0 $
         IStr (if r == Rec then "letrec " else "let ")

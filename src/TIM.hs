@@ -115,15 +115,7 @@ instantiate (Let Rec bs e) h g = instantiate e h' env
             let (h',a) = instantiate v h env
             in (h',(k,a))
 
-instantiate (Prim (IntP n)) h _ = alloc h (NNum n)
-instantiate (Prim p) h _ = alloc h (NPrim n p)
-    where
-        n = fromMaybe
-                (error $ "primitive `" <> show p <> "' has no associated name")
-                $ lookupV p primitives
-
-        lookupV v d = fmap (\ (a,b) -> (b,a)) d
-                    & lookup v
+instantiate (IntE n) h _ = alloc h (NNum n)
 
 instantiate _ _ _ = error "unimplemented"
 
@@ -150,7 +142,7 @@ instantiateU (Let NonRec bs e) root h g = h''
             let (h',a) = instantiate v h g
             in (h',(k,a))
 
-instantiateU (Prim (IntP n)) root h _ = update h root (NNum n)
+instantiateU (IntE n) root h _ = update h root (NNum n)
 
 ----------------------------------------------------------------------------------
 
@@ -320,29 +312,29 @@ letrecExample = Program
             , "b" := "pair" :$ "y" :$ "a"
             ]
             ("fst" :$ ("snd" :$ ("snd" :$ ("snd" :$ "a"))))
-    , ScDef "main" [] $ "f" :$ Prim (IntP 3) :$ Prim (IntP 4)
+    , ScDef "main" [] $ "f" :$ IntE 3 :$ IntE 4
     ]
 
 idExample :: Program
 idExample = Program
-    [ ScDef "main" [] $ "id" :$ Prim (IntP 3)
+    [ ScDef "main" [] $ "id" :$ IntE 3
     ]
 
 indExample1 :: Program
 indExample1 = Program
-    [ ScDef "main" [] $ "twice" :$ "twice" :$ "id" :$ Prim (IntP 3)
+    [ ScDef "main" [] $ "twice" :$ "twice" :$ "id" :$ IntE 3
     ]
 
 indExample2 :: Program
 indExample2 = Program
-    [ ScDef "main" [] $ "twice" :$ "twice" :$ "twice" :$ "id" :$ Prim (IntP 3)
+    [ ScDef "main" [] $ "twice" :$ "twice" :$ "twice" :$ "id" :$ IntE 3
     ]
 
 indExample3 :: Program
 indExample3 = Program
     [ ScDef "main" [] $
         Let Rec
-            [ "x" := Prim (IntP 2)
+            [ "x" := IntE 2
             , "y" := "f" :$ "x" :$ "x"
             ]
             ("g" :$ "y" :$ "y")
@@ -353,25 +345,25 @@ indExample3 = Program
 negExample1 :: Program
 negExample1 = Program
     [ ScDef "main" [] $
-        Prim IntNegP :$ ("id" :$ Prim (IntP 3))
+        "negate#" :$ ("id" :$ IntE 3)
     ]
 
 negExample2 :: Program
 negExample2 = Program
     [ ScDef "main" [] $
-        Prim IntNegP :$ Prim (IntP 3)
+        "negate#" :$ IntE 3
     ]
 
 negExample3 :: Program
 negExample3 = Program
     [ ScDef "main" [] $
-        "twice" :$ Prim IntNegP :$ Prim (IntP 3)
+        "twice" :$ "negate#" :$ IntE 3
     ]
 
 arithExample1 :: Program
 arithExample1 = Program
     [ ScDef "main" [] $
-        "+#" :$ (Prim $ IntP 3) :$ ("negate#" :$ (Prim $ IntP 2))
+        "+#" :$ (IntE 3) :$ ("negate#" :$ (IntE 2))
     ]
 
 ----------------------------------------------------------------------------------
