@@ -184,6 +184,7 @@ step st =
         NSupercomb n as b -> scStep   n as b st
         NInd a            -> indStep  a      st
         NPrim n p         -> primStep n p    st
+        NData t as        -> dataStep t as   st
 
     where
         numStep :: Int -> TiState -> TiState
@@ -252,7 +253,18 @@ step st =
         primStep _ IntMulP st = primBinOp (*) st
         primStep _ IntDivP st = primBinOp (div) st
 
-        -- primStep _ 
+        primStep n (ConP t a) (TiState s d h g sts) =
+            TiState s' d h' g sts
+            where
+                s' = drop a s
+                h' = update h rootAddr $ NData t argAddrs
+                rootAddr = s !! a
+                argAddrs = getArgs h s
+
+        dataStep :: Int -> [Addr] -> TiState -> TiState
+        dataStep _ _ (TiState [a] (s:d) h g sts) = TiState s d h g sts
+
+        dataStep _ _ _ = error "data applied as function..."
 
 primBinOp :: (Int -> Int -> Int) -> TiState -> TiState
 primBinOp f (TiState s d h g sts) =
