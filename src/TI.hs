@@ -184,7 +184,7 @@ step st =
             case hLookupUnsafe ap h of
                 -- rule 2.8
                 NAp f (hViewUnsafe h -> NInd a) ->
-                    TiState (ap:s) d h' g 666
+                    TiState (ap:s) d h' g sts
                     where
                         h' = (update h ap $ NAp f a)
                         -- this is bad rewrite later :3
@@ -237,14 +237,23 @@ primBinOp f (TiState s d h g sts) =
         True -> case isDataNode yarg of
             True -> TiState s' d h' g sts
                 where
-                    h' = update h rootAddr (NNum $ x+y)
+                    h' = update h rootAddr (NNum $ x `f` y)
                     rootAddr = head s'
 
                     -- number of arguments
                     s' = drop 2 s
 
                     NNum x = xarg
-                    NNum y = xarg
+                    NNum y = yarg
+            False -> TiState s' d' h g sts
+                where
+                    d' = drop 2 s : d
+                    s' = [yAddr]
+
+        False -> TiState s' d' h g sts
+            where
+                d' = drop 1 s : d
+                s' = [xAddr]
     where
         [xAddr,yAddr] = getArgs h s
         xarg = hLookupUnsafe xAddr h
@@ -357,6 +366,7 @@ instance Pretty TiState where
         <> sheap <> IBreak
         where
             showAddr a = IStr (show a) <> ": " <> pnode (hLookupUnsafe a h) 0
+            -- showAddr a = IStr (show a) <> ": " <> IStr (show (hLookupUnsafe a h))
             sheap = mconcat $ ((<>IBreak) . showAddr) <$> addresses h
 
             pnode :: Node -> Int -> ISeq
@@ -376,18 +386,4 @@ instance Pretty TiState where
             pnode (NSupercomb n _ _) _ = IStr n
 
             pnode (NPrim n _) _ = IStr n
-
-            -- pnoderef :: Addr -> Int -> ISeq
-            -- pnoderef a p = bracketPrec 0 p $
-            --     IStr (show a) <> " -> " <> pnode (hLookupUnsafe a h) 0
-
-            -- pnode :: Node -> Int -> ISeq
-            -- pnode (NAp f x) p = bracketPrec 0 p $
-            --     "NAp " <> pnoderef f (succ p) <> pnoderef x (succ p)
-            -- pnode (NSupercomb n _ _) p = bracketPrec 0 p $
-            --     "NSupercomb " <> IStr n
-            -- pnode (NNum n) p = bracketPrec 0 p $
-            --     "NNum " <> IStr (show n)
-            -- pnode (NInd a) p = bracketPrec 0 p $
-            --     "NInd " <> pnoderef a p
 
