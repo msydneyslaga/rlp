@@ -40,6 +40,7 @@ type Stats = Int
 ----------------------------------------------------------------------------------
 
 data Prim = ConP Int Int -- ConP Tag Arity
+          | IfP
           | IntP Int
           | IntAddP
           | IntSubP
@@ -97,6 +98,7 @@ primitives =
     , ("-#",        IntSubP)
     , ("*#",        IntMulP)
     , ("/#",        IntDivP)
+    , ("if#",       IfP)
     ]
 
 instantiate :: Expr -> TiHeap -> [(Name, Addr)] -> (TiHeap, Addr)
@@ -248,10 +250,10 @@ step st =
                 [argAddr] = getArgs h s
                 arg = hLookupUnsafe argAddr h
 
-        primStep _ IntAddP st = primBinOp (+) st
-        primStep _ IntSubP st = primBinOp (-) st
-        primStep _ IntMulP st = primBinOp (*) st
-        primStep _ IntDivP st = primBinOp (div) st
+        primStep _ IntAddP st = primArith (+) st
+        primStep _ IntSubP st = primArith (-) st
+        primStep _ IntMulP st = primArith (*) st
+        primStep _ IntDivP st = primArith (div) st
 
         primStep n (ConP t a) (TiState s d h g sts) =
             TiState s' d h' g sts
@@ -266,33 +268,63 @@ step st =
 
         dataStep _ _ _ = error "data applied as function..."
 
-primBinOp :: (Int -> Int -> Int) -> TiState -> TiState
-primBinOp f (TiState s d h g sts) =
-    case isDataNode xarg of
-        True -> case isDataNode yarg of
-            True -> TiState s' d h' g sts
-                where
-                    h' = update h rootAddr (NNum $ x `f` y)
-                    rootAddr = head s'
-
-                    -- number of arguments
-                    s' = drop 2 s
-
-                    NNum x = xarg
-                    NNum y = yarg
-            False -> TiState s' d' h g sts
-                where
-                    d' = drop 2 s : d
-                    s' = [yAddr]
-
-        False -> TiState s' d' h g sts
-            where
-                d' = drop 1 s : d
-                s' = [xAddr]
+primBinary :: (Node -> Node -> Node) -> TiState -> TiState
+primBinary f (TiState s d h g sts) = 
+    TiState s' d' h' g sts
     where
+        s' | needsEval xarg    = [xAddr]
+           | needsEval yarg    = [yAddr]
+           | otherwise         = drop 2 s -- # of arguments
+
+        h' | needsEval xarg    = h
+           | needsEval yarg    = h
+           | otherwise         = update h rootAddr (xarg `f` yarg)
+
+        d' | needsEval xarg    = drop 1 s : d
+           | needsEval yarg    = drop 2 s : d
+           | otherwise         = d
+
+        rootAddr = head s'
+
+        needsEval = not . isDataNode
+
         [xAddr,yAddr] = getArgs h s
         xarg = hLookupUnsafe xAddr h
         yarg = hLookupUnsafe yAddr h
+
+primArith :: (Int -> Int -> Int) -> TiState -> TiState
+primArith f = primBinary f'
+    where
+        f' (NNum a) (NNum b) = NNum (a `f` b)
+        f' _        _        = error "primArith expected number"
+
+-- primArith :: (Int -> Int -> Int) -> TiState -> TiState
+-- primArith f (TiState s d h g sts) =
+--     case isDataNode xarg of
+--         True -> case isDataNode yarg of
+--             True -> TiState s' d h' g sts
+--                 where
+--                     h' = update h rootAddr (NNum $ x `f` y)
+--                     rootAddr = head s'
+
+--                     -- number of arguments
+--                     s' = drop 2 s
+
+--                     NNum x = xarg
+--                     NNum y = yarg
+--             False -> TiState s' d' h g sts
+--                 where
+--                     d' = drop 2 s : d
+--                     s' = [yAddr]
+
+--         False -> TiState s' d' h g sts
+--             where
+--                 d' = drop 1 s : d
+--                 s' = [xAddr]
+--     where
+--         [xAddr,yAddr] = getArgs h s
+--         xarg = hLookupUnsafe xAddr h
+--         yarg = hLookupUnsafe yAddr h
 
 getArgs :: TiHeap -> [Addr] -> [Addr]
 getArgs h (_:s) = fmap f s
@@ -401,6 +433,12 @@ arithExample1 :: Program
 arithExample1 = Program
     [ ScDef "main" [] $
         "+#" :$ (IntE 3) :$ ("negate#" :$ (IntE 2))
+    ]
+
+arithExample2 :: Program
+arithExample2 = Program
+    [ ScDef "main" [] $
+        "negate#" :$ ("+#" :$ (IntE 2) :$ ("*#" :$ IntE 5 :$ IntE 3))
     ]
 
 ----------------------------------------------------------------------------------
