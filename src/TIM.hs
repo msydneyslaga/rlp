@@ -196,12 +196,13 @@ step st =
                     TiState (f:ap:s) d h g sts
 
         scStep :: Name -> [Name] -> Expr -> TiState -> TiState
-        scStep n as b (TiState s d h g sts) =
-            TiState s' d h'' g sts
+        scStep n as e (TiState s d h g sts) =
+            TiState s' d h' g sts
             where
-                h'' = update h' (s !! length as) (NInd resAddr)
-                s' = resAddr : drop (length as + 1) s
-                (h', resAddr) = instantiate b h env
+                s' = rootAddr : drop (length as + 1) s
+                rootAddr = (s !! length as)
+                h' = instantiateU e rootAddr h env
+
                 env = argBinds ++ g
                 argBinds = as `zip` argAddrs
                 argAddrs = getArgs h s
@@ -320,6 +321,11 @@ letrecExample = Program
             ]
             ("fst" :$ ("snd" :$ ("snd" :$ ("snd" :$ "a"))))
     , ScDef "main" [] $ "f" :$ Prim (IntP 3) :$ Prim (IntP 4)
+    ]
+
+idExample :: Program
+idExample = Program
+    [ ScDef "main" [] $ "id" :$ Prim (IntP 3)
     ]
 
 indExample1 :: Program
