@@ -78,6 +78,9 @@ primitives :: [(Name, Prim)]
 primitives =
     [ ("negate#",   IntNegP)
     , ("+#",        IntAddP)
+    , ("-#",        IntSubP)
+    , ("*#",        IntMulP)
+    , ("/#",        IntDivP)
     ]
 
 instantiate :: Expr -> TiHeap -> [(Name, Addr)] -> (TiHeap, Addr)
@@ -230,6 +233,9 @@ step st =
                 arg = hLookupUnsafe argAddr h
 
         primStep _ IntAddP st = primBinOp (+) st
+        primStep _ IntSubP st = primBinOp (-) st
+        primStep _ IntMulP st = primBinOp (*) st
+        primStep _ IntDivP st = primBinOp (div) st
 
 primBinOp :: (Int -> Int -> Int) -> TiState -> TiState
 primBinOp f (TiState s d h g sts) =
@@ -354,6 +360,12 @@ negExample3 :: Program
 negExample3 = Program
     [ ScDef "main" [] $
         "twice" :$ Prim IntNegP :$ Prim (IntP 3)
+    ]
+
+arithExample1 :: Program
+arithExample1 = Program
+    [ ScDef "main" [] $
+        "+#" :$ (Prim $ IntP 3) :$ ("negate#" :$ (Prim $ IntP 2))
     ]
 
 ----------------------------------------------------------------------------------

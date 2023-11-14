@@ -19,6 +19,9 @@ data Expr = Var Name
 
 data Prim = IntP Int
           | IntAddP
+          | IntSubP
+          | IntMulP
+          | IntDivP
           | IntNegP
           deriving (Show, Eq)
 
