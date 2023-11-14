@@ -32,7 +32,7 @@ imgmath_latex_preamble = r'''
 \usepackage{tabularray}
 
 \newcommand{\transrule}[2]
-    {\begin{tblr}{|ccclc|}
+    {\begin{tblr}{|rrrlc|}
          \hline
          & #1 \\
          \implies & #2 \\
