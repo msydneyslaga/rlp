@@ -103,3 +103,24 @@ Restore the stack when a sub-computation has completed.
    & g
    }
 
+Reduce a supercombinator and update the root with the :math:`\beta`-reduced form
+
+.. math::
+   \transrule
+   { a_0 : a_1 : \ldots : a_n : s
+   & d
+   & h
+   \begin{bmatrix}
+        a_0 : \mathtt{NSupercomb} \; [x_1,\ldots,x_n] \; e
+   \end{bmatrix}
+   & g
+   }
+   { a_n : s
+   & d
+   & h'
+   & g
+   \\
+   & \SetCell[c=3]{c}
+   \text{where } h' = \mathtt{instantiateU} \; e \; a_n \; h \; g
+   }
+
