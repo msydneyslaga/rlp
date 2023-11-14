@@ -20,7 +20,7 @@ Listed in order of importance.
 - [ ] Backend
     - [x] Core language
         - [x] AST
-    - [ ] Low-level model (STG)
+    - [ ] Low-level evaluation model (STG)
         - [x] Syntax
         - [ ] Arithmetic
     - [ ] Emitter
@@ -39,4 +39,10 @@ Listed in order of importance.
         - [ ] Constraint solver
         - [ ] `do`-notation
     - [ ] CLI
+- [ ] Documentation (mostly for presentation)
+    - [ ] State transition rules
+    - [ ] How does an STG work?
+    - [ ] CLI usage
+    - [ ] Tail-calls
+
 
