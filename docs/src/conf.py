@@ -38,7 +38,10 @@ imgmath_latex_preamble = r'''
          \implies & #2 \\
          \hline
     \end{tblr} }
+
+\newcommand{\nillist}{[\,]}
 '''
+
 imgmath_image_format = 'svg'
 imgmath_font_size = 14
 
