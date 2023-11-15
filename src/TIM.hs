@@ -48,6 +48,7 @@ data Prim = ConP Int Int -- ConP Tag Arity
           | IntMulP
           | IntDivP
           | IntNegP
+          | IntEqP
           deriving (Show, Eq)
 
 instance Pretty Prim where
@@ -99,6 +100,7 @@ primitives =
     , ("-#",        IntSubP)
     , ("*#",        IntMulP)
     , ("/#",        IntDivP)
+    , ("==#",       IntEqP)
     , ("if#",       IfP)
     ]
 
@@ -255,6 +257,32 @@ step st =
         primStep _ IntSubP st = primArith (-) st
         primStep _ IntMulP st = primArith (*) st
         primStep _ IntDivP st = primArith (div) st
+        primStep _ IntEqP  st = primComp  (==) st
+
+        primStep _ IfP (TiState s d h g sts) = TiState s' d' h' g sts
+            where
+                s' | needsEval cn               = [c]
+                   | isTrue,     needsEval tn   = [t]
+                   | not isTrue, needsEval fn   = [f]
+                   | otherwise                  = drop 3 s
+
+                d' | needsEval cn               = drop 1 s : d
+                   | isTrue,     needsEval tn   = drop 2 s : d
+                   | not isTrue, needsEval fn   = drop 3 s : d
+                   | otherwise                  = d
+
+                h' | needsEval cn               = h
+                   | isTrue,     needsEval tn   = h
+                   | not isTrue, needsEval fn   = h
+                   | otherwise                  =
+                       update h rootAddr (if isTrue then tn else fn)
+
+                [cn,tn,fn] = hViewUnsafe h <$> [c,t,f]
+                [c,t,f] = getArgs h s
+                rootAddr = head s'
+                isTrue = case cn of
+                    NData 0 [] -> False
+                    NData 1 [] -> True
 
         primStep n (ConP t a) (TiState s d h g sts) =
             TiState s' d h' g sts
@@ -269,6 +297,9 @@ step st =
 
         dataStep _ _ _ = error "data applied as function..."
 
+----------------------------------------------------------------------------------
+
+-- EVERY ARGUMENT WILL BE EVALUATED!!!!
 primArbitrary :: forall a. (PrimArbitraryType a) => a -> TiState -> TiState
 primArbitrary f (TiState s d h g sts) = 
     TiState s' d' h' g sts
@@ -286,7 +317,6 @@ primArbitrary f (TiState s d h g sts) =
 
         unevaled = find (\ (_,a) -> needsEval $ hLookupUnsafe a h) ans
         ans = [1..] `zip` argAddrs
-        needsEval = not . isDataNode
         argAddrs = getArgs h s
         rootAddr = s !! ar
         ar = arity (Proxy @a)
@@ -330,39 +360,22 @@ primBinary f (TiState s d h g sts) =
         xarg = hLookupUnsafe xAddr h
         yarg = hLookupUnsafe yAddr h
 
+primComp :: (Int -> Int -> Bool) -> TiState -> TiState
+primComp f = primBinary f'
+    where
+        f' (NNum a) (NNum b)
+            | a `f` b   = NData 1 []
+            | otherwise = NData 0 []
+
+        f' _ _ = error "primComp expected number"
+
 primArith :: (Int -> Int -> Int) -> TiState -> TiState
 primArith f = primBinary f'
     where
         f' (NNum a) (NNum b) = NNum (a `f` b)
         f' _        _        = error "primArith expected number"
 
--- primArith :: (Int -> Int -> Int) -> TiState -> TiState
--- primArith f (TiState s d h g sts) =
---     case isDataNode xarg of
---         True -> case isDataNode yarg of
---             True -> TiState s' d h' g sts
---                 where
---                     h' = update h rootAddr (NNum $ x `f` y)
---                     rootAddr = head s'
-
---                     -- number of arguments
---                     s' = drop 2 s
-
---                     NNum x = xarg
---                     NNum y = yarg
---             False -> TiState s' d' h g sts
---                 where
---                     d' = drop 2 s : d
---                     s' = [yAddr]
-
---         False -> TiState s' d' h g sts
---             where
---                 d' = drop 1 s : d
---                 s' = [xAddr]
---     where
---         [xAddr,yAddr] = getArgs h s
---         xarg = hLookupUnsafe xAddr h
---         yarg = hLookupUnsafe yAddr h
+----------------------------------------------------------------------------------
 
 getArgs :: TiHeap -> [Addr] -> [Addr]
 getArgs h (_:s) = fmap f s
@@ -383,6 +396,9 @@ isDataNode :: Node -> Bool
 isDataNode (NNum _)    = True
 isDataNode (NData _ _) = True
 isDataNode _           = False
+
+needsEval :: Node -> Bool
+needsEval = not . isDataNode
 
 doAdmin :: TiState -> TiState
 doAdmin (TiState s d h g sts) = TiState s d h g (sts+1)
@@ -477,6 +493,21 @@ arithExample2 :: Program
 arithExample2 = Program
     [ ScDef "main" [] $
         "negate#" :$ ("+#" :$ (IntE 2) :$ ("*#" :$ IntE 5 :$ IntE 3))
+    ]
+
+ifExample :: Program
+ifExample = Program
+    [ ScDef "main" [] $
+        "if#" :$ "True" :$ IntE 2 :$ IntE 3
+    ]
+
+facExample :: Program
+facExample = Program
+    [ ScDef "fac" ["n"] $
+        "if#" :$ ("==#" :$ "n" :$ IntE 0)
+        :$ (IntE 1)
+        :$ ("*#" :$ "n" :$ ("fac" :$ ("-#" :$ "n" :$ IntE 1)))
+    , ScDef "main" [] $ "fac" :$ IntE 3
     ]
 
 ----------------------------------------------------------------------------------
