@@ -1,5 +1,5 @@
 {-# LANGUAGE PatternSynonyms, OverloadedStrings #-}
-module Core
+module Core.Syntax
     ( Expr(..)
     , pattern (:$)
     , Binding(..)

@@ -23,6 +23,9 @@ library
     other-modules:    Data.Heap
                     , Data.Pretty
                     , Control.Parser
+                    , Core.Syntax
+                    , Core.Parse
+                    , Core.Lex
 
     -- other-extensions:
     build-depends:    base ^>=4.18.0.0

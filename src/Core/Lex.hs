@@ -1,4 +1,4 @@
-module CoreLex
+module Core.Lex
     (
     )
     where
