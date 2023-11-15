@@ -22,7 +22,7 @@ Listed in order of importance.
         - [x] AST
     - [ ] Low-level evaluation model (STG)
         - [x] Syntax
-        - [ ] Arithmetic
+        - [x] Arithmetic
     - [ ] Emitter
         - [ ] Code-gen (target yet to be decided)
         - [ ] Core language emitter
