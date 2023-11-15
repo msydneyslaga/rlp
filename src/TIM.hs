@@ -11,10 +11,11 @@ import Data.Set qualified as S
 import Data.Maybe               (fromJust, fromMaybe)
 import Data.List                (mapAccumL, intersperse)
 import Control.Monad            (guard)
-import Data.Foldable            (traverse_)
+import Data.Foldable            (traverse_, find)
 import Data.Function            ((&))
 import System.IO                (Handle, hPutStr)
 import Text.Printf              (printf)
+import Data.Proxy               (Proxy(..))
 import Data.Pretty
 import Data.Heap
 import Core
@@ -267,6 +268,43 @@ step st =
         dataStep _ _ (TiState [a] (s:d) h g sts) = TiState s d h g sts
 
         dataStep _ _ _ = error "data applied as function..."
+
+primArbitrary :: forall a. (PrimArbitraryType a) => a -> TiState -> TiState
+primArbitrary f (TiState s d h g sts) = 
+    TiState s' d' h' g sts
+    where
+        s' = case unevaled of
+            Just (_,a) -> [a]
+            Nothing    -> drop ar s
+        d' = case unevaled of
+            Just (i,_) -> drop i s : d
+            Nothing    -> d
+        h' = case unevaled of
+            Just _     -> h
+            Nothing    -> update h rootAddr $
+                onList f (fmap (\a -> hLookupUnsafe a h) argAddrs)
+
+        unevaled = find (\ (_,a) -> needsEval $ hLookupUnsafe a h) ans
+        ans = [1..] `zip` argAddrs
+        needsEval = not . isDataNode
+        argAddrs = getArgs h s
+        rootAddr = s !! ar
+        ar = arity (Proxy @a)
+
+class PrimArbitraryType a where
+    -- primArbitrary' :: a -> TiState -> TiState
+    arity :: Proxy a -> Int
+    -- runArb :: Node -> a
+    onList :: a -> [Node] -> Node
+
+instance PrimArbitraryType Node where
+    arity _ = 0
+    onList n [] = n
+    onList _ _ = error "arity and list length do not match!"
+
+instance (PrimArbitraryType a) => PrimArbitraryType (Node -> a) where
+    arity _ = 1 + arity (Proxy @a)
+    onList nf (a:as) = onList (nf a) as
 
 primBinary :: (Node -> Node -> Node) -> TiState -> TiState
 primBinary f (TiState s d h g sts) = 
