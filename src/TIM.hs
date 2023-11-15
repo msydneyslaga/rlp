@@ -72,7 +72,7 @@ compile prog = Just $ TiState s d h g stats
         s = [mainAddr]
         d = []
         (h,g) = buildInitialHeap defs
-        defs = prog -- <> corePrelude
+        defs = prog <> corePrelude
         stats = Stats 0 0 0
 
         mainAddr = fromJust $ lookup "main" g
