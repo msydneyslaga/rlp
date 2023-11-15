@@ -275,7 +275,7 @@ step st =
                    | isTrue,     needsEval tn   = h
                    | not isTrue, needsEval fn   = h
                    | otherwise                  =
-                       update h rootAddr (if isTrue then tn else fn)
+                       update h rootAddr (NInd $ if isTrue then t else f)
 
                 [cn,tn,fn] = hViewUnsafe h <$> [c,t,f]
                 [c,t,f] = getArgs h s
