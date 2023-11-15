@@ -14,14 +14,17 @@ module Control.Parser
     , satisfy
     , char
     , spaces
-    , nl
     , surround
     , string
+    , match
+    , termMany
+    , sepSome
 
     -- * Control.Applicative re-exports
     , (<|>)
     , many
     , some
+    , empty
     )
     where
 ----------------------------------------------------------------------------------
@@ -56,6 +59,7 @@ instance (Monad m) => Monad (ParserT i m) where
 
 instance (MonadFail m) => MonadFail (ParserT i m) where
     fail s = ParserT $ \i -> fail s
+
 ----------------------------------------------------------------------------------
 
 -- TODO: generalise to non-lists
@@ -64,6 +68,18 @@ satisfy p = ParserT $ \case
     (x:xs) | p x -> pure (xs,x)
     _            -> empty
 
+match :: (MonadPlus m) => (a -> Maybe b) -> ParserT [a] m b
+match f = ParserT $ \case
+    (x:xs) -> case f x of
+        Just b  -> pure (xs,b)
+        Nothing -> empty
+    [] -> empty
+
+termMany :: (MonadPlus m) => ParserT i m t -> ParserT i m o -> ParserT i m [o]
+termMany t a = many (a <* t)
+
+sepSome :: (MonadPlus m) => ParserT i m t -> ParserT i m o -> ParserT i m [o]
+sepSome s a = (:) <$> a <*> many (s *> a)
 
 char :: (MonadPlus m, Eq a) => a -> ParserT [a] m a
 char c = satisfy (==c)
@@ -82,7 +98,4 @@ surround l r c = l *> c <* r
 
 spaces :: (MonadPlus m) => ParserT String m Int
 spaces = length <$> many (satisfy (==' '))
-
-nl :: (MonadPlus m) => ParserT String m Int
-nl = undefined
 

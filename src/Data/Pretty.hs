@@ -5,6 +5,7 @@ module Data.Pretty
     , precPretty
     , prettyPrint
     , prettyShow
+    , iShow
     , iBracket
     , withPrec
     , bracketPrec
@@ -68,6 +69,9 @@ withPrec n s p
 
 bracketPrec :: Int -> Int -> ISeq -> ISeq
 bracketPrec n p s = withPrec n s p
+
+iShow :: (Show a) => a -> ISeq
+iShow = IStr . show
 
 ----------------------------------------------------------------------------------
 

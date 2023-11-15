@@ -53,8 +53,10 @@ data Alter = Alter Int [Name] Expr
 type Name = String
 
 data ScDef = ScDef Name [Name] Expr
+    deriving (Show)
 
 newtype Program = Program [ScDef]
+    deriving (Show)
 
 instance IsString Expr where
     fromString = Var
@@ -63,8 +65,9 @@ instance IsString Expr where
 
 instance Pretty Expr where
     prettyPrec (Var k)      = withPrec maxBound $ IStr k
-    prettyPrec (IntE n)     = withPrec maxBound $ IStr (show n)
-    prettyPrec (Con _ _)    = undefined
+    prettyPrec (IntE n)     = withPrec maxBound $ iShow n
+    prettyPrec (Con t a)    = withPrec maxBound $
+        "Pack{" <> iShow t <> " " <> iShow a <> "}"
     prettyPrec (Let r bs e) = withPrec 0 $
         IStr (if r == Rec then "letrec " else "let ")
         <> binds <> IBreak

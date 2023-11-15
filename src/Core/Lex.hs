@@ -3,8 +3,8 @@ Module      : Core.Lex
 Description : Core language lexer
 -}
 module Core.Lex
-    ( CoreToken
-    , Result
+    ( CoreToken(..)
+    , Result(..)
     , lexCore
     )
     where
@@ -40,7 +40,7 @@ data CoreToken = TokLitInt Int
                | TokIn
                | TokCName Name
                | TokName Name
-               deriving (Show)
+               deriving (Show, Eq)
 
 instance Functor Result where
     fmap f (Success a)   = Success (f a)
@@ -62,7 +62,7 @@ instance Applicative Result where
     liftA2 _ _             (Error s l c) = Error s l c
 
 instance Alternative Result where
-    empty = Error "unknown failure" 0 0
+    empty = Error "some error! this is a temporary system lol" 0 0
 
     (Success a) <|> _ = Success a
     _           <|> b = b
@@ -93,8 +93,8 @@ token = litInt
     <|> arrow
     <|> _case
     <|> _of
-    <|> _let
     <|> letrec
+    <|> _let
     <|> _in
     <|> cName
     <|> name
@@ -120,16 +120,16 @@ rparen = char ')'                  $> TokRParen
 lambda = (char '\\' <|> char 'λ')  $> TokLambda
 arrow  = string "->"               $> TokArrow
 _case  = string "case"             $> TokCase
-_of = string "of"                  $> TokOf
-_let = string "let"                $> TokLet
+_of    = string "of"               $> TokOf
+_let   = string "let"              $> TokLet
 letrec = string "letrec"           $> TokLetRec
-_in = string "in"                  $> TokIn
+_in    = string "in"               $> TokIn
 
 cName = TokCName <$> ((:) <$> cNameHead <*> properNameTail)
     where cNameHead = satisfy isUpper
 
 name = some (satisfy p) <&> TokName
-    where p c = not (isSpace c) && c `notElem` ";{}"
+    where p c = not (isSpace c) && c `notElem` ";{}()"
 
 properName :: CoreLexer Name
 properName = (:) <$> nameHead <*> properNameTail
