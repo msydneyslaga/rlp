@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase, BlockArguments #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
 module TIM
     where
 ----------------------------------------------------------------------------------
@@ -16,6 +17,8 @@ import Data.Function            ((&))
 import System.IO                (Handle, hPutStr)
 import Text.Printf              (printf)
 import Data.Proxy               (Proxy(..))
+import Lens.Micro
+import Lens.Micro.TH
 import Data.Pretty
 import Data.Heap
 import Core
@@ -36,10 +39,6 @@ data Node = NAp Addr Addr
 
 type Dump = [[Addr]]
 
-type Stats = Int
-
-----------------------------------------------------------------------------------
-
 data Prim = ConP Int Int -- ConP Tag Arity
           | IfP
           | IntP Int
@@ -55,13 +54,15 @@ instance Pretty Prim where
     prettyPrec (IntP n) = withPrec maxBound $ IStr $ show n ++ "#"
     prettyPrec IntAddP  = withPrec maxBound $ "+#"
 
-----------------------------------------------------------------------------------
+-- TODO: lens
+data Stats = Stats
+    { _stsReductions   :: Int
+    , _stsAllocations  :: Int
+    , _stsDereferences :: Int
+    }
+    deriving (Show)
 
-tiStatIncSteps :: Stats -> Stats
-tiStatIncSteps = (+1)
-
-tiStatGetSteps :: Stats -> Int
-tiStatGetSteps = id
+makeLenses ''Stats
 
 ----------------------------------------------------------------------------------
 
@@ -71,8 +72,8 @@ compile prog = Just $ TiState s d h g stats
         s = [mainAddr]
         d = []
         (h,g) = buildInitialHeap defs
-        defs = prog <> corePrelude
-        stats = 0
+        defs = prog -- <> corePrelude
+        stats = Stats 0 0 0
 
         mainAddr = fromJust $ lookup "main" g
 
@@ -205,12 +206,13 @@ step st =
 
         apStep f _ (TiState (ap:s) d h g sts) =
             case hLookupUnsafe ap h of
+                -- this is bad rewrite later :3
                 -- rule 2.8
                 NAp f (hViewUnsafe h -> NInd a) ->
-                    TiState (ap:s) d h' g sts
+                    TiState (ap:s) d h' g sts'
                     where
                         h' = (update h ap $ NAp f a)
-                        -- this is bad rewrite later :3
+                        sts' = sts & stsDereferences %~ succ
 
                 _ ->
                     TiState (f:ap:s) d h g sts
@@ -230,7 +232,8 @@ step st =
         -- dereference indirections
         indStep :: Addr -> TiState -> TiState
         indStep a (TiState (_:s) d h g sts) =
-            TiState (a:s) d h g sts
+            TiState (a:s) d h g sts'
+            where sts' = sts & stsDereferences %~ succ
 
         primStep :: Name -> Prim -> TiState -> TiState
         primStep _ IntNegP (TiState s d h g sts) =
@@ -395,27 +398,29 @@ needsEval :: Node -> Bool
 needsEval = not . isDataNode
 
 doAdmin :: TiState -> TiState
-doAdmin (TiState s d h g sts) = TiState s d h g (sts+1)
+doAdmin (TiState s d h g sts) = TiState s d h g sts'
+    where sts' = sts & stsReductions %~ succ
+                     -- not a perfect measurement
+                     & stsAllocations %~ max (hSize h)
 
 ----------------------------------------------------------------------------------
 
-dbgProg :: Program -> IO Node
+dbgProg :: Program -> IO (Node, Stats)
 dbgProg p = do
     prettyPrint `traverse` p'
-    pure res
+    pure (res, sts)
     where
         p' = eval (fromJust $ compile p)
-        TiState [resAddr] _ h _ _ = last p'
+        TiState [resAddr] _ h _ sts = last p'
         res = hLookupUnsafe resAddr h
 
-hdbgProg :: Program -> Handle -> IO Node
+hdbgProg :: Program -> Handle -> IO (Node, Stats)
 hdbgProg p hio = do
     (hPutStr hio . prettyShow) `traverse_` p'
-    let TiState [a] _ h _ _ = last p'
-    pure res
+    pure (res, sts)
     where
         p' = eval (fromJust $ compile p)
-        TiState [resAddr] _ h _ _ = last p'
+        TiState [resAddr] _ h _ sts = last p'
         res = hLookupUnsafe resAddr h
 
 letrecExample :: Program
@@ -508,11 +513,14 @@ facExample = Program
 
 instance Pretty TiState where
     prettyPrec (TiState s d h g sts) _ =
-        (IStr $ printf "==== TiState Stack %d ====" sts) <> IBreak
+        (IStr $ printf "==== TiState Stack %d ====" no) <> IBreak
         <> mconcat (fmap ((<>IBreak) . showAddr) s)
-        <> (IStr $ printf "==== TiState Heap %d ====" sts) <> IBreak
+        <> (IStr $ printf "==== TiState Heap %d ====" no) <> IBreak
         <> sheap <> IBreak
         where
+            no :: Int
+            no = sts ^. stsReductions
+
             showAddr a = IStr (show a) <> ": " <> pnode (hLookupUnsafe a h) 0
             -- showAddr a = IStr (show a) <> ": " <> IStr (show (hLookupUnsafe a h))
             sheap = mconcat $ ((<>IBreak) . showAddr) <$> addresses h
