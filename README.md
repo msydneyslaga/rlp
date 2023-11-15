@@ -43,6 +43,6 @@ Listed in order of importance.
     - [ ] State transition rules
     - [ ] How does an STG work?
     - [ ] CLI usage
-    - [ ] Tail-calls
-
+    - [ ] Tail call optimisation
+    - [ ] Parser combinators
 
