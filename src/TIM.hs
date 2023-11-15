@@ -262,18 +262,12 @@ step st =
         primStep _ IfP (TiState s d h g sts) = TiState s' d' h' g sts
             where
                 s' | needsEval cn               = [c]
-                   | isTrue,     needsEval tn   = [t]
-                   | not isTrue, needsEval fn   = [f]
                    | otherwise                  = drop 3 s
 
                 d' | needsEval cn               = drop 1 s : d
-                   | isTrue,     needsEval tn   = drop 2 s : d
-                   | not isTrue, needsEval fn   = drop 3 s : d
                    | otherwise                  = d
 
                 h' | needsEval cn               = h
-                   | isTrue,     needsEval tn   = h
-                   | not isTrue, needsEval fn   = h
                    | otherwise                  =
                        update h rootAddr (NInd $ if isTrue then t else f)
 
