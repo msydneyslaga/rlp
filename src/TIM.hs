@@ -54,7 +54,6 @@ instance Pretty Prim where
     prettyPrec (IntP n) = withPrec maxBound $ IStr $ show n ++ "#"
     prettyPrec IntAddP  = withPrec maxBound $ "+#"
 
--- TODO: lens
 data Stats = Stats
     { _stsReductions   :: Int
     , _stsAllocations  :: Int
