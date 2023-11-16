@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase, BlockArguments #-}
 module Core.Parse
     ( parseCore
+    , parseCoreExpr
     )
     where
 ----------------------------------------------------------------------------------
@@ -14,6 +15,9 @@ type CoreParser = ParserT [CoreToken] Result
 
 parseCore :: [CoreToken] -> Result Program
 parseCore = fmap snd . runParserT program
+
+parseCoreExpr :: [CoreToken] -> Result Expr
+parseCoreExpr = fmap snd . runParserT expr
 
 program :: CoreParser Program
 program = Program <$> termMany (char TokSemicolon) scdef

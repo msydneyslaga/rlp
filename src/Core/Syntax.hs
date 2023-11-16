@@ -18,9 +18,10 @@ module Core.Syntax
 ----------------------------------------------------------------------------------
 import Data.Coerce
 import Data.Pretty
-import Data.List            (intersperse)
-import Data.Function        ((&))
+import Data.List                    (intersperse)
+import Data.Function                ((&))
 import Data.String
+import Language.Haskell.TH.Syntax   (Lift)
 ----------------------------------------------------------------------------------
 
 data Expr = Var Name
@@ -30,14 +31,14 @@ data Expr = Var Name
           | Lam [Name] Expr
           | App Expr Expr
           | IntE Int
-          deriving Show
+          deriving (Show, Lift)
 
 infixl 2 :$
 pattern (:$) :: Expr -> Expr -> Expr
 pattern f :$ x = App f x
 
 data Binding = Binding Name Expr
-    deriving Show
+    deriving (Show, Lift)
 
 infixl 1 :=
 pattern (:=) :: Name -> Expr -> Binding
@@ -45,18 +46,18 @@ pattern k := v = Binding k v
 
 data Rec = Rec
          | NonRec
-         deriving (Show, Eq)
+         deriving (Show, Eq, Lift)
 
 data Alter = Alter Int [Name] Expr
-    deriving Show
+    deriving (Show, Lift)
 
 type Name = String
 
 data ScDef = ScDef Name [Name] Expr
-    deriving (Show)
+    deriving (Show, Lift)
 
 newtype Program = Program [ScDef]
-    deriving (Show)
+    deriving (Show, Lift)
 
 instance IsString Expr where
     fromString = Var

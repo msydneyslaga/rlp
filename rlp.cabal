@@ -26,12 +26,14 @@ library
                     , Core.Syntax
                     , Core.Parse
                     , Core.Lex
+                    , Core.TH
 
     -- other-extensions:
     build-depends:    base ^>=4.18.0.0
                     , containers
                     , microlens
                     , microlens-th
+                    , template-haskell
     hs-source-dirs:   src
     default-language: GHC2021
 

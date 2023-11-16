@@ -62,6 +62,11 @@ instance (MonadFail m) => MonadFail (ParserT i m) where
 
 ----------------------------------------------------------------------------------
 
+eof :: (MonadPlus m) => ParserT [a] m ()
+eof = ParserT $ \case
+    [] -> pure ([], ())
+    _  -> empty
+
 -- TODO: generalise to non-lists
 satisfy :: (MonadPlus m) => (a -> Bool) -> ParserT [a] m a
 satisfy p = ParserT $ \case
