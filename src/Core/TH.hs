@@ -27,13 +27,16 @@ coreExpr = QuasiQuoter
     , quoteDec = error "core quasiquotes may only be used in expressions"
     }
 
-qCore :: String -> Q Exp
-qCore s = case lexCore s >>= parseCore of
-    Success a -> lift a
-    Error e _ _ -> error e
+qCore = undefined
+qCoreExpr = undefined
 
-qCoreExpr :: String -> Q Exp
-qCoreExpr s = case lexCore s >>= parseCoreExpr of
-    Success a -> lift a
-    Error e _ _ -> error e
+-- qCore :: String -> Q Exp
+-- qCore s = case lexCore s >>= parseCore of
+--     Success a -> lift a
+--     Error e _ _ -> error e
+
+-- qCoreExpr :: String -> Q Exp
+-- qCoreExpr s = case lexCore s >>= parseCoreExpr of
+--     Success a -> lift a
+--     Error e _ _ -> error e
 

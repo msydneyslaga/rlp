@@ -22,11 +22,13 @@ library
                     , TIM
     other-modules:    Data.Heap
                     , Data.Pretty
-                    , Control.Parser
                     , Core.Syntax
                     , Core.Parse
-                    , Core.Lex
                     , Core.TH
+                    , Core.Examples
+                    , Core.Lex
+
+    build-tool-depends: happy:happy, alex:alex
 
     -- other-extensions:
     build-depends:    base ^>=4.18.0.0
@@ -34,6 +36,8 @@ library
                     , microlens
                     , microlens-th
                     , template-haskell
+                    -- required for happy
+                    , array
     hs-source-dirs:   src
     default-language: GHC2021
 

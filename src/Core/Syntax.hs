@@ -8,11 +8,13 @@ module Core.Syntax
     , Alter(..)
     , Name
     , ScDef(..)
+    , Module(..)
     , Program(..)
     , corePrelude
     , bindersOf
     , rhssOf
     , isAtomic
+    , insertModule
     )
     where
 ----------------------------------------------------------------------------------
@@ -56,6 +58,9 @@ type Name = String
 data ScDef = ScDef Name [Name] Expr
     deriving (Show, Lift)
 
+data Module = Module (Maybe (Name, [Name])) Program
+    deriving (Show, Lift)
+
 newtype Program = Program [ScDef]
     deriving (Show, Lift)
 
@@ -63,6 +68,15 @@ instance IsString Expr where
     fromString = Var
 
 ----------------------------------------------------------------------------------
+
+instance Pretty Program where
+    -- TODO: module header
+    prettyPrec (Program ss) _ = mconcat $ intersperse "\n\n" $ fmap pretty ss
+
+instance Pretty ScDef where
+    prettyPrec (ScDef n as e) _ =
+        mconcat (intersperse " " $ fmap IStr (n:as))
+        <> " = " <> pretty e <> IBreak
 
 instance Pretty Expr where
     prettyPrec (Var k)      = withPrec maxBound $ IStr k
@@ -106,7 +120,7 @@ instance Pretty Binding where
 ----------------------------------------------------------------------------------
 
 instance Semigroup Program where
-    (<>) = coerce $ (++) @ScDef
+    (<>) = coerce $ (<>) @[ScDef] 
 
 instance Monoid Program where
     mempty = Program []
@@ -125,15 +139,19 @@ isAtomic _       = False
 
 ----------------------------------------------------------------------------------
 
-corePrelude :: Program
-corePrelude = Program
+corePrelude :: Module
+corePrelude = Module (Just ("Prelude", [])) $ Program
     [ ScDef "id" ["x"] (Var "x")
-    , ScDef "K" ["x", "y"] (Var "x")
-    , ScDef "K1" ["x", "y"] (Var "y")
-    , ScDef "S" ["f", "g", "x"] (Var "f" :$ Var "x" :$ (Var "g" :$ Var "x"))
+    , ScDef "k" ["x", "y"] (Var "x")
+    , ScDef "k1" ["x", "y"] (Var "y")
+    , ScDef "succ" ["f", "g", "x"] (Var "f" :$ Var "x" :$ (Var "g" :$ Var "x"))
     , ScDef "compose" ["f", "g", "x"] (Var "f" :$ (Var "g" :$ Var "x"))
     , ScDef "twice" ["f", "x"] (Var "f" :$ (Var "f" :$ Var "x"))
     , ScDef "False" [] $ Con 0 0
     , ScDef "True" [] $ Con 1 0
     ]
+
+-- TODO: export list awareness
+insertModule :: Module -> Program -> Program
+insertModule (Module _ m) p = p <> m
 
