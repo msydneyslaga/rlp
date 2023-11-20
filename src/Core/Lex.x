@@ -4,6 +4,7 @@ module Core.Lex
     ( lexCore
     , lexCore'
     , CoreToken(..)
+    , lexTmp
     )
     where
 import Data.Char (chr)
@@ -81,7 +82,7 @@ $white_no_nl+           { skip }
     "of"                    { constTok TokenOf `andBegin` layout_keyword }
     "case"                  { constTok TokenCase }
     "module"                { constTok TokenModule }
-    "in"                    { constTok TokenIn }
+    "in"                    { letin }
     "where"                 { constTok TokenWhere }
 }
 
@@ -136,10 +137,8 @@ data CoreToken = TokenLet
                | TokenLitInt Int
                | TokenVarName Name
                | TokenConName Name
-               | TokenName Name -- temp
                | TokenVarSym Name
                | TokenConSym Name
-               | TokenSym Name -- temp
                | TokenEquals
                | TokenLParen
                | TokenRParen
@@ -265,17 +264,21 @@ getOffside = do
 doBol :: Lexer
 doBol (p,c,_,s) l = do
     off <- getOffside
-    -- traceM $ show (p, c, s)
     col <- getSrcCol
-    traceM $ show (s, p, col, off)
     case off of
         LT      -> insRBrace p
         EQ      -> insSemi p
         _       -> lexToken
 
-testTmp :: IO (Either String [CoreToken])
-testTmp = do
-    s <- readFile "/tmp/t.hs"
-    pure $ lexCore' s
+letin :: Lexer
+letin (p,_,_,_) l = do
+    popContext
+    pure $ Located p TokenIn
 
+lexTmp :: IO [CoreToken]
+lexTmp = do
+    s <- readFile "/tmp/t.hs"
+    case lexCore' s of
+        Left e -> error e
+        Right a -> pure a
 }
