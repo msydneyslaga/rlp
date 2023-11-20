@@ -154,7 +154,9 @@ Lastly, to handle the top level we will initialise the stack with a
 3. If the first lexeme of a module is not '{' or :code:`module`, then it is
    preceded by :math:`\{n\}` where :math:`n` is the indentation of the lexeme. 
 
-For a more pedantic description of the layout system, see `chapter 10
+This set of rules is adequete enough to satisfy our basic concerns about line
+continations and layout lists. For a more pedantic description of the layout
+system, see `chapter 10
 <https://www.haskell.org/onlinereport/haskell2010/haskellch10.html>`_ of the
 2010 Haskell Report, which I **heavily** referenced here.
 
