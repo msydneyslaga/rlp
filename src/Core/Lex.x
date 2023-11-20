@@ -76,11 +76,11 @@ $white_no_nl+           { skip }
 -- see commentary on the layout system
 <0>
 {
-    "module"                { constTok TokenModule }
-    "let"                   { constTok TokenLet `andBegin` layout }
-    "letrec"                { constTok TokenLet `andBegin` layout }
+    "let"                   { constTok TokenLet `andBegin` layout_keyword }
+    "letrec"                { constTok TokenLet `andBegin` layout_keyword }
+    "of"                    { constTok TokenOf `andBegin` layout_keyword }
     "case"                  { constTok TokenCase }
-    "of"                    { constTok TokenOf `andBegin` layout }
+    "module"                { constTok TokenModule }
     "in"                    { constTok TokenIn }
     "where"                 { constTok TokenWhere }
 }
@@ -89,6 +89,7 @@ $white_no_nl+           { skip }
 <0>
 {
     "="                     { constTok TokenEquals }
+    "->"                    { constTok TokenArrow }
 }
 
 -- identifiers
@@ -105,15 +106,14 @@ $white_no_nl+           { skip }
 <bol>
 {
     \n                      { skip }
-    ()                      { doBOL }
+    ()                      { doBol `andBegin` 0 }
 }
 
-<layout>
+<layout_keyword>
 {
-    -- TODO: does not respect comments nor pragmas
-    \{                      { doLayoutBrace }
-    \n                      { skip }
-    ()                      { newLayoutContext }
+    $white                  { skip }
+    \{                      { lbrace `andBegin` 0 }
+    ()                      { noBrace `andBegin` 0 }
 }
 
 {
@@ -145,29 +145,25 @@ data CoreToken = TokenLet
                | TokenRParen
                | TokenLBrace
                | TokenRBrace
+               | TokenIndent Int
+               | TokenDedent Int
                | TokenSemicolon
                | TokenEOF
                deriving Show
 
 data LayoutContext = Layout Int
                    | NoLayout
+                   deriving Show
 
 data AlexUserState = AlexUserState
     { _ausContext :: [LayoutContext]
-    , _ausStack   :: [Int]
     }
 
 ausContext :: Lens' AlexUserState [LayoutContext]
-ausContext f (AlexUserState ctx stk)
+ausContext f (AlexUserState ctx)
   = fmap
-      (\a -> AlexUserState a stk) (f ctx)
+      (\a -> AlexUserState a) (f ctx)
 {-# INLINE ausContext #-}
-
-ausStack :: Lens' AlexUserState [Int]
-ausStack f (AlexUserState ctx stk)
-  = fmap
-      (\a -> AlexUserState ctx a) (f stk)
-{-# INLINE ausStack #-}
 
 pushContext :: LayoutContext -> Alex ()
 pushContext c = do
@@ -190,7 +186,7 @@ alexEOF :: Alex (Located CoreToken)
 alexEOF = Alex $ \ st@(AlexState { alex_pos = p }) -> Right (st, Located p TokenEOF)
 
 alexInitUserState :: AlexUserState
-alexInitUserState = AlexUserState [] [bol,0]
+alexInitUserState = AlexUserState [Layout 1]
 
 nestedComment :: Lexer
 nestedComment _ _ = undefined
@@ -203,7 +199,8 @@ lexStream = do
         _                   -> (l:) <$> lexStream
 
 lexCore :: String -> Either String [Located CoreToken]
-lexCore s = runAlex s lexStream
+lexCore s = runAlex s (alexSetStartCode layout_keyword *> lexStream)
+-- temp; does not support module header
 
 lexCore' :: String -> Either String [CoreToken]
 lexCore' s = fmap f <$> lexCore s
@@ -220,9 +217,6 @@ getSrcCol = Alex $ \ st ->
     let AlexPn _ _ col = alex_pos st
     in Right (st, col)
 
-doLayoutBrace :: Lexer
-doLayoutBrace (p,_,_,s) _ = undefined
-
 lbrace :: Lexer
 lbrace (p,_,_,_) _ = do
     pushContext NoLayout
@@ -233,8 +227,14 @@ rbrace (p,_,_,_) _ = do
     popContext
     pure $ Located p TokenRBrace
 
-setLexState :: Int -> Alex ()
-setLexState n = Alex $ \st -> Right (st { alex_scd = n }, ())
+insRBrace :: AlexPosn -> Alex (Located CoreToken)
+insRBrace p = do
+    popContext
+    pure $ Located p TokenRBrace
+
+insSemi  :: AlexPosn -> Alex (Located CoreToken)
+insSemi p = do
+    pure $ Located p TokenSemicolon
 
 modifyUst :: (AlexUserState -> AlexUserState) -> Alex ()
 modifyUst f = do
@@ -244,32 +244,38 @@ modifyUst f = do
 getUst :: Alex AlexUserState
 getUst = alexGetUserState
 
-pushLexState :: Int -> Alex ()
-pushLexState n = modifyUst (ausStack %~ (n:)) *> setLexState n
-
-popLexState :: Alex Int
-popLexState = do
-    modifyUst (ausStack %~ drop 1)
-    ust <- getUst
-    let s = case ust ^. ausStack of
-            (a:_) -> a
-            _     -> 0
-    setLexState s
-    pure s
-
 newLayoutContext :: Lexer
 newLayoutContext (p,_,_,_) _ = do
-    _ <- popLexState
-    ctx <- getContext
-    off <- getSrcCol
-    case ctx of
-        Layout prev : _ | off <= prev
-            -> error $ show prev
-        _ -> do
-            pushContext $ Layout off
-            pure $ Located p TokenLBrace
+    undefined
 
-doBOL :: Lexer
-doBOL = undefined
+noBrace :: Lexer
+noBrace (p,_,_,_) l = do
+    col <- getSrcCol
+    pushContext (Layout col)
+    pure $ Located p TokenLBrace
+
+getOffside :: Alex Ordering
+getOffside = do
+    ctx <- getContext
+    m <- getSrcCol
+    case ctx of
+        Layout n : _ -> pure $ m `compare` n
+        _            -> pure GT
+
+doBol :: Lexer
+doBol (p,c,_,s) l = do
+    off <- getOffside
+    -- traceM $ show (p, c, s)
+    col <- getSrcCol
+    traceM $ show (s, p, col, off)
+    case off of
+        LT      -> insRBrace p
+        EQ      -> insSemi p
+        _       -> lexToken
+
+testTmp :: IO (Either String [CoreToken])
+testTmp = do
+    s <- readFile "/tmp/t.hs"
+    pure $ lexCore' s
 
 }
