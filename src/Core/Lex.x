@@ -5,6 +5,7 @@ module Core.Lex
     , lexCore'
     , CoreToken(..)
     , lexTmp
+    , ParserError
     )
     where
 import Data.Char (chr)
@@ -77,13 +78,13 @@ $white_no_nl+           { skip }
 -- see commentary on the layout system
 <0>
 {
-    "let"                   { constTok TokenLet `andBegin` layout_keyword }
-    "letrec"                { constTok TokenLet `andBegin` layout_keyword }
-    "of"                    { constTok TokenOf `andBegin` layout_keyword }
+    "let"                   { constTok TokenLet `andBegin` layout }
+    "letrec"                { constTok TokenLet `andBegin` layout }
+    "of"                    { constTok TokenOf `andBegin` layout }
     "case"                  { constTok TokenCase }
     "module"                { constTok TokenModule }
     "in"                    { letin }
-    "where"                 { constTok TokenWhere }
+    "where"                 { constTok TokenWhere `andBegin` layout }
 }
 
 -- reserved symbols
@@ -110,7 +111,7 @@ $white_no_nl+           { skip }
     ()                      { doBol `andBegin` 0 }
 }
 
-<layout_keyword>
+<layout>
 {
     $white                  { skip }
     \{                      { lbrace `andBegin` 0 }
@@ -144,6 +145,8 @@ data CoreToken = TokenLet
                | TokenRParen
                | TokenLBrace
                | TokenRBrace
+               | TokenLBraceV -- virtual brace inserted by layout
+               | TokenRBraceV -- virtual brace inserted by layout
                | TokenIndent Int
                | TokenDedent Int
                | TokenSemicolon
@@ -198,8 +201,7 @@ lexStream = do
         _                   -> (l:) <$> lexStream
 
 lexCore :: String -> Either String [Located CoreToken]
-lexCore s = runAlex s (alexSetStartCode layout_keyword *> lexStream)
--- temp; does not support module header
+lexCore s = runAlex s (alexSetStartCode 0 *> lexStream)
 
 lexCore' :: String -> Either String [CoreToken]
 lexCore' s = fmap f <$> lexCore s
@@ -226,10 +228,10 @@ rbrace (p,_,_,_) _ = do
     popContext
     pure $ Located p TokenRBrace
 
-insRBrace :: AlexPosn -> Alex (Located CoreToken)
-insRBrace p = do
+insRBraceV :: AlexPosn -> Alex (Located CoreToken)
+insRBraceV p = do
     popContext
-    pure $ Located p TokenRBrace
+    pure $ Located p TokenRBraceV
 
 insSemi  :: AlexPosn -> Alex (Located CoreToken)
 insSemi p = do
@@ -251,7 +253,7 @@ noBrace :: Lexer
 noBrace (p,_,_,_) l = do
     col <- getSrcCol
     pushContext (Layout col)
-    pure $ Located p TokenLBrace
+    pure $ Located p TokenLBraceV
 
 getOffside :: Alex Ordering
 getOffside = do
@@ -266,7 +268,7 @@ doBol (p,c,_,s) l = do
     off <- getOffside
     col <- getSrcCol
     case off of
-        LT      -> insRBrace p
+        LT      -> insRBraceV p
         EQ      -> insSemi p
         _       -> lexToken
 
@@ -281,4 +283,7 @@ lexTmp = do
     case lexCore' s of
         Left e -> error e
         Right a -> pure a
+
+data ParserError
+
 }
