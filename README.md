@@ -44,5 +44,5 @@ Listed in order of importance.
     - [ ] How does an STG work?
     - [ ] CLI usage
     - [ ] Tail call optimisation
-    - [ ] Parser combinators
+    - [x] Parsing rlp
 
