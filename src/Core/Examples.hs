@@ -84,16 +84,16 @@ pairExample = [coreProg|
 
 corePrelude :: Module
 corePrelude = Module (Just ("Prelude", [])) $ Program
-    [ ScDef "id" ["x"] (Var "x")
-    , ScDef "k" ["x", "y"] (Var "x")
-    , ScDef "k1" ["x", "y"] (Var "y")
-    , ScDef "succ" ["f", "g", "x"] (Var "f" :$ Var "x" :$ (Var "g" :$ Var "x"))
-    , ScDef "compose" ["f", "g", "x"] (Var "f" :$ (Var "g" :$ Var "x"))
-    , ScDef "twice" ["f", "x"] (Var "f" :$ (Var "f" :$ Var "x"))
+    [ ScDef "id" ["x"] $ "x"
+    , ScDef "k" ["x", "y"] $ "x"
+    , ScDef "k1" ["x", "y"] $ "y"
+    , ScDef "succ" ["f", "g", "x"] $ "f" :$ "x" :$ ("g" :$ "x")
+    , ScDef "compose" ["f", "g", "x"] "f" :$ ("g" :$ "x")
+    , ScDef "twice" ["f", "x"] $ "f" :$ ("f" :$ "x")
     , ScDef "False" [] $ Con 0 0
     , ScDef "True" [] $ Con 1 0
     , ScDef "MkPair" [] $ Con 1 2
-    -- , ScDef "fst" ["p"] $ "casePair#" :$ "p" :$ "k"
-    -- , ScDef "snd" ["p"] $ "casePair#" :$ "p" :$ "k1"
+    , ScDef "fst" ["p"] $ "casePair#" :$ "p" :$ "k"
+    , ScDef "snd" ["p"] $ "casePair#" :$ "p" :$ "k1"
     ]
 
