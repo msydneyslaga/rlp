@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Core.Examples where
 ----------------------------------------------------------------------------------
 import Core.Syntax
@@ -77,6 +78,10 @@ facExample = [coreProg|
     main = fac 3;
 |]
 
+pairExample = [coreProg|
+    main = fst (snd (fst (MkPair (MkPair 1 (MkPair 2 3)) 4)));
+|]
+
 corePrelude :: Module
 corePrelude = Module (Just ("Prelude", [])) $ Program
     [ ScDef "id" ["x"] (Var "x")
@@ -87,5 +92,8 @@ corePrelude = Module (Just ("Prelude", [])) $ Program
     , ScDef "twice" ["f", "x"] (Var "f" :$ (Var "f" :$ Var "x"))
     , ScDef "False" [] $ Con 0 0
     , ScDef "True" [] $ Con 1 0
+    , ScDef "MkPair" [] $ Con 1 2
+    -- , ScDef "fst" ["p"] $ "casePair#" :$ "p" :$ "k"
+    -- , ScDef "snd" ["p"] $ "casePair#" :$ "p" :$ "k1"
     ]
 
