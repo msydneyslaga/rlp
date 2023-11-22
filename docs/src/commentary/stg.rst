@@ -149,7 +149,7 @@ constructor :code:`O` on two :code:`NNum` s both in normal form.
    }
 
 In a conditional primitive, perform the reduction if the condition has been
-evaluated as True (:code:`ConP 2 0`).
+evaluated as True (:code:`NData 1 []`).
 
 .. math::
    \transrule
@@ -158,7 +158,7 @@ evaluated as True (:code:`ConP 2 0`).
    & h
    \begin{bmatrix}
         f : \mathtt{NPrim} \; \mathtt{IfP} \\
-        c : \mathtt{NPrim} \; (\mathtt{ConP} \; 2 \; 0) \\
+        c : \mathtt{NPrim} \; (\mathtt{NData} \; 1 \; []) \\
         a_1 : \mathtt{NAp} \; f \; c \\
         a_2 : \mathtt{NAp} \; a_1 \; x \\
         a_3 : \mathtt{NAp} \; a_2 \; y
@@ -172,7 +172,7 @@ evaluated as True (:code:`ConP 2 0`).
    }
 
 In a conditional primitive, perform the reduction if the condition has been
-evaluated as False (:code:`ConP 1 0`).
+evaluated as False (:code:`NData 0 []`).
 
 .. math::
    \transrule
@@ -181,7 +181,7 @@ evaluated as False (:code:`ConP 1 0`).
    & h
    \begin{bmatrix}
         f : \mathtt{NPrim} \; \mathtt{IfP} \\
-        c : \mathtt{NPrim} \; (\mathtt{ConP} \; 1 \; 0) \\
+        c : \mathtt{NPrim} \; (\mathtt{NData} \; 0 \; []) \\
         a_1 : \mathtt{NAp} \; f \; c \\
         a_2 : \mathtt{NAp} \; a_1 \; x \\
         a_3 : \mathtt{NAp} \; a_2 \; y
