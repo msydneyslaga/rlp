@@ -23,9 +23,7 @@ import Lens.Micro.TH
 $whitechar = [ \t\n\r\f\v]
 $special   = [\(\)\,\;\[\]\{\}]
 
-$ascdigit  = 0-9
-$unidigit  = [] -- TODO
-$digit     = [$ascdigit $unidigit]
+$digit     = 0-9
 
 $ascsymbol = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~]
 $unisymbol = [] -- TODO
@@ -62,6 +60,8 @@ rlp :-
 -- everywhere: skip whitespace
 $white_no_nl+           { skip }
 
+-- TODO: `--` could begin an operator
+"--"[^$nl]*             { skip }
 "--"\-*[^$symbol].*     { skip }
 
 "{-"                        { nestedComment }
@@ -82,7 +82,7 @@ $white_no_nl+           { skip }
 <0>
 {
     "let"                   { constTok TokenLet `andBegin` layout }
-    "letrec"                { constTok TokenLet `andBegin` layout }
+    "letrec"                { constTok TokenLetrec `andBegin` layout }
     "of"                    { constTok TokenOf `andBegin` layout }
     "case"                  { constTok TokenCase }
     "module"                { constTok TokenModule }
@@ -106,7 +106,20 @@ $white_no_nl+           { skip }
     @varsym                 { lexWith TokenVarSym }
 }
 
+-- literals
+<0>
+{
+    @decimal                { lexWith (TokenLitInt . read @Int) }
+}
+
 <0> \n                      { begin bol }
+
+<initial>
+{
+    $white                  { skip }
+    \n                      { skip }
+    ()                      { topLevelOff `andBegin` 0 }
+}
 
 <bol>
 {
@@ -188,7 +201,7 @@ getContext = do
 type Lexer = AlexInput -> Int -> Alex (Located CoreToken)
 
 alexInitUserState :: AlexUserState
-alexInitUserState = AlexUserState [Layout 1]
+alexInitUserState = AlexUserState []
 
 nestedComment :: Lexer
 nestedComment _ _ = undefined
@@ -205,13 +218,13 @@ lexCore :: String -> RLPC ParseError [Located CoreToken]
 lexCore s = case m of
     Left e   -> addFatal err
         where err = SrcError
-                { _errLocation = undefined -- TODO: location
+                { _errLocation = (0,0) -- TODO: location
                 , _errSeverity = Error
                 , _errDiagnostic = ParErrLexical e
                 }
     Right ts -> pure ts
     where
-        m = runAlex s (alexSetStartCode 0 *> lexStream)
+        m = runAlex s (alexSetStartCode initial *> lexStream)
 
 -- | @lexCore@, but the tokens are stripped of location info. Useful for
 -- debugging
@@ -280,7 +293,7 @@ getOffside = do
         _            -> pure GT
 
 doBol :: Lexer
-doBol (p,c,_,s) l = do
+doBol (p,c,_,s) _ = do
     off <- getOffside
     case off of
         LT      -> insRBraceV p
@@ -292,7 +305,11 @@ letin (p,_,_,_) l = do
     popContext
     pure $ Located p TokenIn
 
+topLevelOff :: Lexer
+topLevelOff = noBrace
+
 alexEOF :: Alex (Located CoreToken)
-alexEOF = Alex $ \ st@(AlexState { alex_pos = p }) -> Right (st, Located p TokenEOF)
+alexEOF = Alex $ \ st@(AlexState { alex_pos = p }) ->
+    Right (st, Located p TokenEOF)
 
 }

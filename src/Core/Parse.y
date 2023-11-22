@@ -2,6 +2,7 @@
 module Core.Parse
     ( parseCore
     , parseCoreExpr
+    , parseCoreProg
     , module Core.Lex -- temp convenience
     , parseTmp
     , SrcError
@@ -19,6 +20,7 @@ import Compiler.RLPC
 
 %name parseCore Module
 %name parseCoreExpr StandaloneExpr
+%name parseCoreProg StandaloneProgram
 %tokentype { Located CoreToken }
 %error { parseError }
 %monad { RLPC ParseError }
@@ -56,6 +58,9 @@ Module          : module conname where Program Eof { Module (Just ($2, [])) $4 }
 Eof             :: { () }
 Eof             : eof           { () }
                 | error         { () }
+
+StandaloneProgram :: { Program }
+StandaloneProgram : Program eof                 { $1 }
 
 Program         :: { Program }
 Program         : VOpen ScDefs VClose           { Program $2 }

@@ -1,5 +1,6 @@
 module Core.TH
     ( coreExpr
+    , coreProg
     , core
     )
     where
@@ -16,6 +17,14 @@ import Core.Lex
 core :: QuasiQuoter
 core = QuasiQuoter
     { quoteExp = qCore
+    , quotePat = error "core quasiquotes may only be used in expressions"
+    , quoteType = error "core quasiquotes may only be used in expressions"
+    , quoteDec = error "core quasiquotes may only be used in expressions"
+    }
+
+coreProg :: QuasiQuoter
+coreProg = QuasiQuoter
+    { quoteExp = qCoreProg
     , quotePat = error "core quasiquotes may only be used in expressions"
     , quoteType = error "core quasiquotes may only be used in expressions"
     , quoteDec = error "core quasiquotes may only be used in expressions"
@@ -42,4 +51,11 @@ qCoreExpr s = case parseExpr s of
     Right (m,ts) -> lift m
     where
         parseExpr = evalRLPC RLPCOptions . (lexCore >=> parseCoreExpr)
+
+qCoreProg :: String -> Q Exp
+qCoreProg s = case parseProg s of
+    Left e       -> error (show e)
+    Right (m,ts) -> lift m
+    where
+        parseProg = evalRLPC RLPCOptions . (lexCore >=> parseCoreProg)
 
