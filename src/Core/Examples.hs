@@ -64,8 +64,12 @@ arithExample2 = [coreProg|
     main = negate# ((+#) 2 ((*#) 5 3));
 |]
 
-ifExample = [coreProg|
+ifExample1 = [coreProg|
     main = if# True 2 3;
+|]
+
+ifExample2 = [coreProg|
+    main = if# (id True) 2 3;
 |]
 
 facExample = [coreProg|

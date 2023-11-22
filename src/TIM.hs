@@ -3,7 +3,8 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 module TIM
-    where
+    ( module Core.Examples
+    ) where
 ----------------------------------------------------------------------------------
 import Data.Map                 (Map, (!?), (!))
 import Data.Map qualified as M
@@ -21,6 +22,7 @@ import Lens.Micro
 import Lens.Micro.TH
 import Data.Pretty
 import Data.Heap
+import Core.Examples
 import Core
 ----------------------------------------------------------------------------------
 
