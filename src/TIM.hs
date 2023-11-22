@@ -185,7 +185,7 @@ eval st = st : sts
 step :: TiState -> TiState
 step st =
     let TiState (top:_) _ h _ _ = st
-    in case fromMaybe (error "segfault!") (hLookup top h) of
+    in case hLookupUnsafe top h of
         NNum n            -> numStep  n      st
         NAp f x           -> apStep   f x    st
         NSupercomb n as b -> scStep   n as b st
