@@ -45,4 +45,7 @@ Listed in order of importance.
     - [ ] CLI usage
     - [ ] Tail call optimisation
     - [x] Parsing rlp
+- [ ] Tests
+    - [ ] Generic example programs
+    - [ ] Parser
 
