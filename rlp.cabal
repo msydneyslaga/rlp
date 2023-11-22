@@ -35,6 +35,7 @@ library
                     , containers
                     , microlens
                     , microlens-th
+                    , mtl
                     , template-haskell
                     -- required for happy
                     , array

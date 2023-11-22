@@ -1,4 +1,3 @@
--- TODO: resolve shift/reduce conflicts
 {
 module Core.Parse
     ( parseCore
@@ -8,6 +7,7 @@ module Core.Parse
     )
     where
 
+import Control.Monad        ((>=>))
 import Data.Foldable        (foldl')
 import Core.Syntax
 import Core.Lex
@@ -16,31 +16,33 @@ import Compiler.RLPC
 
 %name parseCore Module
 %name parseCoreExpr Expr
-%tokentype { CoreToken }
+%tokentype { Located CoreToken }
 %error { parseError }
-%monad { RLPC }
+%monad { RLPC ParseError }
 
 %token
-      let             { TokenLet }
-      letrec          { TokenLetrec }
-      module          { TokenModule }
-      where           { TokenWhere }
-      ','             { TokenComma }
-      in              { TokenIn }
-      litint          { TokenLitInt $$ }
-      varname         { TokenVarName $$ }
-      varsym          { TokenVarSym $$ }
-      conname         { TokenConName $$ }
-      consym          { TokenConSym $$ }
-      'λ'             { TokenLambda }
-      '->'            { TokenArrow }
-      '='             { TokenEquals }
-      '('             { TokenLParen }
-      ')'             { TokenRParen }
-      '{'             { TokenLBrace }
-      '}'             { TokenRBrace }
-      ';'             { TokenSemicolon }
-      eof             { TokenEOF }
+      let             { Located _ TokenLet }
+      letrec          { Located _ TokenLetrec }
+      module          { Located _ TokenModule }
+      where           { Located _ TokenWhere }
+      ','             { Located _ TokenComma }
+      in              { Located _ TokenIn }
+      litint          { Located _ (TokenLitInt $$) }
+      varname         { Located _ (TokenVarName $$) }
+      varsym          { Located _ (TokenVarSym $$) }
+      conname         { Located _ (TokenConName $$) }
+      consym          { Located _ (TokenConSym $$) }
+      'λ'             { Located _ TokenLambda }
+      '->'            { Located _ TokenArrow }
+      '='             { Located _ TokenEquals }
+      '('             { Located _ TokenLParen }
+      ')'             { Located _ TokenRParen }
+      '{'             { Located _ TokenLBrace }
+      '}'             { Located _ TokenRBrace }
+      vl              { Located _ TokenLBraceV }
+      vr              { Located _ TokenRBraceV }
+      ';'             { Located _ TokenSemicolon }
+      eof             { Located _ TokenEOF }
 
 %%
 
@@ -53,7 +55,14 @@ Eof             : eof           { () }
                 | error         { () }
 
 Program         :: { Program }
-Program         : '{' ScDefs Close              { Program $2 }
+Program         : VOpen ScDefs VClose              { Program $2 }
+
+VOpen           :: { () }
+VOpen           : vl                            { () }
+
+VClose          :: { () }
+VClose          : vr                            { () }
+                | error                         { () }
 
 ScDefs          :: { [ScDef] }
 ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
@@ -67,15 +76,16 @@ ParList         : Var ParList                   { $1 : $2 }
                 | {- epsilon -}                 { [] }
 
 Expr            :: { Expr }
-Expr            : let '{' Bindings Close in Expr  { Let NonRec $3 $6 }
-                | letrec '{' Bindings Close in Expr { Let Rec $3 $6 }
+Expr            : LetExpr                       { $1 }
                 | 'λ' Binders '->' Expr         { Lam $2 $4 }
                 | Application                   { $1 }
                 | Expr1                         { $1 }
 
-Close           :: { () }
-Close           : '}'                           { () }
-                | error                         { () }
+LetExpr         :: { Expr }
+LetExpr         : let    VOpen Bindings VClose in Expr { Let NonRec $3 $6 }
+                | letrec VOpen Bindings VClose in Expr { Let Rec $3 $6 }
+                | let    '{'   Bindings '}'    in Expr { Let NonRec $3 $6 }
+                | letrec '{'   Bindings '}'    in Expr { Let Rec $3 $6 }
 
 Binders         :: { [Name] }
 Binders         : Var Binders                  { $1 : $2 }
@@ -115,14 +125,21 @@ Con             : '(' consym ')'                    { $2 }
                 | conname                           { $1 }
 
 {
-parseError :: [CoreToken] -> a
-parseError ts = error $ "parse error at token: " <> show (head ts)
+parseError :: [Located CoreToken] -> RLPC ParseError a
+parseError (Located (AlexPn _ x y) _ : _) = addFatal err
+    where err = SrcError
+            { _errLocation = (x, y)
+            , _errSeverity = Error
+            , _errDiagnostic = ParErrParse
+            }
 
-parseTmp :: IO (Module)
+parseTmp :: IO Module
 parseTmp = do
     s <- readFile "/tmp/t.hs"
-    case lexCore' s >>= runRLPC . parseCore of
-        Left e -> error e
-        Right a -> pure a
+    case parse s of
+        Left e -> error (show e)
+        Right (ts,_) -> pure ts
+    where
+        parse = evalRLPC RLPCOptions . (lexCore >=> parseCore)
 }
 

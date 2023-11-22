@@ -1,16 +1,19 @@
 {
+-- TODO: layout semicolons are not inserted at EOf.
 {-# LANGUAGE TemplateHaskell #-}
 module Core.Lex
     ( lexCore
     , lexCore'
     , CoreToken(..)
-    , lexTmp
-    , ParserError
+    , ParseError(..)
+    , Located(..)
+    , AlexPosn(..)
     )
     where
 import Data.Char (chr)
 import Debug.Trace
 import Core.Syntax
+import Compiler.RLPC
 import Lens.Micro
 import Lens.Micro.TH
 }
@@ -184,9 +187,6 @@ getContext = do
 
 type Lexer = AlexInput -> Int -> Alex (Located CoreToken)
 
-alexEOF :: Alex (Located CoreToken)
-alexEOF = Alex $ \ st@(AlexState { alex_pos = p }) -> Right (st, Located p TokenEOF)
-
 alexInitUserState :: AlexUserState
 alexInitUserState = AlexUserState [Layout 1]
 
@@ -200,12 +200,28 @@ lexStream = do
         Located _ TokenEOF  -> pure [l]
         _                   -> (l:) <$> lexStream
 
-lexCore :: String -> Either String [Located CoreToken]
-lexCore s = runAlex s (alexSetStartCode 0 *> lexStream)
+-- | The main lexer driver.
+lexCore :: String -> RLPC ParseError [Located CoreToken]
+lexCore s = case m of
+    Left e   -> addFatal err
+        where err = SrcError
+                { _errLocation = undefined -- TODO: location
+                , _errSeverity = Error
+                , _errDiagnostic = ParErrLexical e
+                }
+    Right ts -> pure ts
+    where
+        m = runAlex s (alexSetStartCode 0 *> lexStream)
 
-lexCore' :: String -> Either String [CoreToken]
+-- | @lexCore@, but the tokens are stripped of location info. Useful for
+-- debugging
+lexCore' :: String -> RLPC ParseError [CoreToken]
 lexCore' s = fmap f <$> lexCore s
     where f (Located _ t) = t
+
+data ParseError = ParErrLexical String
+                | ParErrParse
+                deriving Show
 
 lexWith :: (String -> CoreToken) -> Lexer
 lexWith f (p,_,_,s) l = pure $ Located p (f $ take l s)
@@ -266,7 +282,6 @@ getOffside = do
 doBol :: Lexer
 doBol (p,c,_,s) l = do
     off <- getOffside
-    col <- getSrcCol
     case off of
         LT      -> insRBraceV p
         EQ      -> insSemi p
@@ -277,13 +292,7 @@ letin (p,_,_,_) l = do
     popContext
     pure $ Located p TokenIn
 
-lexTmp :: IO [CoreToken]
-lexTmp = do
-    s <- readFile "/tmp/t.hs"
-    case lexCore' s of
-        Left e -> error e
-        Right a -> pure a
-
-data ParserError
+alexEOF :: Alex (Located CoreToken)
+alexEOF = Alex $ \ st@(AlexState { alex_pos = p }) -> Right (st, Located p TokenEOF)
 
 }
