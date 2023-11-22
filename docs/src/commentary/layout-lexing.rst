@@ -92,9 +92,10 @@ styles often seen in Haskell are somewhat esoteric compared to Python's
        }
 
    -- another formatting oddity
-   -- note that this is not line contiation!
-   -- `look at`, `this`, and `alignment`
-   -- are all separate expressions!
+   -- note that this is not a single
+   -- continued line! `look at`,
+   -- `this`, and `alignment` are all
+   -- separate expressions!
    anotherThing = do look at
                      this
                      alignment
@@ -109,56 +110,120 @@ Thankfully for us, our entry point is quite clear; layouts only appear after a
 select few keywords, (with a minor exception; TODO: elaborate) being :code:`let`
 (followed by supercombinators), :code:`where` (followed by supercombinators),
 :code:`do` (followed by expressions), and :code:`of` (followed by alternatives)
-(TODO: all of these terms need linked glossary entries). Under this assumption,
-we give the following rule:
-
-1. If a :code:`let`, :code:`where`, :code:`do`, or :code:`of` keyword is not
-   followed by the lexeme :code:`{`, the token :math:`\{n\}` is inserted after
-   the keyword, where :math:`n` is the indentation of the next lexeme if there
-   is one, or 0 if the end of file has been reached.
-
-Henceforth :math:`\{n\}` will denote the token representing the begining of a
-layout; similar in function to a brace, but it stores the indentation level for
-subsequent lines to compare with. We must introduce an additional input to the
-function handling layouts. Obviously, such a function would require the input
-string, but a helpful book-keeping tool which we will make good use of is a
-stack of "layout contexts", describing the current cascade of layouts. Each
-element is either a :code:`NoLayout`, indicating an explicit layout (i.e. the
-programmer inserted semicolons and braces herself) or a :code:`Layout n` where
-:code:`n` is a non-negative integer representing the indentation level of the
-enclosing context.
+(TODO: all of these terms need linked glossary entries). In order to manage the
+cascade of layout contexts, our lexer will record a stack for which each element
+is either :math:`\varnothing`, denoting an explicit layout written with braces
+and semicolons, or a :math:`\langle n \rangle`, denoting an implicitly laid-out
+layout where the start of each item belonging to the layout is indented
+:math:`n` columns.
 
 .. code-block:: haskell
 
-    f x -- layout stack: []
-        = let -- layout keyword; remember indentation of next token
-              y = w * w -- layout stack: [Layout 10]
+    -- layout stack: []
+    module M where -- layout stack: [∅]
+
+    f x = let -- layout keyword; remember indentation of next token
+              y = w * w -- layout stack: [∅, <10>]
               w = x + x
+              -- layout ends here
           in do -- layout keyword; next token is a brace!
-              { -- layout stack: [NoLayout]
-              pure }
+              { -- layout stack: [∅]
+                  print y;
+                  print x;
+              }
 
-In the code seen above, notice that :code:`let` allows for multiple definitions,
-separated by a newline. We accomate for this with a token :math:`\langle n
-\rangle` which compliments :math:`\{n\}` in how it functions as a closing brace
-that stores indentation. We give a rule to describe the source of such a token:
+Finally, we also need the concept of "virtual" brace tokens, which as far as
+we're concerned at this moment are exactly like normal brace tokens, except
+implicitly inserted by the compiler. With the presented ideas in mind, we may
+begin to introduce a small set of informal rules describing the lexer's handling
+of layouts, the first being:
 
-2. When the first lexeme on a line is preceeded by only whitespace a
-   :math:`\langle n \rangle` token is inserted before the lexeme, where
-   :math:`n` is the indentation of the lexeme, provided that it is not, as a
-   consequence of rule 1 or rule 3 (as we'll see), preceded by {n}. 
+1. If a layout keyword is followed by the token '{', push :math:`\varnothing`
+   onto the layout context stack. Otherwise, push :math:`\langle n \rangle` onto
+   the layout context stack where :math:`n` is the indentation of the token
+   following the layout keyword. Additionally, the lexer is to insert a virtual
+   opening brace after the token representing the layout keyword.
 
-Lastly, to handle the top level we will initialise the stack with a
-:math:`\{n\}` where :math:`n` is the indentation of the first lexeme.
+Consider the following observations from that previous code sample:
 
-3. If the first lexeme of a module is not '{' or :code:`module`, then it is
-   preceded by :math:`\{n\}` where :math:`n` is the indentation of the lexeme. 
+* Function definitions should belong to a layout, each of which may start at
+  column 1.
+
+* A layout can enclose multiple bodies, as seen in the :code:`let`-bindings and
+  the :code:`do`-expression.
+
+* Semicolons should *terminate* items, rather than *separate* them.
+
+Our current focus is the semicolons. In an implicit layout, items are on
+separate lines each aligned with the previous. A naïve implementation would be
+to insert the semicolon token when the EOL is reached, but this proves unideal
+when you consider the alignment requirement. In our implementation, our lexer
+will wait until the first token on a new line is reached, then compare
+indentation and insert a semicolon if appropriate. This comparison -- the
+nondescript measurement of "more, less, or equal indentation" rather than a
+numeric value -- is referred to as *offside* by myself internally and the
+Haskell report describing layouts. We informally formalise this rule as follows:
+
+2. When the first token on a line is preceeded only by whitespace, if the
+   token's first grapheme resides on a column number :math:`m` equal to the
+   indentation level of the enclosing context -- i.e. the :math:`\langle n
+   \rangle` on top of the layout stack. Should no such context exist on the
+   stack, assume :math:`m > n`.
+
+We have an idea of how to begin layouts, delimit the enclosed items, and last
+we'll need to end layouts. This is where the distinction between virtual and
+non-virtual brace tokens comes into play. The lexer needs only partial concern
+towards closing layouts; the complete responsibility is shared with the parser.
+This will be elaborated on in the next section. For now, we will be content with
+naïvely inserting a virtual closing brace when a token is indented right of the
+layout.
+
+3. Under the same conditions as rule 2., when :math:`m < n` the lexer shall
+   insert a virtual closing brace and pop the layout stack.
+
+This rule covers some cases including the top-level, however, consider
+tokenising the :code:`in` in a :code:`let`-expression. If our lexical analysis
+framework only allows for lexing a single token at a time, we cannot return both
+a virtual right-brace and a :code:`in`. Under this model, the lexer may simply
+pop the layout stack and return the :code:`in` token. As we'll see in the next
+section, as long as the lexer keeps track of its own context (i.e. the stack),
+the parser will cope just fine without the virtual end-brace.
+
+Parsing Lonely Braces
+*********************
+
+When viewed in the abstract, parsing and tokenising are near-identical tasks yet
+the two are very often decomposed into discrete systems with very different
+implementations. Lexers operate on streams of text and tokens, while parsers
+are typically far less linear, using a parse stack or recursing top-down. A
+big reason for this separation is state management: the parser aims to be as
+context-free as possible, while the lexer tends to burden the necessary
+statefulness. Still, the nature of a stream-oriented lexer makes backtracking
+difficult and quite inelegant.
+
+However, simply declaring a parse error to be not an error at all
+counterintuitively proves to be an elegant solution our layout problem which
+minimises backtracking and state in both the lexer and the parser. Consider the
+following definitions found in rlp's BNF:
+
+.. productionlist:: rlp
+   VOpen   : `vopen`
+   VClose  : `vclose` | `error`
+
+A parse error is recovered and treated as a closing brace. Another point of note
+in the BNF is the difference between virtual and non-virtual braces (TODO: i
+don't like that the BNF is formatted without newlines :/):
+
+.. productionlist:: rlp
+   LetExpr : `let` VOpen Bindings VClose `in` Expr | `let` `{` Bindings `}` `in` Expr
+
+This ensures that non-virtual braces are closed explicitly.
 
 This set of rules is adequete enough to satisfy our basic concerns about line
 continations and layout lists. For a more pedantic description of the layout
 system, see `chapter 10
 <https://www.haskell.org/onlinereport/haskell2010/haskellch10.html>`_ of the
-2010 Haskell Report, which I **heavily** referenced here.
+2010 Haskell Report, which I heavily referenced here.
 
 References
 ----------
@@ -166,5 +231,5 @@ References
 * `Python's lexical analysis
   <https://docs.python.org/3/reference/lexical_analysis.html>`_
 
-* `Haskell Syntax Reference
+* `Haskell syntax reference
   <https://www.haskell.org/onlinereport/haskell2010/haskellch10.html>`_

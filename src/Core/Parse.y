@@ -58,7 +58,8 @@ Eof             : eof           { () }
                 | error         { () }
 
 Program         :: { Program }
-Program         : VOpen ScDefs VClose              { Program $2 }
+Program         : VOpen ScDefs VClose           { Program $2 }
+                | '{'   ScDefs '}'              { Program $2 }
 
 VOpen           :: { () }
 VOpen           : vl                            { () }
