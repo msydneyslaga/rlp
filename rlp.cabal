@@ -27,6 +27,8 @@ library
                     , Core.TH
                     , Core.Examples
                     , Core.Lex
+                    , Compiler.RLPC
+                    , Control.Monad.Errorful
 
     build-tool-depends: happy:happy, alex:alex
 

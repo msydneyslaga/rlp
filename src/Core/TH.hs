@@ -5,8 +5,10 @@ module Core.TH
     where
 ----------------------------------------------------------------------------------
 import Language.Haskell.TH
-import Language.Haskell.TH.Syntax
+import Language.Haskell.TH.Syntax hiding (Module)
 import Language.Haskell.TH.Quote
+import Control.Monad                ((>=>))
+import Compiler.RLPC
 import Core.Parse
 import Core.Lex
 ----------------------------------------------------------------------------------
@@ -27,16 +29,17 @@ coreExpr = QuasiQuoter
     , quoteDec = error "core quasiquotes may only be used in expressions"
     }
 
-qCore = undefined
-qCoreExpr = undefined
+qCore :: String -> Q Exp
+qCore s = case parse s of
+    Left e       -> error (show e)
+    Right (m,ts) -> lift m
+    where
+        parse = evalRLPC RLPCOptions . (lexCore >=> parseCore)
 
--- qCore :: String -> Q Exp
--- qCore s = case lexCore s >>= parseCore of
---     Success a -> lift a
---     Error e _ _ -> error e
-
--- qCoreExpr :: String -> Q Exp
--- qCoreExpr s = case lexCore s >>= parseCoreExpr of
---     Success a -> lift a
---     Error e _ _ -> error e
+qCoreExpr :: String -> Q Exp
+qCoreExpr s = case parseExpr s of
+    Left e       -> error (show e)
+    Right (m,ts) -> lift m
+    where
+        parseExpr = evalRLPC RLPCOptions . (lexCore >=> parseCoreExpr)
 

@@ -4,6 +4,9 @@ module Core.Parse
     , parseCoreExpr
     , module Core.Lex -- temp convenience
     , parseTmp
+    , SrcError
+    , ParseError
+    , Module
     )
     where
 
@@ -15,7 +18,7 @@ import Compiler.RLPC
 }
 
 %name parseCore Module
-%name parseCoreExpr Expr
+%name parseCoreExpr StandaloneExpr
 %tokentype { Located CoreToken }
 %error { parseError }
 %monad { RLPC ParseError }
@@ -74,6 +77,9 @@ ScDef           : Var ParList '=' Expr          { ScDef $1 $2 $4 }
 ParList         :: { [Name] }
 ParList         : Var ParList                   { $1 : $2 }
                 | {- epsilon -}                 { [] }
+
+StandaloneExpr  :: { Expr }
+StandaloneExpr  : Expr eof                      { $1 }
 
 Expr            :: { Expr }
 Expr            : LetExpr                       { $1 }
@@ -141,5 +147,6 @@ parseTmp = do
         Right (ts,_) -> pure ts
     where
         parse = evalRLPC RLPCOptions . (lexCore >=> parseCore)
+
 }
 
