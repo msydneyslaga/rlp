@@ -139,7 +139,7 @@ data Located a = Located Int Int Int a
     deriving Show
 
 constTok :: t -> AlexInput -> Int -> Alex (Located t)
-constTok t (AlexPn _ y x,_,_,_) l = pure $ Located x y l t
+constTok t (AlexPn _ y x,_,_,_) l = pure $ Located y x l t
 
 data CoreToken = TokenLet
                | TokenLetrec
@@ -237,7 +237,7 @@ data ParseError = ParErrLexical String
                 deriving Show
 
 lexWith :: (String -> CoreToken) -> Lexer
-lexWith f (AlexPn _ y x,_,_,s) l = pure $ Located x y l (f $ take l s)
+lexWith f (AlexPn _ y x,_,_,s) l = pure $ Located y x l (f $ take l s)
 
 lexToken :: Alex (Located CoreToken)
 lexToken = alexMonadScan
@@ -250,21 +250,21 @@ getSrcCol = Alex $ \ st ->
 lbrace :: Lexer
 lbrace (AlexPn _ y x,_,_,_) l = do
     pushContext NoLayout
-    pure $ Located x y l TokenLBrace
+    pure $ Located y x l TokenLBrace
 
 rbrace :: Lexer
 rbrace (AlexPn _ y x,_,_,_) l = do
     popContext
-    pure $ Located x y l TokenRBrace
+    pure $ Located y x l TokenRBrace
 
 insRBraceV :: AlexPosn -> Alex (Located CoreToken)
 insRBraceV (AlexPn _ y x) = do
     popContext
-    pure $ Located x y 0 TokenRBraceV
+    pure $ Located y x 0 TokenRBraceV
 
 insSemi  :: AlexPosn -> Alex (Located CoreToken)
 insSemi (AlexPn _ y x) = do
-    pure $ Located x y 0 TokenSemicolon
+    pure $ Located y x 0 TokenSemicolon
 
 modifyUst :: (AlexUserState -> AlexUserState) -> Alex ()
 modifyUst f = do
@@ -282,7 +282,7 @@ noBrace :: Lexer
 noBrace (AlexPn _ y x,_,_,_) l = do
     col <- getSrcCol
     pushContext (Layout col)
-    pure $ Located x y l TokenLBraceV
+    pure $ Located y x l TokenLBraceV
 
 getOffside :: Alex Ordering
 getOffside = do
@@ -303,13 +303,13 @@ doBol (p,c,_,s) _ = do
 letin :: Lexer
 letin (AlexPn _ y x,_,_,_) l = do
     popContext
-    pure $ Located x y l TokenIn
+    pure $ Located y x l TokenIn
 
 topLevelOff :: Lexer
 topLevelOff = noBrace
 
 alexEOF :: Alex (Located CoreToken)
 alexEOF = Alex $ \ st@(AlexState { alex_pos = AlexPn _ y x }) ->
-    Right (st, Located x y 0 TokenEOF)
+    Right (st, Located y x 0 TokenEOF)
 
 }

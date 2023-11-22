@@ -50,6 +50,7 @@ data Prim = ConP Int Int -- ConP Tag Arity
           | IntDivP
           | IntNegP
           | IntEqP
+          | CasePairP
           deriving (Show, Eq)
 
 instance Pretty Prim where
@@ -104,6 +105,7 @@ primitives =
     , ("/#",        IntDivP)
     , ("==#",       IntEqP)
     , ("if#",       IfP)
+    , ("casePair#", CasePairP)
     ]
 
 instantiate :: Expr -> TiHeap -> [(Name, Addr)] -> (TiHeap, Addr)

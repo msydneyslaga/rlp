@@ -138,9 +138,9 @@ Con             : '(' consym ')'                    { $2 }
 
 {
 parseError :: [Located CoreToken] -> RLPC ParseError a
-parseError (Located x y l _ : _) = addFatal err
+parseError (Located y x l _ : _) = addFatal err
     where err = SrcError
-            { _errSpan       = (x, y, l)
+            { _errSpan       = (y,x,l)
             , _errSeverity   = Error
             , _errDiagnostic = ParErrParse
             }

@@ -10,7 +10,6 @@ module Core.Syntax
     , ScDef(..)
     , Module(..)
     , Program(..)
-    , corePrelude
     , bindersOf
     , rhssOf
     , isAtomic
@@ -138,18 +137,6 @@ isAtomic (Var _) = True
 isAtomic _       = False
 
 ----------------------------------------------------------------------------------
-
-corePrelude :: Module
-corePrelude = Module (Just ("Prelude", [])) $ Program
-    [ ScDef "id" ["x"] (Var "x")
-    , ScDef "k" ["x", "y"] (Var "x")
-    , ScDef "k1" ["x", "y"] (Var "y")
-    , ScDef "succ" ["f", "g", "x"] (Var "f" :$ Var "x" :$ (Var "g" :$ Var "x"))
-    , ScDef "compose" ["f", "g", "x"] (Var "f" :$ (Var "g" :$ Var "x"))
-    , ScDef "twice" ["f", "x"] (Var "f" :$ (Var "f" :$ Var "x"))
-    , ScDef "False" [] $ Con 0 0
-    , ScDef "True" [] $ Con 1 0
-    ]
 
 -- TODO: export list awareness
 insertModule :: Module -> Program -> Program
