@@ -13,3 +13,7 @@ simple ideas. Please excuse us, it's really fun :3.
    case alternative
       An possible match in a case expression (TODO: example)
 
+   layout
+      The syntax used in rlp and Haskell that allows for implicitly sectioned
+      code using alignment and newlines.
+
