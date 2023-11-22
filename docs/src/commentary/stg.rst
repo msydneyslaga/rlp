@@ -4,7 +4,7 @@ The *Spineless Tagless G-Machine*
 WIP. This will hopefully be expanded into a thorough walkthrough of the state
 machine.
 
-Evaluation is complete when a single \texttt{NNum} remains on the stack and the
+Evaluation is complete when a single :code:`NNum` remains on the stack and the
 dump is empty.
 
 .. math::
