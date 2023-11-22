@@ -267,6 +267,7 @@ step st =
 
         primStep _ IfP (TiState s d h g sts) = TiState s' d' h' g sts
             where
+                -- the condition is evaluated if it is not in normal form
                 s' | needsEval cn               = [c]
                    | otherwise                  = drop 3 s
 
@@ -281,6 +282,8 @@ step st =
                 [c,t,f] = getArgs h s
                 rootAddr = head s'
                 isTrue = case cn of
+                    -- see Core.Examples.corePrelude; True and False are defined
+                    -- as Con 1 0 and Con 0 0, respectively
                     NData 0 [] -> False
                     NData 1 [] -> True
 
