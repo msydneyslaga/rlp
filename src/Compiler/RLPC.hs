@@ -42,7 +42,7 @@ evalRLPC o m = coerce $ evalRLPCT o m
 data RLPCOptions = RLPCOptions
 
 data SrcError e = SrcError
-    { _errLocation   :: (Int, Int)
+    { _errSpan       :: (Int, Int, Int)
     , _errSeverity   :: Severity
     , _errDiagnostic :: e
     }

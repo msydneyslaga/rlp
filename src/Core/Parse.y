@@ -26,28 +26,28 @@ import Compiler.RLPC
 %monad { RLPC ParseError }
 
 %token
-      let             { Located _ TokenLet }
-      letrec          { Located _ TokenLetrec }
-      module          { Located _ TokenModule }
-      where           { Located _ TokenWhere }
-      ','             { Located _ TokenComma }
-      in              { Located _ TokenIn }
-      litint          { Located _ (TokenLitInt $$) }
-      varname         { Located _ (TokenVarName $$) }
-      varsym          { Located _ (TokenVarSym $$) }
-      conname         { Located _ (TokenConName $$) }
-      consym          { Located _ (TokenConSym $$) }
-      'λ'             { Located _ TokenLambda }
-      '->'            { Located _ TokenArrow }
-      '='             { Located _ TokenEquals }
-      '('             { Located _ TokenLParen }
-      ')'             { Located _ TokenRParen }
-      '{'             { Located _ TokenLBrace }
-      '}'             { Located _ TokenRBrace }
-      vl              { Located _ TokenLBraceV }
-      vr              { Located _ TokenRBraceV }
-      ';'             { Located _ TokenSemicolon }
-      eof             { Located _ TokenEOF }
+      let             { Located _ _ _ TokenLet }
+      letrec          { Located _ _ _ TokenLetrec }
+      module          { Located _ _ _ TokenModule }
+      where           { Located _ _ _ TokenWhere }
+      ','             { Located _ _ _ TokenComma }
+      in              { Located _ _ _ TokenIn }
+      litint          { Located _ _ _ (TokenLitInt $$) }
+      varname         { Located _ _ _ (TokenVarName $$) }
+      varsym          { Located _ _ _ (TokenVarSym $$) }
+      conname         { Located _ _ _ (TokenConName $$) }
+      consym          { Located _ _ _ (TokenConSym $$) }
+      'λ'             { Located _ _ _ TokenLambda }
+      '->'            { Located _ _ _ TokenArrow }
+      '='             { Located _ _ _ TokenEquals }
+      '('             { Located _ _ _ TokenLParen }
+      ')'             { Located _ _ _ TokenRParen }
+      '{'             { Located _ _ _ TokenLBrace }
+      '}'             { Located _ _ _ TokenRBrace }
+      vl              { Located _ _ _ TokenLBraceV }
+      vr              { Located _ _ _ TokenRBraceV }
+      ';'             { Located _ _ _ TokenSemicolon }
+      eof             { Located _ _ _ TokenEOF }
 
 %%
 
@@ -138,10 +138,10 @@ Con             : '(' consym ')'                    { $2 }
 
 {
 parseError :: [Located CoreToken] -> RLPC ParseError a
-parseError (Located (AlexPn _ x y) _ : _) = addFatal err
+parseError (Located x y l _ : _) = addFatal err
     where err = SrcError
-            { _errLocation = (x, y)
-            , _errSeverity = Error
+            { _errSpan       = (x, y, l)
+            , _errSeverity   = Error
             , _errDiagnostic = ParErrParse
             }
 

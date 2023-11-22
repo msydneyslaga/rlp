@@ -135,11 +135,11 @@ $white_no_nl+           { skip }
 }
 
 {
-data Located a = Located AlexPosn a
+data Located a = Located Int Int Int a
     deriving Show
 
 constTok :: t -> AlexInput -> Int -> Alex (Located t)
-constTok t (p,_,_,_) _ = pure $ Located p t
+constTok t (AlexPn _ y x,_,_,_) l = pure $ Located x y l t
 
 data CoreToken = TokenLet
                | TokenLetrec
@@ -210,16 +210,16 @@ lexStream :: Alex [Located CoreToken]
 lexStream = do
     l <- alexMonadScan
     case l of
-        Located _ TokenEOF  -> pure [l]
-        _                   -> (l:) <$> lexStream
+        Located _ _ _ TokenEOF  -> pure [l]
+        _                       -> (l:) <$> lexStream
 
 -- | The main lexer driver.
 lexCore :: String -> RLPC ParseError [Located CoreToken]
 lexCore s = case m of
     Left e   -> addFatal err
         where err = SrcError
-                { _errLocation = (0,0) -- TODO: location
-                , _errSeverity = Error
+                { _errSpan       = (0,0,0) -- TODO: location
+                , _errSeverity   = Error
                 , _errDiagnostic = ParErrLexical e
                 }
     Right ts -> pure ts
@@ -230,14 +230,14 @@ lexCore s = case m of
 -- debugging
 lexCore' :: String -> RLPC ParseError [CoreToken]
 lexCore' s = fmap f <$> lexCore s
-    where f (Located _ t) = t
+    where f (Located _ _ _ t) = t
 
 data ParseError = ParErrLexical String
                 | ParErrParse
                 deriving Show
 
 lexWith :: (String -> CoreToken) -> Lexer
-lexWith f (p,_,_,s) l = pure $ Located p (f $ take l s)
+lexWith f (AlexPn _ y x,_,_,s) l = pure $ Located x y l (f $ take l s)
 
 lexToken :: Alex (Located CoreToken)
 lexToken = alexMonadScan
@@ -248,23 +248,23 @@ getSrcCol = Alex $ \ st ->
     in Right (st, col)
 
 lbrace :: Lexer
-lbrace (p,_,_,_) _ = do
+lbrace (AlexPn _ y x,_,_,_) l = do
     pushContext NoLayout
-    pure $ Located p TokenLBrace
+    pure $ Located x y l TokenLBrace
 
 rbrace :: Lexer
-rbrace (p,_,_,_) _ = do
+rbrace (AlexPn _ y x,_,_,_) l = do
     popContext
-    pure $ Located p TokenRBrace
+    pure $ Located x y l TokenRBrace
 
 insRBraceV :: AlexPosn -> Alex (Located CoreToken)
-insRBraceV p = do
+insRBraceV (AlexPn _ y x) = do
     popContext
-    pure $ Located p TokenRBraceV
+    pure $ Located x y 0 TokenRBraceV
 
 insSemi  :: AlexPosn -> Alex (Located CoreToken)
-insSemi p = do
-    pure $ Located p TokenSemicolon
+insSemi (AlexPn _ y x) = do
+    pure $ Located x y 0 TokenSemicolon
 
 modifyUst :: (AlexUserState -> AlexUserState) -> Alex ()
 modifyUst f = do
@@ -279,10 +279,10 @@ newLayoutContext (p,_,_,_) _ = do
     undefined
 
 noBrace :: Lexer
-noBrace (p,_,_,_) l = do
+noBrace (AlexPn _ y x,_,_,_) l = do
     col <- getSrcCol
     pushContext (Layout col)
-    pure $ Located p TokenLBraceV
+    pure $ Located x y l TokenLBraceV
 
 getOffside :: Alex Ordering
 getOffside = do
@@ -301,15 +301,15 @@ doBol (p,c,_,s) _ = do
         _       -> lexToken
 
 letin :: Lexer
-letin (p,_,_,_) l = do
+letin (AlexPn _ y x,_,_,_) l = do
     popContext
-    pure $ Located p TokenIn
+    pure $ Located x y l TokenIn
 
 topLevelOff :: Lexer
 topLevelOff = noBrace
 
 alexEOF :: Alex (Located CoreToken)
-alexEOF = Alex $ \ st@(AlexState { alex_pos = p }) ->
-    Right (st, Located p TokenEOF)
+alexEOF = Alex $ \ st@(AlexState { alex_pos = AlexPn _ y x }) ->
+    Right (st, Located x y 0 TokenEOF)
 
 }
