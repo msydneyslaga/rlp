@@ -20,6 +20,56 @@ letrecExample = [coreProg|
         in fst (snd (snd (snd a)));
 
     main = f 3 4;
+|]
 
+idExample :: Program
+idExample = [coreProg|
+    main = id 3;
+|]
+
+indExample1 = [coreProg|
+    main = twice twice id 3;
+|]
+
+indExample2 = [coreProg|
+    main = twice twice twice id 3;
+|]
+
+indExample3 = [coreProg|
+    main = letrec x = 2
+                  y = f x x
+           in g y y;
+
+    f a b = b;
+    g a b = a;
+|]
+
+negExample1 = [coreProg|
+    main = negate# (id 3);
+|]
+
+negExample2 = [coreProg|
+    main = negate# 3;
+|]
+
+negExample3 = [coreProg|
+    main = twice negate# 3;
+|]
+
+arithExample1 = [coreProg|
+    main = (+#) 3 (negate# 2);
+|]
+
+arithExample2 = [coreProg|
+    main = negate# ((+#) 2 ((*#) 5 3));
+|]
+
+ifExample = [coreProg|
+    main = if# True 2 3;
+|]
+
+facExample = [coreProg|
+    fac n = if# ((==#) n 0) 1 ((*#) n (fac ((-#) n 1)))
+    main = fac 3;
 |]
 

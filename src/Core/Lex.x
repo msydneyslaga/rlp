@@ -37,7 +37,7 @@ $graphic   = [$small $large $symbol $digit $special \:\"\']
 
 $octit     = 0-7
 $hexit     = [0-9 A-F a-f]
-$namechar  = [$alpha $digit \']
+$namechar  = [$alpha $digit \' \#]
 $symchar   = [$symbol \:]
 $nl        = [\n\r]
 $white_no_nl = $white # $nl
