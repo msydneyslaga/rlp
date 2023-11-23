@@ -12,13 +12,13 @@ letrecExample :: Program
 letrecExample = [coreProg|
     pair x y f = f x y
 
-    fst p = p k
-    snd p = p k1
+    fst' p = p k
+    snd' p = p k1
 
     f x y =
         letrec a = pair x b
                b = pair y a
-        in fst (snd (snd (snd a)));
+        in fst' (snd' (snd' (snd' a)));
 
     main = f 3 4;
 |]

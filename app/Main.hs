@@ -55,7 +55,7 @@ whenView l m = view l >>= \a -> when a m
 dumpEval :: RLPCIO () ()
 dumpEval = whenView rlpcDumpEval do
     fs <- view rlpcInputFiles
-    forM_ fs $ \f -> liftIO (readFile f) >>= doProg 
+    forM_ fs $ \f -> liftIO (readFile f) >>= doProg
 
     where
         doProg :: String -> RLPCIO () ()

@@ -277,7 +277,7 @@ Perform the reduction if the first argument is in normal form
    \end{bmatrix}
    & g
    }
-   { a_2 : s
+   { a_1 : a_2 : s
    & d
    & h
    \begin{bmatrix}

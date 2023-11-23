@@ -145,18 +145,18 @@ instantiate _ _ _ = error "unimplemented"
 
 -- instantiate and update
 instantiateU :: Expr -> Addr -> TiHeap -> [(Name, Addr)] -> TiHeap
-instantiateU (App f x) root h g = update h'' root (NAp f' x')
+instantiateU (App f x) root h g = update root (NAp f' x') h''
     where
         (h',f') = instantiate f h g
         (h'',x') = instantiate x h' g
 
 instantiateU (Case _ _) _ _ _ = error "cannot instantiate case expressions"
 
-instantiateU (Con t a) root h g = update h root c
+instantiateU (Con t a) root h g = update root c h
     where
         c = NPrim "Pack" (ConP t a)
 
-instantiateU (Var k) root h g = update h' root (NInd a)
+instantiateU (Var k) root h g = update root (NInd a) h'
     where (h',a) = instantiate (Var k) h g
 
 -- i don't really know if this is correct tbh i'm gonna cry
@@ -170,7 +170,7 @@ instantiateU (Let NonRec bs e) root h g = h''
             let (h',a) = instantiate v h g
             in (h',(k,a))
 
-instantiateU (IntE n) root h _ = update h root (NNum n)
+instantiateU (IntE n) root h _ = update root (NNum n) h
 
 ----------------------------------------------------------------------------------
 
@@ -211,7 +211,7 @@ step st =
                 NAp f (hViewUnsafe h -> NInd a) ->
                     TiState (ap:s) d h' g sts'
                     where
-                        h' = (update h ap $ NAp f a)
+                        h' = update ap (NAp f a) h
                         sts' = sts & stsDereferences %~ succ
 
                 _ ->
@@ -240,7 +240,7 @@ step st =
             case isDataNode arg of
                 True  -> TiState s'' d h' g sts
                     where
-                        h' = update h rootAddr (NNum $ negate n)
+                        h' = update rootAddr (NNum $ negate n) h
                         s'' = rootAddr : s'
                         (_:rootAddr:s') = s
                         NNum n = arg
@@ -273,7 +273,7 @@ step st =
 
                 h' | needsEval cn               = h
                    | otherwise                  =
-                       update h rootAddr (NInd $ if isTrue then t else f)
+                       update rootAddr (NInd $ if isTrue then t else f) h
 
                 [cn,tn,fn] = hViewUnsafe h <$> [c,t,f]
                 [c,t,f] = getArgs h s
@@ -287,18 +287,27 @@ step st =
         primStep _ CasePairP (TiState s d h g sts) =
             case needsEval pn of
                 True  -> TiState s' d' h g sts
-                    where s' = undefined; d' = undefined
+                    where
+                        s' = [p]
+                        d' = drop 1 s : d
                 False -> TiState s' d h' g sts
-                    where s' = undefined; h' = undefined
+                    where
+                        s' = drop 1 s
+                        h' = h & update a1 (NAp f x)
+                               & update a2 (NAp a1 y)
+                        rootAddr = head s'
+                        a1 = s' !! 0
+                        a2 = s' !! 1
+                        NData 0 [x,y] = pn
             where
                 [p,f] = getArgs h s
-                pn = undefined
+                pn = hLookupUnsafe p h
 
         primStep n (ConP t a) (TiState s d h g sts) =
             TiState s' d h' g sts
             where
                 s' = drop a s
-                h' = update h rootAddr $ NData t argAddrs
+                h' = update rootAddr (NData t argAddrs) h
                 rootAddr = s !! a
                 argAddrs = getArgs h s
 
@@ -322,8 +331,8 @@ primArbitrary f (TiState s d h g sts) =
             Nothing    -> d
         h' = case unevaled of
             Just _     -> h
-            Nothing    -> update h rootAddr $
-                onList f (fmap (\a -> hLookupUnsafe a h) argAddrs)
+            Nothing    -> update rootAddr x h
+                where x = onList f (fmap (\a -> hLookupUnsafe a h) argAddrs)
 
         unevaled = find (\ (_,a) -> needsEval $ hLookupUnsafe a h) ans
         ans = [1..] `zip` argAddrs
@@ -356,7 +365,7 @@ primBinary f (TiState s d h g sts) =
 
         h' | needsEval xarg    = h
            | needsEval yarg    = h
-           | otherwise         = update h rootAddr (xarg `f` yarg)
+           | otherwise         = update rootAddr (xarg `f` yarg) h
 
         d' | needsEval xarg    = drop 1 s : d
            | needsEval yarg    = drop 2 s : d
