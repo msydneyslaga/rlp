@@ -262,27 +262,26 @@ step st =
         primStep _ IntDivP st = primArith (div) st
         primStep _ IntEqP  st = primComp  (==) st
 
-        primStep _ IfP (TiState s d h g sts) = TiState s' d' h' g sts
+        primStep _ IfP (TiState s d h g sts) =
+            case needsEval cn of
+                True  -> TiState s' d' h g sts
+                    where
+                        s' = [c]
+                        d' = drop 1 s : d
+                False -> TiState s' d h' g sts
+                    where
+                        s' = drop 3 s
+                        h' = update rootAddr res h
+                        res = NInd $ if isTrue then t else f
+                        rootAddr = head s'
+                        isTrue = case cn of
+                            -- see Core.Examples.corePrelude; True and False are
+                            -- defined as Con 1 0 and Con 0 0, respectively
+                            NData 0 [] -> False
+                            NData 1 [] -> True
             where
-                -- the condition is evaluated if it is not in normal form
-                s' | needsEval cn               = [c]
-                   | otherwise                  = drop 3 s
-
-                d' | needsEval cn               = drop 1 s : d
-                   | otherwise                  = d
-
-                h' | needsEval cn               = h
-                   | otherwise                  =
-                       update rootAddr (NInd $ if isTrue then t else f) h
-
-                [cn,tn,fn] = hViewUnsafe h <$> [c,t,f]
-                [c,t,f] = getArgs h s
-                rootAddr = head s'
-                isTrue = case cn of
-                    -- see Core.Examples.corePrelude; True and False are defined
-                    -- as Con 1 0 and Con 0 0, respectively
-                    NData 0 [] -> False
-                    NData 1 [] -> True
+                cn = hLookupUnsafe c h
+                (c:t:f:_) = getArgs h s
 
         primStep _ CasePairP (TiState s d h g sts) =
             case needsEval pn of
@@ -300,7 +299,7 @@ step st =
                         a2 = s' !! 1
                         NData 0 [x,y] = pn
             where
-                [p,f] = getArgs h s
+                (p:f:_) = getArgs h s
                 pn = hLookupUnsafe p h
 
         primStep n (ConP t a) (TiState s d h g sts) =

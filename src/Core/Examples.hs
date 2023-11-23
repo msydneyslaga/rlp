@@ -78,8 +78,12 @@ facExample = [coreProg|
     main = fac 3;
 |]
 
-pairExample = [coreProg|
+pairExample1 = [coreProg|
     main = fst (snd (fst (MkPair (MkPair 1 (MkPair 2 3)) 4)));
+|]
+
+pairExample2 = [coreProg|
+    main = (if# False fst snd) (MkPair 2 3);
 |]
 
 corePrelude :: Module
