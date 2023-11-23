@@ -13,7 +13,7 @@ import Control.Monad            (guard)
 import Data.Foldable            (traverse_, find)
 import Data.Function            ((&))
 import System.IO                (Handle, hPutStr)
-import Text.Printf              (printf)
+import Text.Printf              (printf, hPrintf)
 import Data.Proxy               (Proxy(..))
 import Lens.Micro
 import Lens.Micro.TH
@@ -437,6 +437,15 @@ dbgProg p = do
 
 hdbgProg :: Program -> Handle -> IO (Node, Stats)
 hdbgProg p hio = do
+    hPrintf hio "==== Stats ====\n\
+                \result       : %s\n\
+                \allocations  : %4d\n\
+                \reductions   : %4d\n\
+                \dereferences : %4d\n\n"
+                (show res)
+                (sts ^. stsAllocations)
+                (sts ^. stsReductions)
+                (sts ^. stsDereferences)
     (hPutStr hio . prettyShow) `traverse_` p'
     pure (res, sts)
     where
