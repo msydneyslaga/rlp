@@ -16,6 +16,7 @@ import Data.Foldable        (foldl')
 import Core.Syntax
 import Core.Lex
 import Compiler.RLPC
+import Data.Default.Class   (def)
 }
 
 %name parseCore Module
@@ -152,7 +153,7 @@ parseTmp = do
         Left e -> error (show e)
         Right (ts,_) -> pure ts
     where
-        parse = evalRLPC RLPCOptions . (lexCore >=> parseCore)
+        parse = evalRLPC def . (lexCore >=> parseCore)
 
 }
 

@@ -20,6 +20,8 @@ library
     import:           warnings
     exposed-modules:  Core
                     , TIM
+                    , Compiler.RLPC
+
     other-modules:    Data.Heap
                     , Data.Pretty
                     , Core.Syntax
@@ -27,7 +29,6 @@ library
                     , Core.TH
                     , Core.Examples
                     , Core.Lex
-                    , Compiler.RLPC
                     , Control.Monad.Errorful
 
     build-tool-depends: happy:happy, alex:alex
@@ -41,6 +42,7 @@ library
                     , template-haskell
                     -- required for happy
                     , array
+                    , data-default-class
     hs-source-dirs:   src
     default-language: GHC2021
 
@@ -49,9 +51,12 @@ executable rlpc
     main-is:          Main.hs
     -- other-modules:
     -- other-extensions:
-    build-depends:
-          base ^>=4.18.0.0
-        , rlp
+    build-depends: base ^>=4.18.0.0
+                 , rlp
+                 , optparse-applicative
+                 , microlens
+                 , microlens-mtl
+                 , mtl
 
     hs-source-dirs:   app
     default-language: GHC2021

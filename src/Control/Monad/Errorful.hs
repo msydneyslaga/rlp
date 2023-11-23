@@ -1,3 +1,4 @@
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TupleSections, PatternSynonyms #-}
 module Control.Monad.Errorful
@@ -39,6 +40,9 @@ instance (Applicative m) => MonadErrorful e (ErrorfulT e m) where
 
 instance MonadTrans (ErrorfulT e) where
     lift m = ErrorfulT (Right . (,[]) <$> m)
+
+instance (MonadIO m) => MonadIO (ErrorfulT e m) where
+    liftIO = lift . liftIO
 
 instance (Functor m) => Functor (ErrorfulT e m) where
     fmap f (ErrorfulT m) = ErrorfulT $ fmap (_1 %~ f) <$> m

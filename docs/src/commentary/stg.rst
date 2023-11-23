@@ -158,7 +158,7 @@ evaluated as True (:code:`NData 1 []`).
    & h
    \begin{bmatrix}
         f : \mathtt{NPrim} \; \mathtt{IfP} \\
-        c : \mathtt{NPrim} \; (\mathtt{NData} \; 1 \; []) \\
+        c : \mathtt{NPrim} \; (\mathtt{NData} \; 1 \; \nillist) \\
         a_1 : \mathtt{NAp} \; f \; c \\
         a_2 : \mathtt{NAp} \; a_1 \; x \\
         a_3 : \mathtt{NAp} \; a_2 \; y
@@ -181,7 +181,7 @@ evaluated as False (:code:`NData 0 []`).
    & h
    \begin{bmatrix}
         f : \mathtt{NPrim} \; \mathtt{IfP} \\
-        c : \mathtt{NPrim} \; (\mathtt{NData} \; 0 \; []) \\
+        c : \mathtt{NPrim} \; (\mathtt{NData} \; 0 \; \nillist) \\
         a_1 : \mathtt{NAp} \; f \; c \\
         a_2 : \mathtt{NAp} \; a_1 \; x \\
         a_3 : \mathtt{NAp} \; a_2 \; y
@@ -237,3 +237,53 @@ Construct :code:`NData` out of a constructor and its arguments
    \end{bmatrix}
    & g
    }
+
+Pairs
+-----
+
+Evaluate the first argument if necessary
+
+.. math::
+   \transrule
+   { c : a_1 : a_2 : \nillist
+   & d
+   & h
+   \begin{bmatrix}
+        c : \mathtt{NPrim} \; \mathtt{CasePairP} \\
+        p : \mathtt{NAp} \; \_ \: \_ \\
+        a_1 : \mathtt{NAp} \; c \; p \\
+        a_2 : \mathtt{NAp} \; a_2 \; f
+   \end{bmatrix}
+   & g
+   }
+   { p : \nillist
+   & (c : a_1 : a_2 : \nillist) : d
+   & h
+   & g
+   }
+
+Perform the reduction if the first argument is in normal form
+
+.. math::
+   \transrule
+   { c : a_1 : a_2 : s
+   & d
+   & h
+   \begin{bmatrix}
+        c : \mathtt{NPrim} \; \mathtt{CasePairP} \\
+        p : \mathtt{NData} \; 0 \; [x,y] \\
+        a_1 : \mathtt{NAp} \; c \; p \\
+        a_2 : \mathtt{NAp} \; a_1 \; f
+   \end{bmatrix}
+   & g
+   }
+   { a_2 : s
+   & d
+   & h
+   \begin{bmatrix}
+        a_1 : \mathtt{NAp} \; f \; x \\
+        a_2 : \mathtt{NAp} \; a_1 \; y
+   \end{bmatrix}
+   & g
+   }
+

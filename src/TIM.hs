@@ -4,12 +4,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 module TIM
     ( module Core.Examples
+    , hdbgProg
     ) where
 ----------------------------------------------------------------------------------
-import Data.Map                 (Map, (!?), (!))
-import Data.Map qualified as M
-import Data.Set                 (Set)
-import Data.Set qualified as S
 import Data.Maybe               (fromJust, fromMaybe)
 import Data.List                (mapAccumL, intersperse)
 import Control.Monad            (guard)
@@ -287,6 +284,16 @@ step st =
                     NData 0 [] -> False
                     NData 1 [] -> True
 
+        primStep _ CasePairP (TiState s d h g sts) =
+            case needsEval pn of
+                True  -> TiState s' d' h g sts
+                    where s' = undefined; d' = undefined
+                False -> TiState s' d h' g sts
+                    where s' = undefined; h' = undefined
+            where
+                [p,f] = getArgs h s
+                pn = undefined
+
         primStep n (ConP t a) (TiState s d h g sts) =
             TiState s' d h' g sts
             where
@@ -465,7 +472,7 @@ instance Pretty TiState where
 
             pnode (NPrim n _) _ = IStr n
 
-            pnode (NData t cs) p = "NData{" <> IStr (show t) <> "}" <> m
+            pnode (NData t cs) p = "NData{" <> IStr (show t) <> "} " <> m
                 where
                     m = cs
                       & fmap (\a -> pnode (hLookupUnsafe a h) (succ p))
