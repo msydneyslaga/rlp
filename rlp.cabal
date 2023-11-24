@@ -43,6 +43,7 @@ library
                     -- required for happy
                     , array
                     , data-default-class
+
     hs-source-dirs:   src
     default-language: GHC2021
 

@@ -45,6 +45,8 @@ import Data.Default.Class   (def)
       ')'             { Located _ _ _ TokenRParen }
       '{'             { Located _ _ _ TokenLBrace }
       '}'             { Located _ _ _ TokenRBrace }
+      vl              { Located _ _ _ TokenLBraceV }
+      vr              { Located _ _ _ TokenRBraceV }
       ';'             { Located _ _ _ TokenSemicolon }
       eof             { Located _ _ _ TokenEOF }
 
@@ -62,7 +64,15 @@ StandaloneProgram :: { Program }
 StandaloneProgram : Program eof                 { $1 }
 
 Program         :: { Program }
-Program         : ScDefs                        { Program $1 }
+Program         : VOpen ScDefs VClose           { Program $2 }
+                | '{'   ScDefs '}'              { Program $2 }
+
+VOpen           :: { () }
+VOpen           : vl                            { () }
+
+VClose          :: { () }
+VClose          : vr                            { () }
+                | error                         { () }
 
 ScDefs          :: { [ScDef] }
 ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
@@ -85,7 +95,9 @@ Expr            : LetExpr                       { $1 }
                 | Expr1                         { $1 }
 
 LetExpr         :: { Expr }
-LetExpr         : let    '{'   Bindings '}'    in Expr { Let NonRec $3 $6 }
+LetExpr         : let    VOpen Bindings VClose in Expr { Let NonRec $3 $6 }
+                | letrec VOpen Bindings VClose in Expr { Let Rec $3 $6 }
+                | let    '{'   Bindings '}'    in Expr { Let NonRec $3 $6 }
                 | letrec '{'   Bindings '}'    in Expr { Let Rec $3 $6 }
 
 Binders         :: { [Name] }

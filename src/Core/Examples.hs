@@ -10,15 +10,16 @@ import Core.TH
 
 letrecExample :: Program
 letrecExample = [coreProg|
-    pair x y f = f x y
+    pair x y f = f x y;
 
-    fst' p = p k
-    snd' p = p k1
+    fst' p = p k;
+    snd' p = p k1;
 
     f x y =
-        letrec a = pair x b
-               b = pair y a
-        in fst' (snd' (snd' (snd' a)));
+        letrec
+        { a = pair x b
+        ; b = pair y a
+        } in fst' (snd' (snd' (snd' a)));
 
     main = f 3 4;
 |]
@@ -37,9 +38,10 @@ indExample2 = [coreProg|
 |]
 
 indExample3 = [coreProg|
-    main = letrec x = 2
-                  y = f x x
-           in g y y;
+    main = letrec
+        { x = 2
+        ; y = f x x
+        } in g y y;
 
     f a b = b;
     g a b = a;
@@ -74,7 +76,7 @@ ifExample2 = [coreProg|
 |]
 
 facExample = [coreProg|
-    fac n = if# ((==#) n 0) 1 ((*#) n (fac ((-#) n 1)))
+    fac n = if# ((==#) n 0) 1 ((*#) n (fac ((-#) n 1)));
     main = fac 3;
 |]
 
@@ -91,10 +93,17 @@ listExample1 = [coreProg|
 |]
 
 listExample2 = [coreProg|
-    cc f x xs = Cons (f x) (map f xs)
-    map f l = caseList# l Nil (cc f)
-    list = Cons 1 (Cons 2 (Cons 3 Nil))
+    cc f x xs = Cons (f x) (map f xs);
+    map f l = caseList# l Nil (cc f);
+    list = Cons 1 (Cons 2 (Cons 3 Nil));
     main = map negate# list;
+|]
+
+listExample3 = [coreProg|
+    cc f z x xs = f x (foldr f z xs);
+    foldr f z l = caseList# l z (cc f z);
+    list = Cons 1 (Cons 2 (Cons 3 Nil));
+    main = foldr (+#) 0 list;
 |]
 
 corePrelude :: Module
