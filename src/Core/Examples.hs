@@ -107,19 +107,25 @@ listExample3 = [coreProg|
 |]
 
 corePrelude :: Module
-corePrelude = Module (Just ("Prelude", [])) $ Program
-    [ ScDef "id" ["x"] $ "x"
-    , ScDef "k" ["x", "y"] $ "x"
-    , ScDef "k1" ["x", "y"] $ "y"
-    , ScDef "succ" ["f", "g", "x"] $ "f" :$ "x" :$ ("g" :$ "x")
-    , ScDef "compose" ["f", "g", "x"] $ "f" :$ ("g" :$ "x")
-    , ScDef "twice" ["f", "x"] $ "f" :$ ("f" :$ "x")
-    , ScDef "False" [] $ Con 0 0
-    , ScDef "True" [] $ Con 1 0
-    , ScDef "MkPair" [] $ Con 0 2
-    , ScDef "fst" ["p"] $ "casePair#" :$ "p" :$ "k"
-    , ScDef "snd" ["p"] $ "casePair#" :$ "p" :$ "k1"
-    , ScDef "Nil" [] $ Con 1 0
-    , ScDef "Cons" [] $ Con 2 2
-    ]
+corePrelude = Module (Just ("Prelude", [])) $
+    -- non-primitive defs
+    [coreProg|
+        id x = x;
+        k x y = x;
+        k1 x y = y;
+        succ f g x = f x (g x);
+        compose f g x = f (g x);
+        twice f x = f (f x);
+        fst p = casePair# p k;
+        snd p = casePair# p k1;
+    |]
+    <>
+    -- primitive constructors need some specialised wiring:
+    Program
+        [ ScDef "False" [] $ Con 0 0
+        , ScDef "True" [] $ Con 1 0
+        , ScDef "MkPair" [] $ Con 0 2
+        , ScDef "Nil" [] $ Con 1 0
+        , ScDef "Cons" [] $ Con 2 2
+        ]
 
