@@ -462,6 +462,10 @@ dbgProg p = do
 
 hdbgProg :: Program -> Handle -> IO (Node, Stats)
 hdbgProg p hio = do
+    -- lazy IO causes a funny quirk here! before we had the `hPrintf` call
+    -- printing the final statistics, crashes would leave emit logs allowing us
+    -- to see the state of the machine before an error. the statistics however,
+    -- needs to be fully evaluated and before the logs are printed. a bit goofy.
     hPrintf hio "==== Stats ====\n\
                 \result       : %s\n\
                 \allocations  : %4d\n\
