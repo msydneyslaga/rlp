@@ -86,6 +86,16 @@ pairExample2 = [coreProg|
     main = (if# False fst snd) (MkPair 2 3);
 |]
 
+listExample1 = [coreProg|
+    main = caseList# (Cons 2 Nil) 3 k;
+|]
+
+listExample2 = [coreProg|
+    cc f x xs = Cons (f x) (map f xs)
+    map f l = caseList# l Nil (cc f)
+    main = map negate# list;
+|]
+
 corePrelude :: Module
 corePrelude = Module (Just ("Prelude", [])) $ Program
     [ ScDef "id" ["x"] $ "x"
@@ -99,5 +109,7 @@ corePrelude = Module (Just ("Prelude", [])) $ Program
     , ScDef "MkPair" [] $ Con 0 2
     , ScDef "fst" ["p"] $ "casePair#" :$ "p" :$ "k"
     , ScDef "snd" ["p"] $ "casePair#" :$ "p" :$ "k1"
+    , ScDef "Nil" [] $ Con 1 0
+    , ScDef "Cons" [] $ Con 2 2
     ]
 

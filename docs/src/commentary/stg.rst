@@ -257,7 +257,7 @@ Evaluate the first argument if necessary
    & g
    }
    { p : \nillist
-   & (c : a_1 : a_2 : \nillist) : d
+   & (a_1 : a_2 : \nillist) : d
    & h
    & g
    }
@@ -283,6 +283,53 @@ Perform the reduction if the first argument is in normal form
    \begin{bmatrix}
         a_1 : \mathtt{NAp} \; f \; x \\
         a_2 : \mathtt{NAp} \; a_1 \; y
+   \end{bmatrix}
+   & g
+   }
+
+Lists
+-----
+
+Evaluate the scrutinee
+
+.. math::
+   \transrule
+   { c : a_1 : a_2 : a_3 : \nillist
+   & d
+   & h
+   \begin{bmatrix}
+        c : \mathtt{NPrim} \; \mathtt{CaseListP} \\
+        a_1 : \mathtt{NAp} \; c \; x
+   \end{bmatrix}
+   & g
+   }
+   { x
+   & (a_1 : a_2 : a_3) : \nillist
+   & h
+   & g
+   }
+
+If the scrutinee is :code:`Nil`, perform the appropriate reduction.
+
+.. math::
+   \transrule
+   { c : a_1 : a_2 : a_3 : s
+   & d
+   & h
+   \begin{bmatrix}
+        c : \mathtt{NPrim} \; \mathtt{CaseListP} \\
+        p : \mathtt{NData} \; 1 \; \nillist \\
+        a_1 : \mathtt{NAp} \; c \; p \\
+        a_2 : \mathtt{NAp} \; p \; f_\text{nil} \\
+        a_3 : \mathtt{NAp} \; a_2 \; f_\text{cons}
+   \end{bmatrix}
+   & g
+   }
+   { a_3 : s
+   & d
+   & h
+   \begin{bmatrix}
+        a_3 : \mathtt{NAp} \; f_\text{nil}
    \end{bmatrix}
    & g
    }

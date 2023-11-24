@@ -48,6 +48,7 @@ data Prim = ConP Int Int -- ConP Tag Arity
           | IntNegP
           | IntEqP
           | CasePairP
+          | CaseListP
           deriving (Show, Eq)
 
 instance Pretty Prim where
@@ -103,6 +104,7 @@ primitives =
     , ("==#",       IntEqP)
     , ("if#",       IfP)
     , ("casePair#", CasePairP)
+    , ("caseList#", CaseListP)
     ]
 
 instantiate :: Expr -> TiHeap -> [(Name, Addr)] -> (TiHeap, Addr)
@@ -291,6 +293,7 @@ step st =
                         d' = drop 1 s : d
                 False -> TiState s' d h' g sts
                     where
+                        -- TODO: maybe should be a drop 2 perhaps
                         s' = drop 1 s
                         h' = h & update a1 (NAp f x)
                                & update a2 (NAp a1 y)
@@ -301,6 +304,28 @@ step st =
             where
                 (p:f:_) = getArgs h s
                 pn = hLookupUnsafe p h
+
+        primStep _ CaseListP (TiState s d h g sts) =
+            case needsEval ln of
+                True  -> TiState s' d' h g sts
+                    where
+                        s' = [l]
+                        d' = drop 1 s : d
+                False -> TiState s' d h' g sts
+                    where
+                        s' = drop 3 s
+                        a2 = s !! 2
+                        a3 = s !! 3
+                        h' = case ln of
+                            NData 1 [] ->
+                                h & update a3 (NInd cn)
+                            NData 2 [x,xs] ->
+                                h & update a2 (NAp cc x)
+                                  & update a3 (NAp a2 xs)
+                            _ -> error "bad list"
+            where
+                (l:cn:cc:_) = getArgs h s
+                ln = hLookupUnsafe l h
 
         primStep n (ConP t a) (TiState s d h g sts) =
             TiState s' d h' g sts
@@ -437,15 +462,15 @@ dbgProg p = do
 
 hdbgProg :: Program -> Handle -> IO (Node, Stats)
 hdbgProg p hio = do
-    hPrintf hio "==== Stats ====\n\
-                \result       : %s\n\
-                \allocations  : %4d\n\
-                \reductions   : %4d\n\
-                \dereferences : %4d\n\n"
-                (show res)
-                (sts ^. stsAllocations)
-                (sts ^. stsReductions)
-                (sts ^. stsDereferences)
+    -- hPrintf hio "==== Stats ====\n\
+    --             \result       : %s\n\
+    --             \allocations  : %4d\n\
+    --             \reductions   : %4d\n\
+    --             \dereferences : %4d\n\n"
+    --             (show res)
+    --             (sts ^. stsAllocations)
+    --             (sts ^. stsReductions)
+    --             (sts ^. stsDereferences)
     (hPutStr hio . prettyShow) `traverse_` p'
     pure (res, sts)
     where
