@@ -118,6 +118,10 @@ corePrelude = Module (Just ("Prelude", [])) $
         twice f x = f (f x);
         fst p = casePair# p k;
         snd p = casePair# p k1;
+        head l = caseList# l abort# k;
+        tail l = caseList# l abort# k1;
+        _length_cc x xs = (+#) 1 (length xs);
+        length l = caseList# l 0 length_cc;
     |]
     <>
     -- primitive constructors need some specialised wiring:

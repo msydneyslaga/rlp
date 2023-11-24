@@ -49,6 +49,7 @@ data Prim = ConP Int Int -- ConP Tag Arity
           | IntEqP
           | CasePairP
           | CaseListP
+          | AbortP
           deriving (Show, Eq)
 
 instance Pretty Prim where
@@ -105,6 +106,7 @@ primitives =
     , ("if#",       IfP)
     , ("casePair#", CasePairP)
     , ("caseList#", CaseListP)
+    , ("abort#",    AbortP)
     ]
 
 instantiate :: Expr -> TiHeap -> [(Name, Addr)] -> (TiHeap, Addr)
@@ -334,6 +336,9 @@ step st =
                 h' = update rootAddr (NData t argAddrs) h
                 rootAddr = s !! a
                 argAddrs = getArgs h s
+
+        primStep _ AbortP (TiState s d h g sts) =
+            error "rl' called abort#!"
 
         dataStep :: Int -> [Addr] -> TiState -> TiState
         dataStep _ _ (TiState [a] (s:d) h g sts) = TiState s d h g sts
