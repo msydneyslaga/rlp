@@ -462,15 +462,15 @@ dbgProg p = do
 
 hdbgProg :: Program -> Handle -> IO (Node, Stats)
 hdbgProg p hio = do
-    -- hPrintf hio "==== Stats ====\n\
-    --             \result       : %s\n\
-    --             \allocations  : %4d\n\
-    --             \reductions   : %4d\n\
-    --             \dereferences : %4d\n\n"
-    --             (show res)
-    --             (sts ^. stsAllocations)
-    --             (sts ^. stsReductions)
-    --             (sts ^. stsDereferences)
+    hPrintf hio "==== Stats ====\n\
+                \result       : %s\n\
+                \allocations  : %4d\n\
+                \reductions   : %4d\n\
+                \dereferences : %4d\n\n"
+                (show res)
+                (sts ^. stsAllocations)
+                (sts ^. stsReductions)
+                (sts ^. stsDereferences)
     (hPutStr hio . prettyShow) `traverse_` p'
     pure (res, sts)
     where

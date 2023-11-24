@@ -93,6 +93,7 @@ listExample1 = [coreProg|
 listExample2 = [coreProg|
     cc f x xs = Cons (f x) (map f xs)
     map f l = caseList# l Nil (cc f)
+    list = Cons 1 (Cons 2 (Cons 3 Nil))
     main = map negate# list;
 |]
 
