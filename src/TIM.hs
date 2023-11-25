@@ -16,6 +16,7 @@ import System.IO                (Handle, hPutStr)
 import Text.Printf              (printf, hPrintf)
 import Data.Proxy               (Proxy(..))
 import Data.Monoid              (Endo(..))
+import Debug.Trace              (trace)
 import Lens.Micro
 import Lens.Micro.TH
 import Data.Pretty
@@ -39,6 +40,7 @@ data Node = NAp Addr Addr
           | NNum Int
           | NInd Addr
           | NData Int [Addr] -- NData Tag [Component]
+          | NMarked Node
           deriving Show
 
 type Dump = [Stack]
@@ -464,6 +466,7 @@ isDataNode _           = False
 needsEval :: Node -> Bool
 needsEval = not . isDataNode
 
+-- TODO: count allocations
 doAdmin :: TiState -> TiState
 doAdmin = doStats
         . doGC
@@ -477,10 +480,6 @@ doAdmin = doStats
 isHeapLarge :: TiState -> Bool
 isHeapLarge st = hSize (st ^. tiHeap) >= triggerSize
     where triggerSize = 50
-
-whenE :: Bool -> (a -> a) -> a -> a
-whenE True f  = f
-whenE False _ = id
 
 ----------------------------------------------------------------------------------
 
@@ -560,6 +559,8 @@ instance Pretty TiState where
                       & intersperse " "
                       & mconcat
 
+            pnode (NMarked n) p = bracketPrec 0 p $ "NMarked (" <> pnode n 0 <> ")"
+
 ----------------------------------------------------------------------------------
 
 findRoots :: TiState -> [Addr]
@@ -574,39 +575,34 @@ findRoots (TiState s d _ g _) = stackRoots s <> dumpRoots d <> globalsRoots g
         globalsRoots :: Env -> [Addr]
         globalsRoots = fmap snd
 
-prepMarks :: TiHeap -> Heap (Node, Bool)
-prepMarks = fmap (,False)
-
-unprepMarks :: Heap (Node, Bool) -> TiHeap
-unprepMarks = fmap fst
-
-markFrom :: Addr -> Heap (Node, Bool) -> Heap (Node, Bool)
+markFrom :: Addr -> TiHeap -> TiHeap
 markFrom a h = case hLookup a h of
-    Just (NAp l r,_)    -> h & mark & markFrom l & markFrom r
-    Just (NInd x,_)     -> h & mark & markFrom x
-    Just (NData _ as,_) -> h & mark
-                             & appEndo (foldMap Endo $ fmap markFrom as)
-    Just (x,_)          -> h & mark
-    where mark = adjust a (_2 .~ True)
+    Just (NMarked _) -> h
+    Just n@(NAp l r) -> h & update a (NMarked n)
+                          & markFrom l
+                          & markFrom r
+    -- note that we don't mark the indirection node itself.
+    Just n@(NInd p) -> h & update a (NMarked n)
+                         & markFrom p
+    Just n@(NData _ as) -> h & update a (NMarked n)
+                             & appEndo (foldMap Endo $ markFrom <$> as)
+    Just n -> h & update a (NMarked n)
 
--- TODO: unmedicated code: rewrite
-scanHeap :: Heap (Node, Bool) -> TiHeap
-scanHeap h = unmark $ appEndo (scan h) h
+    -- we silently ignore dangling pointers without a ruckus as findRoots may
+    -- scout the same address multiple times
+    Nothing -> h
+
+scanHeap :: TiHeap -> TiHeap
+scanHeap h = appEndo (foldMap f $ addresses h) h
     where
-        unmark = fmap fst
-        scanAddr :: Addr -> (Node, Bool)
-                 -> Endo (Heap (Node, Bool))
-        scanAddr k (_,True)  = Endo $ id
-        scanAddr k (_,False) = Endo $ free k
-
-        scan :: Heap (Node, Bool) -> Endo (Heap (Node, Bool))
-        scan = foldMapWithAddress scanAddr
+        f a = case hLookupUnsafe a h of
+            NMarked n -> Endo $ update a n
+            _         -> Endo $ free a
 
 gc :: TiState -> TiState
 gc st@(TiState s d h g sts) = TiState s d h' g sts
     where
-        h' = prepMarks h
-           & appEndo (foldMap Endo marked)
-           & unprepMarks
-        marked = fmap markFrom (findRoots st)
+        as = findRoots st
+        marked = h & appEndo (foldMap Endo $ markFrom <$> as)
+        h' = scanHeap marked
 

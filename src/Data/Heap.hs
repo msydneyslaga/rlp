@@ -20,8 +20,10 @@ module Data.Heap
     where
 ----------------------------------------------------------------------------------
 import Data.Map                     (Map, (!?))
+import Debug.Trace
 import Data.Map qualified as M
 import Data.List                    (intersect)
+import GHC.Stack                    (HasCallStack)
 ----------------------------------------------------------------------------------
 
 data Heap a = Heap [Addr] (Map Addr a)
@@ -62,15 +64,16 @@ adjust :: Addr -> (a -> a) -> Heap a -> Heap a
 adjust k f (Heap u m) = Heap u (M.adjust f k m)
 
 free :: Addr -> Heap a -> Heap a
-free k (Heap u m) = Heap (k:u) (M.delete k m)
+free k (Heap u m) = Heap (k:u) (M.delete k' m)
+    where k' = k -- trace ("free " <> show k) k
 
 hLookup :: Addr -> Heap a -> Maybe a
 hLookup k (Heap _ m) = m !? k
 
-hLookupUnsafe :: Addr -> Heap a -> a
+hLookupUnsafe :: (HasCallStack) => Addr -> Heap a -> a
 hLookupUnsafe k (Heap _ m) = case m !? k of
-    Just a  -> a
-    Nothing -> error "erm... segfault much?"
+    Just v  -> v
+    Nothing -> error $ "erm... segfault much? addr: " <> show k
 
 addresses :: Heap a -> [Addr]
 addresses (Heap _ m) = M.keys m
