@@ -64,8 +64,7 @@ adjust :: Addr -> (a -> a) -> Heap a -> Heap a
 adjust k f (Heap u m) = Heap u (M.adjust f k m)
 
 free :: Addr -> Heap a -> Heap a
-free k (Heap u m) = Heap (k:u) (M.delete k' m)
-    where k' = k -- trace ("free " <> show k) k
+free k (Heap u m) = Heap (k:u) (M.delete k m)
 
 hLookup :: Addr -> Heap a -> Maybe a
 hLookup k (Heap _ m) = m !? k

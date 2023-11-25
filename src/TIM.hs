@@ -16,7 +16,6 @@ import System.IO                (Handle, hPutStr)
 import Text.Printf              (printf, hPrintf)
 import Data.Proxy               (Proxy(..))
 import Data.Monoid              (Endo(..))
-import Debug.Trace              (trace)
 import Lens.Micro
 import Lens.Micro.TH
 import Data.Pretty
