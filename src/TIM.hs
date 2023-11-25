@@ -15,6 +15,7 @@ import Data.Function            ((&))
 import System.IO                (Handle, hPutStr)
 import Text.Printf              (printf, hPrintf)
 import Data.Proxy               (Proxy(..))
+import Data.Monoid              (Endo(..))
 import Lens.Micro
 import Lens.Micro.TH
 import Data.Pretty
@@ -23,8 +24,12 @@ import Core.Examples
 import Core
 ----------------------------------------------------------------------------------
 
-data TiState = TiState [Addr] Dump TiHeap [(Name, Addr)] Stats
+data TiState = TiState Stack Dump TiHeap Env Stats
     deriving Show
+
+type Stack = [Addr]
+
+type Env = [(Name, Addr)]
 
 type TiHeap = Heap Node
 
@@ -36,7 +41,7 @@ data Node = NAp Addr Addr
           | NData Int [Addr] -- NData Tag [Component]
           deriving Show
 
-type Dump = [[Addr]]
+type Dump = [Stack]
 
 data Prim = ConP Int Int -- ConP Tag Arity
           | IfP
@@ -60,10 +65,21 @@ data Stats = Stats
     { _stsReductions   :: Int
     , _stsAllocations  :: Int
     , _stsDereferences :: Int
+    , _stsGCCycles     :: Int
     }
     deriving (Show)
 
 makeLenses ''Stats
+
+tiStats :: Lens' TiState Stats
+tiStats = lens
+    (\ (TiState _ _ _ _ sts) -> sts)
+    (\ (TiState s d h g _) sts' -> TiState s d h g sts')
+
+tiHeap :: Lens' TiState TiHeap
+tiHeap = lens
+    (\ (TiState _ _ h _ _) -> h)
+    (\ (TiState s d _ g sts) h' -> TiState s d h' g sts)
 
 ----------------------------------------------------------------------------------
 
@@ -74,7 +90,7 @@ compile prog = Just $ TiState s d h g stats
         d = []
         (h,g) = buildInitialHeap defs
         defs = insertModule corePrelude prog
-        stats = Stats 0 0 0
+        stats = Stats 0 0 0 0
 
         mainAddr = fromJust $ lookup "main" g
 
@@ -449,10 +465,22 @@ needsEval :: Node -> Bool
 needsEval = not . isDataNode
 
 doAdmin :: TiState -> TiState
-doAdmin (TiState s d h g sts) = TiState s d h g sts'
-    where sts' = sts & stsReductions %~ succ
-                     -- not a perfect measurement
-                     & stsAllocations %~ max (hSize h)
+doAdmin = doStats
+        . doGC
+    where
+        doStats = tiStats . stsReductions %~ succ
+        doGC st
+            | isHeapLarge st = gc st & tiStats . stsGCCycles %~ succ
+            | otherwise      = st
+
+-- | is the heap larger than some arbitrary number i declared "bloated"?
+isHeapLarge :: TiState -> Bool
+isHeapLarge st = hSize (st ^. tiHeap) >= triggerSize
+    where triggerSize = 50
+
+whenE :: Bool -> (a -> a) -> a -> a
+whenE True f  = f
+whenE False _ = id
 
 ----------------------------------------------------------------------------------
 
@@ -475,11 +503,13 @@ hdbgProg p hio = do
                 \result       : %s\n\
                 \allocations  : %4d\n\
                 \reductions   : %4d\n\
-                \dereferences : %4d\n\n"
+                \dereferences : %4d\n\
+                \gc cycles    : %4d\n\n"
                 (show res)
                 (sts ^. stsAllocations)
                 (sts ^. stsReductions)
                 (sts ^. stsDereferences)
+                (sts ^. stsGCCycles)
     (hPutStr hio . prettyShow) `traverse_` p'
     pure (res, sts)
     where
@@ -529,4 +559,54 @@ instance Pretty TiState where
                       & fmap (\a -> pnode (hLookupUnsafe a h) (succ p))
                       & intersperse " "
                       & mconcat
+
+----------------------------------------------------------------------------------
+
+findRoots :: TiState -> [Addr]
+findRoots (TiState s d _ g _) = stackRoots s <> dumpRoots d <> globalsRoots g
+    where
+        stackRoots :: Stack -> [Addr]
+        stackRoots = id
+
+        dumpRoots :: Dump -> [Addr]
+        dumpRoots = foldMap stackRoots
+
+        globalsRoots :: Env -> [Addr]
+        globalsRoots = fmap snd
+
+prepMarks :: TiHeap -> Heap (Node, Bool)
+prepMarks = fmap (,False)
+
+unprepMarks :: Heap (Node, Bool) -> TiHeap
+unprepMarks = fmap fst
+
+markFrom :: Addr -> Heap (Node, Bool) -> Heap (Node, Bool)
+markFrom a h = case hLookup a h of
+    Just (NAp l r,_)    -> h & mark & markFrom l & markFrom r
+    Just (NInd x,_)     -> h & mark & markFrom x
+    Just (NData _ as,_) -> h & mark
+                             & appEndo (foldMap Endo $ fmap markFrom as)
+    Just (x,_)          -> h & mark
+    where mark = adjust a (_2 .~ True)
+
+-- TODO: unmedicated code: rewrite
+scanHeap :: Heap (Node, Bool) -> TiHeap
+scanHeap h = unmark $ appEndo (scan h) h
+    where
+        unmark = fmap fst
+        scanAddr :: Addr -> (Node, Bool)
+                 -> Endo (Heap (Node, Bool))
+        scanAddr k (_,True)  = Endo $ id
+        scanAddr k (_,False) = Endo $ free k
+
+        scan :: Heap (Node, Bool) -> Endo (Heap (Node, Bool))
+        scan = foldMapWithAddress scanAddr
+
+gc :: TiState -> TiState
+gc st@(TiState s d h g sts) = TiState s d h' g sts
+    where
+        h' = prepMarks h
+           & appEndo (foldMap Endo marked)
+           & unprepMarks
+        marked = fmap markFrom (findRoots st)
 

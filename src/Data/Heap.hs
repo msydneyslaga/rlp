@@ -3,6 +3,7 @@ module Data.Heap
     , Addr
     , alloc
     , update
+    , adjust
     , free
     , hLookup
     , hLookupUnsafe
@@ -10,6 +11,11 @@ module Data.Heap
     , hSize
     , hView
     , hViewUnsafe
+    , mapWithAddress
+    , elems
+    , assocs
+    , foldrWithAddress
+    , foldMapWithAddress
     )
     where
 ----------------------------------------------------------------------------------
@@ -52,6 +58,9 @@ alloc (Heap [] _)     _ = error "STG heap model ran out of memory..."
 update :: Addr -> a -> Heap a -> Heap a
 update k v (Heap u m) = Heap u (M.adjust (const v) k m)
 
+adjust :: Addr -> (a -> a) -> Heap a -> Heap a
+adjust k f (Heap u m) = Heap u (M.adjust f k m)
+
 free :: Addr -> Heap a -> Heap a
 free k (Heap u m) = Heap (k:u) (M.delete k m)
 
@@ -76,4 +85,19 @@ hView = flip hLookup
 -- | Intended for use with view patterns
 hViewUnsafe :: Heap a -> Addr -> a
 hViewUnsafe = flip hLookupUnsafe
+
+mapWithAddress :: (Addr -> a -> b) -> Heap a -> Heap b
+mapWithAddress f (Heap u m) = Heap u (M.mapWithKey f m)
+
+foldrWithAddress :: (Addr -> a -> b -> b) -> b -> Heap a -> b
+foldrWithAddress f z h = foldr (uncurry f) z $ assocs h
+
+foldMapWithAddress :: (Monoid m) => (Addr -> a -> m) -> Heap a -> m
+foldMapWithAddress f h = mconcat $ fmap (uncurry f) (assocs h)
+
+elems :: Heap a -> [a]
+elems (Heap _ m) = M.elems m
+
+assocs :: Heap a -> [(Addr,a)]
+assocs (Heap _ m) = M.assocs m
 
