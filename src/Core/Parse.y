@@ -1,4 +1,8 @@
 {
+{-|
+Module : Core.Parse
+Description : Parser for the Core language
+-}
 module Core.Parse
     ( parseCore
     , parseCoreExpr

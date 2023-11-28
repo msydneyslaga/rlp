@@ -1,4 +1,8 @@
 {
+{-|
+Module      : Core.Lex
+Description : Lexical analysis for the core language
+-}
 module Core.Lex
     ( lexCore
     , lexCore'

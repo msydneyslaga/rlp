@@ -1,3 +1,7 @@
+{-|
+Module      : Core.Examples
+Description : Core examples (may eventually be unit tests)
+-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Core.Examples where

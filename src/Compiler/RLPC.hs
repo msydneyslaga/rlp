@@ -1,3 +1,10 @@
+{-|
+Module      : Compiler.RLPC
+Description : Tools used to glue each piece of RLPC together
+
+This module implements the toolset common to the entire compiler, most notably
+errors and the family of RLPC monads.
+-}
 {-# LANGUAGE GeneralisedNewtypeDeriving, StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric, DerivingStrategies, DerivingVia #-}

@@ -1,3 +1,7 @@
+{-|
+Module      : Core.Syntax
+Description : Core ASTs and the like
+-}
 {-# LANGUAGE PatternSynonyms, OverloadedStrings #-}
 module Core.Syntax
     ( Expr(..)

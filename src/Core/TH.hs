@@ -1,3 +1,7 @@
+{-|
+Module      : Core.TH
+Description : Core quasiquoters
+-}
 module Core.TH
     ( coreExpr
     , coreProg
