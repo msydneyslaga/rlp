@@ -242,17 +242,19 @@ step st =
                 _ ->
                     TiState (f:ap:s) d h g sts
 
+        -- >> [ref/scStep]
         scStep :: Name -> [Name] -> Expr -> TiState -> TiState
         scStep n as e (TiState s d h g sts) =
             TiState s' d h' g sts
             where
-                s' = rootAddr : drop (length as + 1) s
-                rootAddr = (s !! length as)
-                h' = instantiateU e rootAddr h env
+                s' = rootAddr : drop (length as + 1) s  -- 3., 4.
+                h' = instantiateU e rootAddr h env      -- 2.
+                rootAddr = s !! length as
 
-                env = argBinds ++ g
+                env = argBinds ++ g                     -- 1.
                 argBinds = as `zip` argAddrs
                 argAddrs = getArgs h s
+        -- << [ref/scStep]
 
         -- dereference indirections
         indStep :: Addr -> TiState -> TiState

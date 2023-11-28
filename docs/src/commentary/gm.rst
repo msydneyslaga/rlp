@@ -58,5 +58,152 @@ sequence of instructions* which instantiate the expression at execution.
 Implementation
 **************
 
+WIP. state transition rules
 
+1. Lookup a global by name and push its value onto the stack
+
+.. math::
+   \gmrule
+   { \mathtt{PushGlobal} \; f : i
+   & s
+   & h
+   & m
+   \begin{bmatrix}
+        f : a
+   \end{bmatrix}
+   }
+   { i
+   & a : s
+   & h
+   & m
+   }
+
+2. Allocate an int node on the heap, and push the address of the newly created
+   node onto the stack
+
+.. math::
+   \gmrule
+   { \mathtt{PushInt} \; n : i
+   & s
+   & h
+   & m
+   }
+   { i
+   & a : s
+   & h
+   \begin{bmatrix}
+        a : \mathtt{NNum} \; n
+   \end{bmatrix}
+   & m
+   }
+
+3. Allocate an application node on the heap, applying the top of the stack to
+   the address directly below it. The address of the application node is pushed
+   onto the stack.
+
+.. math::
+   \gmrule
+   { \mathtt{MkAp} : i
+   & f : x : s
+   & h
+   & m
+   }
+   { i
+   & a : s
+   & h
+   \begin{bmatrix}
+        a : \mathtt{NAp} \; f \; x
+   \end{bmatrix}
+   & m
+   }
+
+4. Push a function's argument onto the stack
+
+.. math::
+   \gmrule
+   { \mathtt{Push} \; n : i
+   & a_0 : \ldots : a_{n+1} : s
+   & h
+   \begin{bmatrix}
+        a_{n+1} : \mathtt{NAp} \; a_n \; a'_n
+   \end{bmatrix}
+   & m
+   }
+   { i
+   & a'_n : a_0 : \ldots : a_{n+1} : s
+   & h
+   & m
+   }
+
+5. Tidy up the stack after instantiating a supercombinator
+
+.. math::
+   \gmrule
+   { \mathtt{Slide} \; n : i
+   & a_0 : \ldots : a_n : s
+   & h
+   & m
+   }
+   { i
+   & a_0 : s
+   & h
+   & m
+   }
+
+6. If a number is on top of the stack, :code:`Unwind` leaves the machine in a
+   halt state
+
+.. math::
+   \gmrule
+   { \mathtt{Unwind} : \nillist
+   & a : s
+   & h
+   \begin{bmatrix}
+        a : \mathtt{NNum} \; n
+   \end{bmatrix}
+   & m
+   }
+   { \nillist
+   & a : s
+   & h
+   & m
+   }
+
+7. If an application is on top of the stack, :code:`Unwind` continues unwinding
+
+.. math::
+   \gmrule
+   { \mathtt{Unwind} : \nillist
+   & a : s
+   & h
+   \begin{bmatrix}
+        a : \mathtt{NAp} \; f \; x
+   \end{bmatrix}
+   & m
+   }
+   { \mathtt{Unwind} : \nillist
+   & f : a : s
+   & h
+   & m
+   }
+
+8. When a global node is on top of the stack (and the correct number of
+   arguments have been provided), :code:`Unwind` jumps to the supercombinator's
+   code (:math:`\beta`-reduction)
+
+.. math::
+   \gmrule
+   { \mathtt{Unwind} : \nillist
+   & a_0 : \ldots : a_n : s
+   & h
+   \begin{bmatrix}
+        a_0 : \mathtt{NGlobal} \; n \; c
+   \end{bmatrix}
+   & m
+   }
+   { c
+   & a_0 : \ldots : a_n : s
+   & h
+   & m
+   }
 

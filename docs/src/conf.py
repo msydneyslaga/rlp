@@ -41,6 +41,14 @@ imgmath_latex_preamble = r'''
          \hline
     \end{tblr} }
 
+\newcommand{\gmrule}[2]
+    {\begin{tblr}{|rrrll|}
+         \hline
+         & #1 \\
+         \implies & #2 \\
+         \hline
+    \end{tblr} }
+
 \newcommand{\nillist}{[\,]}
 '''
 
