@@ -2,11 +2,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric, DerivingStrategies, DerivingVia #-}
 module Compiler.RLPC
-    ( RLPC(..)
+    ( RLPC
+    , RLPCT
     , RLPCIO
     , RLPCOptions(RLPCOptions)
     , addFatal
     , addWound
+    , MonadErrorful
     , Severity(..)
     , evalRLPCT
     , evalRLPCIO
@@ -37,7 +39,7 @@ import Lens.Micro.TH
 ----------------------------------------------------------------------------------
 
 -- TODO: fancy errors
-newtype RLPCT e m a = RLPC {
+newtype RLPCT e m a = RLPCT {
         runRLPCT :: ReaderT RLPCOptions (ErrorfulT e m) a
     }
     deriving (Functor, Applicative, Monad, MonadReader RLPCOptions)
@@ -86,9 +88,9 @@ type ErrorDoc = String
 class Diagnostic e where
     errorDoc :: e -> ErrorDoc
 
-instance MonadErrorful e (RLPC e) where
-    addWound = RLPC . lift . addWound
-    addFatal = RLPC . lift . addFatal
+instance (Monad m) => MonadErrorful e (RLPCT e m) where
+    addWound = RLPCT . lift . addWound
+    addFatal = RLPCT . lift . addFatal
 
 ----------------------------------------------------------------------------------
 

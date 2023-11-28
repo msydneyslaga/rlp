@@ -50,33 +50,37 @@ debugFlagReader = maybeReader $ Just . \case
 
 ----------------------------------------------------------------------------------
 
+-- temp
+data CompilerError = CompilerError String
+
 main :: IO ()
 main = do
     opts <- execParser optParser
-    evalRLPCIO opts driver
+    (_, es) <- evalRLPCIO opts driver
+    forM_ es $ \ (CompilerError e) -> print $ "warning: " <> e
     pure ()
 
-driver :: RLPCIO () ()
+driver :: RLPCIO CompilerError ()
 driver = sequence_
     [ dshowFlags
     , ddumpEval
     ]
 
-dshowFlags :: RLPCIO () ()
+dshowFlags :: RLPCIO CompilerError ()
 dshowFlags = whenFlag flagDDumpOpts do
     ask >>= liftIO . print
     liftIO $ exitSuccess
 
-ddumpEval :: RLPCIO () ()
+ddumpEval :: RLPCIO CompilerError ()
 ddumpEval = whenFlag flagDDumpEval do
     fs <- view rlpcInputFiles
     forM_ fs $ \f -> liftIO (readFile f) >>= doProg
 
     where
-        doProg :: String -> RLPCIO () ()
+        doProg :: String -> RLPCIO CompilerError ()
         doProg s = ask >>= \o -> case parseProg o s of
             -- TODO: error handling
-            Left e -> error $ show e
+            Left e -> addFatal . CompilerError $ show e
             Right (a,_) -> do
                 log <- view rlpcLogFile
                 case log of
