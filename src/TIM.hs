@@ -1,6 +1,6 @@
 {-|
 Module    : TIM
-Description : The Spineless Tagless G-Machine
+Description : The Template Instantiation Machine
 -}
 {-# LANGUAGE LambdaCase, BlockArguments #-}
 {-# LANGUAGE OverloadedStrings #-}
