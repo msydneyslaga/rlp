@@ -1,3 +1,7 @@
+{-|
+Module    : TIM
+Description : The Spineless Tagless G-Machine
+-}
 {-# LANGUAGE LambdaCase, BlockArguments #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
