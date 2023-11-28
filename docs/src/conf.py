@@ -18,7 +18,9 @@ extensions = ['sphinx.ext.imgmath']
 templates_path = ['_templates']
 exclude_patterns = []
 
-
+# for the haskell girlies
+highlight_language = 'haskell'
+add_function_parentheses = False
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
