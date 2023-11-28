@@ -21,8 +21,7 @@ potential roadblocks on my mind before making an attempt were:
 
 * Context-sensitive keywords; Haskell allows for some words to be used as identifiers in
   appropriate contexts, such as :code:`family`, :code:`role`, :code:`as`.
-  Reading a note_ found in `GHC's lexer
-  <https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Parser/Lexer.x#L1133>`_,
+  Reading a note_ found in `GHC's lexer`_,
   it appears that keywords are only considered in bodies for which their use is
   relevant, e.g. :code:`family` and :code:`role` in type declarations,
   :code:`as` after :code:`case`; :code:`if`, :code:`then`, and :code:`else` in
@@ -33,6 +32,7 @@ potential roadblocks on my mind before making an attempt were:
   section code in a way that *felt* different.
 
 .. _note: https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/coding-style#2-using-notes
+.. _GHC's lexer: https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Parser/Lexer.x#L1133
 
 After a bit of thought and research, whitespace sensitivity in the form of
 *layouts* as Haskell and I will refer to them as, are easily the scariest thing
