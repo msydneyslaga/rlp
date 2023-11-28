@@ -3,7 +3,8 @@ module Core.Lex
     ( lexCore
     , lexCore'
     , CoreToken(..)
-    , ParseError(..)
+    , SrcError(..)
+    , SrcErrorType(..)
     , Located(..)
     , AlexPosn(..)
     )
@@ -119,19 +120,30 @@ data CoreToken = TokenLet
                | TokenEOF
                deriving Show
 
+data SrcError = SrcError
+    { _errSpan       :: (Int, Int, Int)
+    , _errSeverity   :: Severity
+    , _errDiagnostic :: SrcErrorType
+    }
+    deriving Show
+
+data SrcErrorType = SrcErrLexical String
+                  | SrcErrParse
+                  deriving Show
+
 type Lexer = AlexInput -> Int -> Alex (Located CoreToken)
 
 lexWith :: (String -> CoreToken) -> Lexer
 lexWith f (AlexPn _ y x,_,_,s) l = pure $ Located y x l (f $ take l s)
 
 -- | The main lexer driver.
-lexCore :: String -> RLPC ParseError [Located CoreToken]
+lexCore :: String -> RLPC SrcError [Located CoreToken]
 lexCore s = case m of
     Left e   -> addFatal err
         where err = SrcError
                 { _errSpan       = (0,0,0) -- TODO: location
                 , _errSeverity   = Error
-                , _errDiagnostic = ParErrLexical e
+                , _errDiagnostic = SrcErrLexical e
                 }
     Right ts -> pure ts
     where
@@ -139,7 +151,7 @@ lexCore s = case m of
 
 -- | @lexCore@, but the tokens are stripped of location info. Useful for
 -- debugging
-lexCore' :: String -> RLPC ParseError [CoreToken]
+lexCore' :: String -> RLPC SrcError [CoreToken]
 lexCore' s = fmap f <$> lexCore s
     where f (Located _ _ _ t) = t
 

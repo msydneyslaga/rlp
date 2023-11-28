@@ -6,7 +6,6 @@ module Core.Parse
     , module Core.Lex -- temp convenience
     , parseTmp
     , SrcError
-    , ParseError
     , Module
     )
     where
@@ -24,7 +23,7 @@ import Data.Default.Class   (def)
 %name parseCoreProg StandaloneProgram
 %tokentype { Located CoreToken }
 %error { parseError }
-%monad { RLPC ParseError }
+%monad { RLPC SrcError }
 
 %token
       let             { Located _ _ _ TokenLet }
@@ -126,12 +125,12 @@ Con             : '(' consym ')'                    { $2 }
                 | conname                           { $1 }
 
 {
-parseError :: [Located CoreToken] -> RLPC ParseError a
+parseError :: [Located CoreToken] -> RLPC SrcError a
 parseError (Located y x l _ : _) = addFatal err
     where err = SrcError
             { _errSpan       = (y,x,l)
             , _errSeverity   = Error
-            , _errDiagnostic = ParErrParse
+            , _errDiagnostic = SrcErrParse
             }
 
 parseTmp :: IO Module

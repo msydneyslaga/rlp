@@ -4,7 +4,7 @@ module Core
     , parseCoreProg
     , parseCoreExpr
     , lexCore
-    , ParseError
+    , SrcError(..)
     )
     where
 ----------------------------------------------------------------------------------

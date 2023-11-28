@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving, StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric, DerivingStrategies, DerivingVia #-}
 module Compiler.RLPC
     ( RLPC(..)
     , RLPCIO
@@ -7,13 +8,16 @@ module Compiler.RLPC
     , addFatal
     , addWound
     , Severity(..)
-    , SrcError(..)
     , evalRLPCT
     , evalRLPCIO
     , evalRLPC
-    , rlpcLogFile   
-    , rlpcDumpEval  
+    , rlpcLogFile
+    , rlpcDebugOpts
     , rlpcInputFiles
+    , DebugFlag(..)
+    , whenFlag
+    , flagDDumpEval
+    , flagDDumpOpts
     )
 
     where
@@ -23,6 +27,10 @@ import Control.Monad.Reader
 import Control.Monad.Errorful
 import Data.Functor.Identity
 import Data.Default.Class
+import GHC.Generics             (Generic)
+import Data.Hashable            (Hashable)
+import Data.HashSet             (HashSet)
+import Data.HashSet             qualified as S
 import Data.Coerce
 import Lens.Micro
 import Lens.Micro.TH
@@ -30,7 +38,7 @@ import Lens.Micro.TH
 
 -- TODO: fancy errors
 newtype RLPCT e m a = RLPC {
-        runRLPCT :: ReaderT RLPCOptions (ErrorfulT (SrcError e) m) a
+        runRLPCT :: ReaderT RLPCOptions (ErrorfulT e m) a
     }
     deriving (Functor, Applicative, Monad, MonadReader RLPCOptions)
 
@@ -42,17 +50,17 @@ type RLPCIO e = RLPCT e IO
 
 evalRLPCT :: RLPCOptions
           -> RLPCT e m a
-          -> m (Either (SrcError e) (a, [SrcError e]))
+          -> m (Either e (a, [e]))
 evalRLPCT o = runRLPCT >>> flip runReaderT o >>> runErrorfulT
 
 evalRLPC :: RLPCOptions
          -> RLPC e a
-         -> Either (SrcError e) (a, [SrcError e])
+         -> Either e (a, [e])
 evalRLPC o m = coerce $ evalRLPCT o m
 
 evalRLPCIO :: RLPCOptions
            -> RLPCIO e a
-           -> IO (a, [SrcError e])
+           -> IO (a, [e])
 evalRLPCIO o m = do
     m' <- evalRLPCT o m
     case m' of
@@ -62,25 +70,10 @@ evalRLPCIO o m = do
 
 data RLPCOptions = RLPCOptions
     { _rlpcLogFile    :: Maybe FilePath
-    , _rlpcDumpEval   :: Bool
+    , _rlpcDebugOpts  :: DebugOpts
     , _rlpcInputFiles :: [FilePath]
     }
     deriving Show
-
-instance Default RLPCOptions where
-    def = RLPCOptions
-        { _rlpcLogFile = Nothing
-        , _rlpcDumpEval = False
-        , _rlpcInputFiles = []
-        }
-
-data SrcError e = SrcError
-    { _errSpan       :: (Int, Int, Int)
-    , _errSeverity   :: Severity
-    , _errDiagnostic :: e
-    }
-
-deriving instance (Show e) => Show (SrcError e)
 
 data Severity = Error
               | Warning
@@ -93,12 +86,44 @@ type ErrorDoc = String
 class Diagnostic e where
     errorDoc :: e -> ErrorDoc
 
-makeLenses ''RLPCOptions
-makeLenses ''SrcError
-
-pure []
-
-instance MonadErrorful (SrcError e) (RLPC e) where
+instance MonadErrorful e (RLPC e) where
     addWound = RLPC . lift . addWound
     addFatal = RLPC . lift . addFatal
+
+----------------------------------------------------------------------------------
+
+instance Default RLPCOptions where
+    def = RLPCOptions
+        { _rlpcLogFile = Nothing
+        , _rlpcDebugOpts = mempty
+        , _rlpcInputFiles = []
+        }
+
+type DebugOpts = HashSet DebugFlag
+
+data DebugFlag = DDumpEval
+               | DDumpOpts
+               deriving (Show, Eq, Generic)
+
+    -- deriving (Hashable)
+    -- via Generically DebugFlag
+
+instance Hashable DebugFlag
+
+makeLenses ''RLPCOptions
+pure []
+
+whenFlag :: (MonadReader s m) => SimpleGetter s Bool -> m () -> m ()
+whenFlag l m = asks (^. l) >>= \a -> if a then m else pure ()
+
+-- there's probably a better way to write this. my current knowledge of lenses
+-- is too weak.
+flagGetter :: DebugFlag -> SimpleGetter RLPCOptions Bool
+flagGetter d = to $ \s -> s ^. rlpcDebugOpts & S.member d
+
+flagDDumpEval :: SimpleGetter RLPCOptions Bool
+flagDDumpEval = flagGetter DDumpEval
+
+flagDDumpOpts :: SimpleGetter RLPCOptions Bool
+flagDDumpOpts = flagGetter DDumpOpts
 

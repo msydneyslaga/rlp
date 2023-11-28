@@ -43,6 +43,8 @@ library
                     -- required for happy
                     , array
                     , data-default-class
+                    , unordered-containers
+                    , hashable
 
     hs-source-dirs:   src
     default-language: GHC2021
@@ -58,6 +60,7 @@ executable rlpc
                  , microlens
                  , microlens-mtl
                  , mtl
+                 , unordered-containers
 
     hs-source-dirs:   app
     default-language: GHC2021

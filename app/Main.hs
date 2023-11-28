@@ -1,11 +1,13 @@
-{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE BlockArguments, LambdaCase #-}
 module Main where
 ----------------------------------------------------------------------------------
 import Compiler.RLPC
 import Options.Applicative      hiding (ParseError)
 import Control.Monad
 import Control.Monad.Reader
+import Data.HashSet             qualified as S
 import System.IO
+import System.Exit              (exitSuccess)
 import Core
 import TIM
 import Lens.Micro
@@ -28,15 +30,23 @@ options = RLPCOptions
         <> help "output dumps to FILE. stderr is used by default"
         )
     -- temp. i want gcc/ghc style options
-    <*> switch 
-        (  long "dump-evals"
-        <> short 'd'
+    <*> fmap S.fromList # many # option debugFlagReader
+        (  short 'd'
         <> help "dump evaluation logs"
+        <> metavar "DEBUG FLAG"
         )
     <*> some (argument str (metavar "FILES..."))
     where
         infixr 9 #
         f # x = f x
+
+mmany :: (Alternative f, Monoid m) => f m -> f m
+mmany v = liftA2 (<>) v (mmany v)
+
+debugFlagReader :: ReadM DebugFlag
+debugFlagReader = maybeReader $ Just . \case
+    "dump-eval"  -> DDumpEval
+    "dump-opts"  -> DDumpOpts
 
 main :: IO ()
 main = do
@@ -46,14 +56,17 @@ main = do
 
 driver :: RLPCIO () ()
 driver = sequence_
-    [ dumpEval
+    [ dshowFlags
+    , ddumpEval
     ]
 
-whenView :: (MonadReader s m) => Getting Bool s Bool -> m () -> m ()
-whenView l m = view l >>= \a -> when a m
+dshowFlags :: RLPCIO () ()
+dshowFlags = whenFlag flagDDumpOpts do
+    ask >>= liftIO . print
+    liftIO $ exitSuccess
 
-dumpEval :: RLPCIO () ()
-dumpEval = whenView rlpcDumpEval do
+ddumpEval :: RLPCIO () ()
+ddumpEval = whenFlag flagDDumpEval do
     fs <- view rlpcInputFiles
     forM_ fs $ \f -> liftIO (readFile f) >>= doProg
 
@@ -70,6 +83,6 @@ dumpEval = whenView rlpcDumpEval do
 
         parseProg :: RLPCOptions
                   -> String
-                  -> Either (SrcError ParseError) (Program, [SrcError ParseError])
+                  -> Either SrcError (Program, [SrcError])
         parseProg o = evalRLPC o . (lexCore >=> parseCoreProg)
 
