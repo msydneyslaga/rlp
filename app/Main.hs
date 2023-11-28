@@ -48,6 +48,8 @@ debugFlagReader = maybeReader $ Just . \case
     "dump-eval"  -> DDumpEval
     "dump-opts"  -> DDumpOpts
 
+----------------------------------------------------------------------------------
+
 main :: IO ()
 main = do
     opts <- execParser optParser
