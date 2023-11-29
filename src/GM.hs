@@ -202,7 +202,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiled
             | k `elem` domain  = [Push n]
             | otherwise        = [PushGlobal k]
             where
-                n = fromMaybe (error "unknown var") $ lookup k g
+                n = fromMaybe (error $ "undeclared var: " <> k) $ lookup k g
                 domain = fmap fst g
 
         compileC g (IntE n)  = [PushInt n]
