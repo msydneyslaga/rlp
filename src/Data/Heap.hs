@@ -48,6 +48,8 @@ instance Foldable Heap where
 
     null (Heap _ m) = M.size m == 0
 
+    length (Heap _ m) = M.size m
+
 instance Traversable Heap where
     traverse t (Heap u m) = Heap u <$> (traverse t m)
 
@@ -76,9 +78,6 @@ hLookupUnsafe k (Heap _ m) = case m !? k of
 
 addresses :: Heap a -> [Addr]
 addresses (Heap _ m) = M.keys m
-
-hSize :: Heap a -> Int
-hSize (Heap _ m) = M.size m
 
 -- | Intended for use with view patterns
 hView :: Heap a -> Addr -> Maybe a
