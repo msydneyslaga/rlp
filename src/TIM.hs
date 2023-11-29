@@ -483,7 +483,7 @@ doAdmin = doStats
 
 -- | is the heap larger than some arbitrary number i declared "bloated"?
 isHeapLarge :: TiState -> Bool
-isHeapLarge st = hSize (st ^. tiHeap) >= triggerSize
+isHeapLarge st = length (st ^. tiHeap) >= triggerSize
     where triggerSize = 50
 
 ----------------------------------------------------------------------------------
