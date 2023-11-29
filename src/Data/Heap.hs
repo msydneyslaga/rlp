@@ -1,3 +1,7 @@
+{-
+Module : Data.Heap
+Description : A model heap used by abstract machine
+-}
 module Data.Heap
     ( Heap
     , Addr
