@@ -12,7 +12,6 @@ module Data.Heap
     , hLookup
     , hLookupUnsafe
     , addresses
-    , hSize
     , hView
     , hViewUnsafe
     , mapWithAddress
