@@ -18,6 +18,7 @@ module Core.Syntax
     , rhssOf
     , isAtomic
     , insertModule
+    , extractProgram
     )
     where
 ----------------------------------------------------------------------------------
@@ -145,4 +146,7 @@ isAtomic _       = False
 -- TODO: export list awareness
 insertModule :: Module -> Program -> Program
 insertModule (Module _ m) p = p <> m
+
+extractProgram :: Module -> Program
+extractProgram (Module _ p) = p
 
