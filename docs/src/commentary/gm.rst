@@ -187,9 +187,9 @@ Core Transition Rules
    & m
    }
 
-8. When a global node is on top of the stack (and the correct number of
-   arguments have been provided), :code:`Unwind` jumps to the supercombinator's
-   code (:math:`\beta`-reduction)
+8. When a supercombinator is on top of the stack (and the correct number of
+   arguments have been provided), :code:`Unwind` sets up the stack and jumps to
+   the supercombinator's code (:math:`\beta`-reduction)
 
 .. math::
    \gmrule
@@ -197,12 +197,15 @@ Core Transition Rules
    & a_0 : \ldots : a_n : s
    & h
    \begin{bmatrix}
-        a_0 : \mathtt{NGlobal} \; n \; c
+        a_0 : \mathtt{NGlobal} \; n \; c \\
+        a_1 : \mathtt{NAp} \; a_0 \; e_1 \\
+        \vdots \\
+        a_n : \mathtt{NAp} \; a_{n-1} \; e_n \\
    \end{bmatrix}
    & m
    }
    { c
-   & a_0 : \ldots : a_n : s
+   & e_1 : \ldots : e_n : a_n : s
    & h
    & m
    }

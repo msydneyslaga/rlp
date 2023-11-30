@@ -191,20 +191,15 @@ step st = case head (st ^. gmCode) of
                 (h',a) = alloc h (NAp f x)
 
         -- a `Push n` instruction pushes the address of (n+1)-th argument onto
-        -- the stack. this means that the nth node on the stack is assumed to be
-        -- an application. the (n+1)-th argument is the rhs of that application.
+        -- the stack.
         push :: Int -> GmState -> GmState
         push n st = st
                   & gmCode  %~ drop 1
-                  & gmStack .~ s'
+                  & gmStack %~ (a:)
             where
-                s = st ^. gmStack
                 h = st ^. gmHeap
-
-                s' = arg : s
-                argAp = s !! (n+1)
-                arg = case hLookupUnsafe argAp h of
-                    NAp _ a -> a
+                s = st ^. gmStack
+                a = s !! n
 
         -- 'slide' the top of the stack `n` entries downwards, popping any
         -- entries along the way.
@@ -248,10 +243,20 @@ step st = case head (st ^. gmCode) of
                          -- leave the Unwind instr; continue unwinding
                          & gmStack %~ (f:)
             -- assumes length s < d (i.e. enough args have been supplied)
-            NGlobal d c -> st
+            NGlobal n c -> st
                          -- 'jump' to global's code by replacing our current
                          -- code with `c`
-                         & gmCode .~ c
+                         & gmCode  .~ c
+                         & gmStack .~ s'
+                where
+                    s' = args ++ drop n s
+                    args = getArgs $ take (n+1) s
+
+                    getArgs :: Stack -> [Addr]
+                    getArgs (_:ss) = fmap arg ss
+                        where
+                            arg (hViewUnsafe h -> NAp _ x) = x
+
             -- follow indirection
             NInd a      -> st
                          -- leave the Unwind instr; continue unwinding.
