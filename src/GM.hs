@@ -76,7 +76,7 @@ pure []
 
 hdbgProg :: Program -> Handle -> IO (Node, Stats)
 hdbgProg p hio = do
-    (renderOut . showState) `traverse_` p'
+    (renderOut . showState) `traverse_` states
     -- TODO: i'd like the statistics to be at the top of the file, but `sts`
     -- demands the full evaluation of the entire program, meaning that we
     -- *can't* get partial logs in the case of a crash. this is in opposition to
