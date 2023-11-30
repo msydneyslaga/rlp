@@ -77,17 +77,23 @@ pure []
 hdbgProg :: Program -> Handle -> IO (Node, Stats)
 hdbgProg p hio = do
     (renderOut . showState) `traverse_` p'
+    -- TODO: i'd like the statistics to be at the top of the file, but `sts`
+    -- demands the full evaluation of the entire program, meaning that we
+    -- *can't* get partial logs in the case of a crash. this is in opposition to
+    -- the above traversal which *will* produce partial logs. i love laziness :3
     renderOut . showStats $ sts
     pure (res, sts)
     where
         renderOut r = hPutStrLn hio $ render r ++ "\n"
 
-        p' = eval $ compile p
-        final = last p'
+        states = eval $ compile p
+        final = last states
+        h = final ^. gmHeap
+
         sts = final ^. gmStats
+        -- the address of the result should be the one and only stack entry
         [resAddr] = final ^. gmStack
         res = hLookupUnsafe resAddr h
-        h = final ^. gmHeap
 
 eval :: GmState -> [GmState]
 eval st = st : rest
@@ -99,6 +105,8 @@ eval st = st : rest
 doAdmin :: GmState -> GmState
 doAdmin st = st & gmStats . stsReductions %~ succ
 
+-- the state is considered final if there is no more code to execute. very
+-- simple compared to TIM
 isFinal :: GmState -> Bool
 isFinal st = null $ st ^. gmCode
 
@@ -148,6 +156,9 @@ step st = case head (st ^. gmCode) of
                 s' = a : ss
                 (h',a) = alloc h (NAp f x)
 
+        -- a `Push n` instruction pushes the address of (n+1)-th argument onto
+        -- the stack. this means that the nth node on the stack is assumed to be
+        -- an application. the (n+1)-th argument is the rhs of that application.
         push :: Int -> GmState -> GmState
         push n st = st
                   & gmCode  %~ drop 1
@@ -161,6 +172,14 @@ step st = case head (st ^. gmCode) of
                 arg = case hLookupUnsafe argAp h of
                     NAp _ a -> a
 
+        -- 'slide' the top of the stack `n` entries downwards, popping any
+        -- entries along the way.
+        --
+        -- Initial Stack        Effects of `Slide 3`
+        --  0: 3                  0: 3
+        --  1: f                  1: f x y
+        --  2: f x
+        --  3: f x y
         slide :: Int -> GmState -> GmState
         slide n st = st
                    & gmCode  %~ drop 1
@@ -169,6 +188,7 @@ step st = case head (st ^. gmCode) of
                 (a:s) = st ^. gmStack
                 s' = a : drop n s
 
+        -- the complex heart of the G-machine
         unwind :: GmState -> GmState
         unwind st = case hLookupUnsafe a h of
             NNum n      -> st
