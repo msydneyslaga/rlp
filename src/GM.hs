@@ -156,7 +156,6 @@ step st = case head (st ^. gmCode) of
                 h = st ^. gmHeap
                 n' = show n
 
-
         -- Core Rule 2. (no sharing)
         -- pushInt :: Int -> GmState -> GmState
         -- pushInt n st = st
