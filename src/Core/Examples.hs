@@ -110,6 +110,13 @@ listExample3 = [coreProg|
     main = foldr (+#) 0 list;
 |]
 
+simple1 = [coreProg|
+    k a b = a;
+    s f g x = f x (g x);
+
+    main = s k k 3;
+|]
+
 corePrelude :: Module
 corePrelude = Module (Just ("Prelude", [])) $
     -- non-primitive defs

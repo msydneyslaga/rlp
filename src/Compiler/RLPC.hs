@@ -17,11 +17,13 @@ module Compiler.RLPC
     , addWound
     , MonadErrorful
     , Severity(..)
+    , Evaluator(..)
     , evalRLPCT
     , evalRLPCIO
     , evalRLPC
     , rlpcLogFile
     , rlpcDebugOpts
+    , rlpcEvaluator
     , rlpcInputFiles
     , DebugFlag(..)
     , whenFlag
@@ -80,8 +82,12 @@ evalRLPCIO o m = do
 data RLPCOptions = RLPCOptions
     { _rlpcLogFile    :: Maybe FilePath
     , _rlpcDebugOpts  :: DebugOpts
+    , _rlpcEvaluator  :: Evaluator
     , _rlpcInputFiles :: [FilePath]
     }
+    deriving Show
+
+data Evaluator = EvaluatorGM | EvaluatorTIM
     deriving Show
 
 data Severity = Error
@@ -105,6 +111,7 @@ instance Default RLPCOptions where
     def = RLPCOptions
         { _rlpcLogFile = Nothing
         , _rlpcDebugOpts = mempty
+        , _rlpcEvaluator = EvaluatorGM
         , _rlpcInputFiles = []
         }
 

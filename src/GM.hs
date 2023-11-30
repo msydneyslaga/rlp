@@ -6,7 +6,7 @@ Description : The G-Machine
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 module GM
-    (
+    ( hdbgProg
     )
     where
 ----------------------------------------------------------------------------------
@@ -19,6 +19,8 @@ import Lens.Micro.TH
 import Text.Printf
 import Text.PrettyPrint             hiding ((<>))
 import Text.PrettyPrint.HughesPJ    (maybeParens)
+import Data.Foldable                (traverse_)
+import System.IO                    (Handle, hPutStrLn)
 import Data.Heap
 import Core
 ----------------------------------------------------------------------------------
@@ -71,6 +73,21 @@ makeLenses ''Stats
 pure []
 
 ----------------------------------------------------------------------------------
+
+hdbgProg :: Program -> Handle -> IO (Node, Stats)
+hdbgProg p hio = do
+    (renderOut . showState) `traverse_` p'
+    renderOut . showStats $ sts
+    pure (res, sts)
+    where
+        renderOut r = hPutStrLn hio $ render r ++ "\n"
+
+        p' = eval $ compile p
+        final = last p'
+        sts = final ^. gmStats
+        [resAddr] = final ^. gmStack
+        res = hLookupUnsafe resAddr h
+        h = final ^. gmHeap
 
 eval :: GmState -> [GmState]
 eval st = st : rest
@@ -139,20 +156,18 @@ step st = case head (st ^. gmCode) of
                 s = st ^. gmStack
                 h = st ^. gmHeap
 
-                s' = an : s
-                an = s !! (n+1)
-                an' = getArg an
-
-                getArg (hViewUnsafe h -> NAp _ a) = a
+                s' = arg : s
+                argAp = s !! (n+1)
+                arg = case hLookupUnsafe argAp h of
+                    NAp _ a -> a
 
         slide :: Int -> GmState -> GmState
         slide n st = st
                    & gmCode  %~ drop 1
                    & gmStack .~ s'
             where
-                s = st ^. gmStack
-                a0 = head s
-                s' = a0 : drop n s
+                (a:s) = st ^. gmStack
+                s' = a : drop n s
 
         unwind :: GmState -> GmState
         unwind st = case hLookupUnsafe a h of
@@ -162,6 +177,7 @@ step st = case head (st ^. gmCode) of
             NAp f x     -> st
                          -- leave the Unwind instr; continue unwinding
                          & gmStack %~ (f:)
+            -- assumes length s < d (i.e. enough args have been supplied)
             NGlobal d c -> st
                          -- 'jump' to global's code by replacing our current
                          -- code with `c`
@@ -234,9 +250,6 @@ pprTabstop = 4
 
 qquotes :: Doc -> Doc
 qquotes d = "`" <> d <> "'"
-
-showResults :: [GmState] -> String
-showResults st = undefined
 
 showStats :: Stats -> Doc
 showStats sts = "==== Stats ============" $$ stats
@@ -316,7 +329,8 @@ showNodeAtP p st a = case hLookup a h of
         where
             g = st ^. gmEnv
             name = fromMaybe "<unknown>" $ lookup a (swap <$> g)
-    Just (NAp f x)       -> showNodeAtP (p+1) st f <+> showNodeAtP (p+1) st x
+    Just (NAp f x)       -> pprec $ showNodeAtP (p+1) st f <+> showNodeAtP (p+1) st x
+        where pprec = maybeParens (p > 0)
     Nothing              -> "<invalid address>"
     where h = st ^. gmHeap
 

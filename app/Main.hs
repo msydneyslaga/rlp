@@ -10,6 +10,7 @@ import System.IO
 import System.Exit              (exitSuccess)
 import Core
 import TIM
+import GM
 import Lens.Micro
 import Lens.Micro.Mtl
 ----------------------------------------------------------------------------------
@@ -23,30 +24,46 @@ optParser = info (helper <*> options)
 
 options :: Parser RLPCOptions
 options = RLPCOptions
+    {- --log, -l -}
     <$> optional # strOption
         (  long "log"
         <> short 'l'
         <> metavar "FILE"
         <> help "output dumps to FILE. stderr is used by default"
         )
-    -- temp. i want gcc/ghc style options
+    {- -d -}
     <*> fmap S.fromList # many # option debugFlagReader
         (  short 'd'
         <> help "dump evaluation logs"
         <> metavar "DEBUG FLAG"
+        )
+    {- --evaluator, -e -}
+    <*> option evaluatorReader
+        (  long "evaluator"
+        <> short 'e'
+        <> metavar "gm|tim"
+        <> value EvaluatorGM
+        <> help "the intermediate layer used to model evaluation"
         )
     <*> some (argument str (metavar "FILES..."))
     where
         infixr 9 #
         f # x = f x
 
+evaluatorReader :: ReadM Evaluator
+evaluatorReader = maybeReader $ \case
+    "gm"  -> Just EvaluatorGM
+    "tim" -> Just EvaluatorTIM
+    _     -> Nothing
+
 mmany :: (Alternative f, Monoid m) => f m -> f m
 mmany v = liftA2 (<>) v (mmany v)
 
 debugFlagReader :: ReadM DebugFlag
-debugFlagReader = maybeReader $ Just . \case
-    "dump-eval"  -> DDumpEval
-    "dump-opts"  -> DDumpOpts
+debugFlagReader = maybeReader $ \case
+    "dump-eval"  -> Just DDumpEval
+    "dump-opts"  -> Just DDumpOpts
+    _            -> Nothing
 
 ----------------------------------------------------------------------------------
 
@@ -83,12 +100,21 @@ ddumpEval = whenFlag flagDDumpEval do
             Left e -> addFatal . CompilerError $ show e
             Right (a,_) -> do
                 log <- view rlpcLogFile
+                dumpEval <- chooseEval
                 case log of
-                    Just f  -> void . liftIO $ withFile f WriteMode $ hdbgProg a
-                    Nothing -> void . liftIO $ hdbgProg a stderr
+                    Just f  -> liftIO $ withFile f WriteMode $ dumpEval a
+                    Nothing -> liftIO $ dumpEval a stderr
 
         parseProg :: RLPCOptions
                   -> String
                   -> Either SrcError (Program, [SrcError])
         parseProg o = evalRLPC o . (lexCore >=> parseCoreProg)
+
+        -- choose the appropriate model based on the compiler opts
+        chooseEval = do
+            ev <- view rlpcEvaluator
+            pure $ case ev of
+                EvaluatorGM  -> v GM.hdbgProg
+                EvaluatorTIM -> v TIM.hdbgProg
+            where v f p h = f p h *> pure ()
 
