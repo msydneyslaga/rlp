@@ -45,6 +45,8 @@ data Instr = Unwind
            | Push Int
            | MkAp
            | Slide Int
+           | Update Int
+           | Pop Int
            deriving (Show, Eq)
 
 data Node = NNum Int
@@ -53,7 +55,8 @@ data Node = NNum Int
           -- template to be instantiated, NGlobal holds the global's arity and
           -- the pre-compiled code :3
           | NGlobal Int Code
-          deriving Show
+          | NInd Addr
+          deriving (Show, Eq)
 
 data Stats = Stats
     { _stsReductions     :: Int
@@ -118,6 +121,8 @@ step st = case head (st ^. gmCode) of
     Push       n -> push       n st
     MkAp         -> mkAp         st
     Slide      n -> slide      n st
+    Pop        n -> pop        n st
+    Update     n -> update     n st
     where
 
         pushGlobal :: Name -> GmState -> GmState
@@ -217,6 +222,22 @@ step st = case head (st ^. gmCode) of
                 (a:s) = st ^. gmStack
                 s' = a : drop n s
 
+        update :: Int -> GmState -> GmState
+        update n st = st
+                    & gmCode  %~ drop 1
+                    & gmStack .~ s
+                    & gmHeap  .~ h'
+            where
+                (e:s) = st ^. gmStack
+                an = s !! n
+                h' = st ^. gmHeap
+                    & Data.Heap.update an (NInd e)
+
+        pop :: Int -> GmState -> GmState
+        pop n st = st
+                 & gmCode  %~ drop 1
+                 & gmStack %~ drop n
+
         -- the complex heart of the G-machine
         unwind :: GmState -> GmState
         unwind st = case hLookupUnsafe a h of
@@ -231,6 +252,12 @@ step st = case head (st ^. gmCode) of
                          -- 'jump' to global's code by replacing our current
                          -- code with `c`
                          & gmCode .~ c
+            -- follow indirection
+            NInd a      -> st
+                         -- leave the Unwind instr; continue unwinding.
+                         -- follow the indirection; replace the address on the
+                         -- stack with the pointee
+                         & gmStack . _head .~ a
             where
                 s = st ^. gmStack
                 a = head s
@@ -269,7 +296,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiled
         -- << [ref/compileSc]
 
         compileR :: Env -> Expr -> Code
-        compileR g e = compileC g e <> [Slide (d+1), Unwind]
+        compileR g e = compileC g e <> [Update d, Pop d, Unwind]
             where
                 d = length g
 
@@ -380,6 +407,8 @@ showNodeAtP p st a = case hLookup a h of
             g = st ^. gmEnv
             name = fromMaybe "<unknown>" $ lookup a (swap <$> g)
     Just (NAp f x)       -> pprec $ showNodeAtP (p+1) st f <+> showNodeAtP (p+1) st x
+        where pprec = maybeParens (p > 0)
+    Just (NInd a)        -> pprec $ "NInd -> " <> showNodeAtP (p+1) st a
         where pprec = maybeParens (p > 0)
     Nothing              -> "<invalid address>"
     where h = st ^. gmHeap

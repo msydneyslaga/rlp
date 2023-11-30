@@ -210,6 +210,62 @@ Core Transition Rules
    & m
    }
 
+9. Pop the stack, and update the nth node to point to the popped address
+
+.. math::
+   \gmrule
+   { \mathtt{Update} \; n : i
+   & e : f : a_1 : \ldots : a_n : s
+   & h
+   \begin{bmatrix}
+        a_1 : \mathtt{NAp} \; f \; e \\
+        \vdots \\
+        a_n : \mathtt{NAp} \; a_{n-1} \; e_n
+   \end{bmatrix}
+   & m
+   }
+   { i
+   & f : a_1 : \ldots : a_n : s
+   & h
+   \begin{bmatrix}
+        a_n : \mathtt{NInd} \; e
+   \end{bmatrix}
+   & m
+   }
+
+10. Pop the stack.
+
+.. math::
+   \gmrule
+   { \mathtt{Pop} \; n : i
+   & a_1 : \ldots : a_n : s
+   & h
+   & m
+   }
+   { i
+   & s
+   & h
+   & m
+   }
+
+11. Follow indirections while unwinding
+
+.. math::
+   \gmrule
+   { \mathtt{Unwind} : \nillist
+   & a : s
+   & h
+   \begin{bmatrix}
+        a : \mathtt{NInd} \; a'
+   \end{bmatrix}
+   & m
+   }
+   { \mathtt{Unwind} : \nillist
+   & a' : s
+   & h
+   & m
+   }
+
 Extension Rules
 ---------------
 
@@ -221,7 +277,7 @@ Extension Rules
    (remember that the environment is intended for *globals*).
 
 .. math::
-   \transrule
+   \gmrule
    { \mathtt{PushInt} \; n : i
    & s
    & h
@@ -270,6 +326,13 @@ Evaluation: Slurping Vines
 
 WIP.
 
+Laziness
+--------
+
+WIP.
+
+* Instead of :code:`Slide (n+1); Unwind`, do :code:`Update n; Pop n; Unwind`
+
 ****************************
 Compilation: Squashing Trees
 ****************************
@@ -296,4 +359,6 @@ The way around this is quite simple: simply offset the stack when w
    :start-after: -- >> [ref/compileC]
    :end-before: -- << [ref/compileC]
    :caption: src/GM.hs
+
+
 
