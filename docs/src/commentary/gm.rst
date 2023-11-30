@@ -54,9 +54,9 @@ Achilles' heel. Traversing a tree structure is a very non-linear task unfit for
 an assembly target. The goal of our new G-Machine is to compile a *linear
 sequence of instructions* which instantiate the expression at execution.
 
-**************
-Implementation
-**************
+**************************
+Trees and Vines, in Theory
+**************************
 
 WIP. state transition rules
 
@@ -207,9 +207,15 @@ WIP. state transition rules
    & m
    }
 
-*********************************
-Compilation: How to Squash a Tree
-*********************************
+**************************
+Evaluation: Slurping Vines
+**************************
+
+WIP.
+
+****************************
+Compilation: Squashing Trees
+****************************
 
 WIP.
 
