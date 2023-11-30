@@ -13,8 +13,10 @@ module GM
 import Data.Default.Class
 import Data.List                    (mapAccumL, intersperse)
 import Data.Maybe                   (fromMaybe)
+import Data.Tuple                   (swap)
 import Lens.Micro
 import Lens.Micro.TH
+import Text.Printf
 import Text.PrettyPrint             hiding ((<>))
 import Text.PrettyPrint.HughesPJ    (maybeParens)
 import Data.Heap
@@ -52,15 +54,16 @@ data Node = NNum Int
           deriving Show
 
 data Stats = Stats
-    { _stsReductions   :: Int
-    , _stsAllocations  :: Int
-    , _stsDereferences :: Int
-    , _stsGCCycles     :: Int
+    { _stsReductions     :: Int
+    , _stsPrimReductions :: Int
+    , _stsAllocations    :: Int
+    , _stsDereferences   :: Int
+    , _stsGCCycles       :: Int
     }
     deriving Show
 
 instance Default Stats where
-    def = Stats 0 0 0 0
+    def = Stats 0 0 0 0 0
 
 -- TODO: _gmGlobals should not have a setter
 makeLenses ''GmState
@@ -235,6 +238,20 @@ qquotes d = "`" <> d <> "'"
 showResults :: [GmState] -> String
 showResults st = undefined
 
+showStats :: Stats -> Doc
+showStats sts = "==== Stats ============" $$ stats
+    where
+        info = nest pprTabstop
+        stats = text $ printf
+            "Reductions      : %5d\n\
+            \Prim Reductions : %5d\n\
+            \Allocations     : %5d\n\
+            \GC Cycles       : %5d"
+            (sts ^. stsReductions)
+            (sts ^. stsPrimReductions)
+            (sts ^. stsAllocations)
+            (sts ^. stsGCCycles)
+
 showState :: GmState -> Doc
 showState st = vcat
         [ "==== GmState " <> int stnum <> " ===="
@@ -274,10 +291,10 @@ showStack st = vcat $ uncurry showEntry <$> si
             where pad = text (replicate (maxWidth - digitalWidth n) ' ')
 
         showEntry :: Int -> Addr -> Doc
-        showEntry n a = showIndex n <> showNodeAt h a
+        showEntry n a = showIndex n <> showNodeAt st a
 
 showHeap :: GmState -> Doc
-showHeap st = vcat $ uncurry showEntry <$> assocs h
+showHeap st = vcat $ showEntry <$> addresses h
     where
         digitalWidth = length . show
         maxWidth = digitalWidth $ maximum (addresses h)
@@ -286,27 +303,22 @@ showHeap st = vcat $ uncurry showEntry <$> assocs h
 
         h = st ^. gmHeap
 
-        showEntry :: Addr -> Node -> Doc
-        showEntry a n = showAddr a <> showNode h n
+        showEntry :: Addr -> Doc
+        showEntry a = showAddr a <> showNodeAt st a
 
-showNodeAt :: GmHeap -> Addr -> Doc
+showNodeAt :: GmState -> Addr -> Doc
 showNodeAt = showNodeAtP 0
 
-showNodeAtP :: Int -> GmHeap -> Addr -> Doc
-showNodeAtP p h a = case hLookup a h of
-    Just n  -> showNodeP p h n
-    Nothing -> "<invalid address>"
-
-showNode :: GmHeap -> Node -> Doc
-showNode = showNodeP 0
-
-showNodeP :: Int -> GmHeap -> Node -> Doc
-showNodeP _ h (NNum n) = int n <> "#"
-showNodeP p h (NGlobal d c) = precp $ "NGlobal" <+> int d
-    where precp = maybeParens (p > 0)
-showNodeP p h (NAp f x) = precp $ showNodeAtP (p+1) h f
-                              <+> showNodeAtP (p+1) h x
-    where precp = maybeParens (p > 0)
+showNodeAtP :: Int -> GmState -> Addr -> Doc
+showNodeAtP p st a = case hLookup a h of
+    Just (NNum n)        -> int n <> "#"
+    Just (NGlobal d c)   -> text name
+        where
+            g = st ^. gmEnv
+            name = fromMaybe "<unknown>" $ lookup a (swap <$> g)
+    Just (NAp f x)       -> showNodeAtP (p+1) st f <+> showNodeAtP (p+1) st x
+    Nothing              -> "<invalid address>"
+    where h = st ^. gmHeap
 
 showSc :: GmState -> (Name, Addr) -> Doc
 showSc st (k,a) = "Supercomb " <> qquotes (text k) <> colon
@@ -330,5 +342,7 @@ test = GmState c s h'' g sts
         (h,a0) = alloc mempty $ NGlobal 2 [Push 2,Push 3,MkAp,Slide 2,Unwind]
         (h',a1) = alloc h $ NNum 4
         (h'',a2) = alloc h' $ NAp a0 a1
-        g = []
+        g = [ ("f", a0)
+            ]
         sts = def
+
