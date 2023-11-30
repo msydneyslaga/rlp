@@ -132,23 +132,52 @@ step st = case head (st ^. gmCode) of
                 a = fromMaybe (error $ "undefined var: " <> show k)
                         $ lookup k m
 
+        -- Extension Rules 1,2 (sharing)
         pushInt :: Int -> GmState -> GmState
-        pushInt n st = st
+        pushInt n st = case lookup n' m of
+            Just a  -> st
+                     & gmCode  %~ drop 1
+                     & gmStack .~ s'
+                where
+                    s' = a : s
+            Nothing -> st
                      & gmCode  %~ drop 1
                      & gmStack .~ s'
                      & gmHeap  .~ h'
+                     -- record the newly allocated int
+                     & gmStats . stsAllocations %~ succ --
+                where
+                    s' = a : s
+                    (h',a) = alloc h (NNum n)
+                    m' = (n',a) : m
             where
+                m = st ^. gmEnv
                 s = st ^. gmStack
                 h = st ^. gmHeap
+                n' = show n
 
-                s' = a : s
-                (h',a) = alloc h (NNum n)
+
+        -- Core Rule 2. (no sharing)
+        -- pushInt :: Int -> GmState -> GmState
+        -- pushInt n st = st
+        --              & gmCode  %~ drop 1
+        --              & gmStack .~ s'
+        --              & gmHeap  .~ h'
+        --              & gmStats . stsAllocations %~ succ
+        --     where
+        --         s = st ^. gmStack
+        --         h = st ^. gmHeap
+
+        --         s' = a : s
+        --         (h',a) = alloc h (NNum n)
 
         mkAp :: GmState -> GmState
         mkAp st = st
                 & gmCode  %~ drop 1
                 & gmStack .~ s'
                 & gmHeap  .~ h'
+                -- record the application we allocated
+                & gmStats . stsAllocations %~ succ
             where
                 (f:x:ss) = st ^. gmStack
                 h = st ^. gmHeap
@@ -224,6 +253,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiled
     where
         compiled = fmap compileSc ss
 
+        -- note that we don't count sc allocations in the stats
         allocateSc :: GmHeap -> CompiledSC -> (GmHeap, (Name, Addr))
         allocateSc h (n,d,c) = (h', (n, a))
             where (h',a) = alloc h $ NGlobal d c

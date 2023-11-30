@@ -60,6 +60,9 @@ Trees and Vines, in Theory
 
 WIP. state transition rules
 
+Core Transition Rules
+---------------------
+
 1. Lookup a global by name and push its value onto the stack
 
 .. math::
@@ -205,6 +208,60 @@ WIP. state transition rules
    & a_0 : \ldots : a_n : s
    & h
    & m
+   }
+
+Extension Rules
+---------------
+
+1. A sneaky trick to enable sharing of :code:`NNum` nodes. We note that the
+   global environment is a mapping of :code:`Name` objects (i.e. identifiers) to
+   heap addresses. Strings of digits are not considered valid identifiers! We
+   abuse this by modifying Core Rule 2 to update the global environment with the
+   new node's address. Consider how this rule might impact garbage collection
+   (remember that the environment is intended for *globals*).
+
+.. math::
+   \transrule
+   { \mathtt{PushInt} \; n : i
+   & s
+   & h
+   & m
+   }
+   { i
+   & a : s
+   & h
+   \begin{bmatrix}
+        a : \mathtt{NNum} \; n
+   \end{bmatrix}
+   & m
+   \begin{bmatrix}
+        n' : a
+   \end{bmatrix}
+   \\
+   \SetCell[c=5]{c}
+   \text{where $n'$ is the base-10 string rep. of $n$}
+   }
+
+2. In order for Extension Rule 1. to be effective, we are also required to take
+   action when a number already exists in the environment:
+
+.. math::
+   \transrule
+   { \mathtt{PushInt} \; n : i
+   & s
+   & h
+   & m
+   \begin{bmatrix}
+        n' : a
+   \end{bmatrix}
+   }
+   { i
+   & a : s
+   & h
+   & m
+   \\
+   \SetCell[c=5]{c}
+   \text{where $n'$ is the base-10 string rep. of $n$}
    }
 
 **************************
