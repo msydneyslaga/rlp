@@ -5,7 +5,7 @@ The *G-Machine*
 Motivation
 **********
 
-Our initial model, the *Template Instantiation Machine* (TIM) was a very
+Our initial model, the *Template Instantiator* (TI) was a very
 straightforward solution to compilation, but its core design has a major
 Achilles' heel, being that Compilation is interleaved with evaluation -- The
 heap nodes for supercombinators hold uninstantiated expressions, i.e. raw ASTs
@@ -43,11 +43,11 @@ The process of instantiating a supercombinator goes something like this
 
 4. Push the address to the newly instantiated body onto the stack.
 
-.. literalinclude:: /../../src/TIM.hs
+.. literalinclude:: /../../src/TI.hs
    :dedent:
    :start-after: -- >> [ref/scStep]
    :end-before: -- << [ref/scStep]
-   :caption: src/TIM.hs
+   :caption: src/TI.hs
 
 Instantiating the supercombinator's body in this way is the root of our
 Achilles' heel. Traversing a tree structure is a very non-linear task unfit for
@@ -125,15 +125,12 @@ Core Transition Rules
 .. math::
    \gmrule
    { \mathtt{Push} \; n : i
-   & a_0 : \ldots : a_{n+1} : s
+   & a_0 : \ldots : a_n : s
    & h
-   \begin{bmatrix}
-        a_{n+1} : \mathtt{NAp} \; a_n \; a'_n
-   \end{bmatrix}
    & m
    }
    { i
-   & a'_n : a_0 : \ldots : a_{n+1} : s
+   & a_n : a_0 : \ldots : a_n : s
    & h
    & m
    }
