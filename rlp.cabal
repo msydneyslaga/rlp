@@ -46,6 +46,7 @@ library
                     , data-default-class
                     , unordered-containers
                     , hashable
+                    , pretty
 
     hs-source-dirs:   src
     default-language: GHC2021

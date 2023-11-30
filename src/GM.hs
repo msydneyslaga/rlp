@@ -4,16 +4,19 @@ Description : The G-Machine
 -}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 module GM
     (
     )
     where
 ----------------------------------------------------------------------------------
 import Data.Default.Class
-import Data.List                    (mapAccumL)
+import Data.List                    (mapAccumL, intersperse)
 import Data.Maybe                   (fromMaybe)
 import Lens.Micro
 import Lens.Micro.TH
+import Text.PrettyPrint             hiding ((<>))
+import Text.PrettyPrint.HughesPJ    (maybeParens)
 import Data.Heap
 import Core
 ----------------------------------------------------------------------------------
@@ -186,11 +189,15 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiled
         allocateSc h (n,d,c) = (h', (n, a))
             where (h',a) = alloc h $ NGlobal d c
 
+        -- >> [ref/compileSc]
+        -- type CompiledSC = (Name, Int, Code)
+
         compileSc :: ScDef -> CompiledSC
         compileSc (ScDef n as b) = (n, d, compileR env b)
             where
                 env = as `zip` [0..]
                 d = length as
+        -- << [ref/compileSc]
 
         compileR :: Env -> Expr -> Code
         compileR g e = compileC g e <> [Slide (d+1), Unwind]
@@ -206,11 +213,122 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiled
                 domain = fmap fst g
 
         compileC g (IntE n)  = [PushInt n]
+
+        -- >> [ref/compileC]
         compileC g (App f x) = compileC g x
                             <> compileC (argOffset 1 g) f
                             <> [MkAp]
+        -- << [ref/compileC]
 
         -- | offset each address in the environment by n
         argOffset :: Int -> Env -> Env
         argOffset n = each . _2 %~ (+n)
 
+----------------------------------------------------------------------------------
+
+pprTabstop :: Int
+pprTabstop = 4
+
+qquotes :: Doc -> Doc
+qquotes d = "`" <> d <> "'"
+
+showResults :: [GmState] -> String
+showResults st = undefined
+
+showState :: GmState -> Doc
+showState st = vcat
+        [ "==== GmState " <> int stnum <> " ===="
+        , "-- Next instructions -------"
+        , info $ showNextCode c
+        , "-- Stack -------------------"
+        , info $ showStack st
+        , "-- Heap --------------------"
+        , info $ showHeap st
+        ]
+    where
+        stnum = st ^. (gmStats . stsReductions)
+        c = st ^. gmCode
+
+        -- indent data
+        info = nest pprTabstop
+
+showNextCode :: Code -> Doc
+showNextCode c = brackets c'
+    where
+        c' | length c > 3 = list (showInstr <$> take 3 c) <> ", ..."
+           | otherwise    = list (showInstr <$> c)
+        list = hcat . punctuate ", "
+
+showStack :: GmState -> Doc
+showStack st = vcat $ uncurry showEntry <$> si
+    where
+        h = st ^. gmHeap
+        s = st ^. gmStack
+
+        -- stack with labeled indices
+        si = [0..] `zip` s
+
+        digitalWidth = length . show
+        maxWidth = digitalWidth $ maximum (addresses h)
+        showIndex n = pad <> int n <> ": "
+            where pad = text (replicate (maxWidth - digitalWidth n) ' ')
+
+        showEntry :: Int -> Addr -> Doc
+        showEntry n a = showIndex n <> showNodeAt h a
+
+showHeap :: GmState -> Doc
+showHeap st = vcat $ uncurry showEntry <$> assocs h
+    where
+        digitalWidth = length . show
+        maxWidth = digitalWidth $ maximum (addresses h)
+        showAddr n = pad <> int n <> ": "
+            where pad = text (replicate (maxWidth - digitalWidth n) ' ')
+
+        h = st ^. gmHeap
+
+        showEntry :: Addr -> Node -> Doc
+        showEntry a n = showAddr a <> showNode h n
+
+showNodeAt :: GmHeap -> Addr -> Doc
+showNodeAt = showNodeAtP 0
+
+showNodeAtP :: Int -> GmHeap -> Addr -> Doc
+showNodeAtP p h a = case hLookup a h of
+    Just n  -> showNodeP p h n
+    Nothing -> "<invalid address>"
+
+showNode :: GmHeap -> Node -> Doc
+showNode = showNodeP 0
+
+showNodeP :: Int -> GmHeap -> Node -> Doc
+showNodeP _ h (NNum n) = int n <> "#"
+showNodeP p h (NGlobal d c) = precp $ "NGlobal" <+> int d
+    where precp = maybeParens (p > 0)
+showNodeP p h (NAp f x) = precp $ showNodeAtP (p+1) h f
+                              <+> showNodeAtP (p+1) h x
+    where precp = maybeParens (p > 0)
+
+showSc :: GmState -> (Name, Addr) -> Doc
+showSc st (k,a) = "Supercomb " <> qquotes (text k) <> colon
+               $$ code
+    where
+        code = case hLookup a (st ^. gmHeap) of
+            Just (NGlobal _ c) -> showCode c
+            Nothing            -> "<invalid address/node>"
+
+showCode :: Code -> Doc
+showCode c = "Code" <+> braces instrs
+    where instrs = vcat $ showInstr <$> c
+
+showInstr :: Instr -> Doc
+showInstr i = text $ show i
+
+test = GmState c s h'' g sts
+    where
+        c = [Push 4, Push 5, Slide 2, Unwind]
+        s = [a0,a1,a2]
+        (h,a0) = alloc mempty $ NGlobal 2 [Push 2,Push 3,MkAp,Slide 2,Unwind]
+        (h',a1) = alloc h $ NNum 4
+        (h'',a2) = alloc h' $ NAp a0 a1
+        g = []
+        sts = def
