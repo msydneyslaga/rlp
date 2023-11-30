@@ -9,7 +9,7 @@ import Data.HashSet             qualified as S
 import System.IO
 import System.Exit              (exitSuccess)
 import Core
-import TIM
+import TI
 import GM
 import Lens.Micro
 import Lens.Micro.Mtl
@@ -41,7 +41,7 @@ options = RLPCOptions
     <*> option evaluatorReader
         (  long "evaluator"
         <> short 'e'
-        <> metavar "gm|tim"
+        <> metavar "gm|ti"
         <> value EvaluatorGM
         <> help "the intermediate layer used to model evaluation"
         )
@@ -53,7 +53,7 @@ options = RLPCOptions
 evaluatorReader :: ReadM Evaluator
 evaluatorReader = maybeReader $ \case
     "gm"  -> Just EvaluatorGM
-    "tim" -> Just EvaluatorTIM
+    "tim" -> Just EvaluatorTI
     _     -> Nothing
 
 mmany :: (Alternative f, Monoid m) => f m -> f m
@@ -115,6 +115,6 @@ ddumpEval = whenFlag flagDDumpEval do
             ev <- view rlpcEvaluator
             pure $ case ev of
                 EvaluatorGM  -> v GM.hdbgProg
-                EvaluatorTIM -> v TIM.hdbgProg
+                EvaluatorTI -> v TI.hdbgProg
             where v f p h = f p h *> pure ()
 

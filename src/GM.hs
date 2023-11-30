@@ -109,7 +109,7 @@ doAdmin :: GmState -> GmState
 doAdmin st = st & gmStats . stsReductions %~ succ
 
 -- the state is considered final if there is no more code to execute. very
--- simple compared to TIM
+-- simple compared to TI
 isFinal :: GmState -> Bool
 isFinal st = null $ st ^. gmCode
 

@@ -1,12 +1,12 @@
 {-|
-Module    : TIM
-Description : The Template Instantiation Machine
+Module    : TI
+Description : The Template Instantiator
 -}
 {-# LANGUAGE LambdaCase, BlockArguments #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
-module TIM
+module TI
     ( module Core.Examples
     , hdbgProg
     ) where

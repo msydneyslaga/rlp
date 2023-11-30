@@ -19,7 +19,7 @@ common warnings
 library
     import:           warnings
     exposed-modules:  Core
-                    , TIM
+                    , TI
                     , GM
                     , Compiler.RLPC
 

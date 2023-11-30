@@ -87,7 +87,7 @@ data RLPCOptions = RLPCOptions
     }
     deriving Show
 
-data Evaluator = EvaluatorGM | EvaluatorTIM
+data Evaluator = EvaluatorGM | EvaluatorTI
     deriving Show
 
 data Severity = Error
