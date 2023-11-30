@@ -144,6 +144,7 @@ step st = case head (st ^. gmCode) of
                      & gmCode  %~ drop 1
                      & gmStack .~ s'
                      & gmHeap  .~ h'
+                     & gmEnv   .~ m'
                      -- record the newly allocated int
                      & gmStats . stsAllocations %~ succ --
                 where
@@ -167,8 +168,8 @@ step st = case head (st ^. gmCode) of
         --         s = st ^. gmStack
         --         h = st ^. gmHeap
 
-        --         s' = a : s
-        --         (h',a) = alloc h (NNum n)
+                s' = a : s
+                (h',a) = alloc h (NNum n)
 
         mkAp :: GmState -> GmState
         mkAp st = st
