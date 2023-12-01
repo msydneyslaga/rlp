@@ -1,7 +1,15 @@
-# rlp
+# rl'
 
 `rlp` (ruelang') will be a lazily-evaluated purely-functional language heavily
 imitating Haskell.
+
+### Build Info
+```sh
+$ cabal build       # build the rlpc compiler
+$ cabal install     # install rlpc to $PATH
+$ cabal haddock     # build the API docs w/ haddock
+$ make -C docs html # build the primary docs w/ sphinx
+```
 
 ### Potential Features
 Listed in order of importance.
