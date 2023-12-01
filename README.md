@@ -8,10 +8,23 @@ imitating Haskell.
 * rlp's documentation is built using [Sphinx](https://www.sphinx-doc.org/en/master/)
 
 ```sh
-$ cabal build       # build the rlpc compiler
-$ cabal install     # install rlpc to $PATH
-$ cabal haddock     # build the API docs w/ haddock
-$ make -C docs html # build the primary docs w/ sphinx
+$ cabal build       # Build the rlpc compiler
+$ cabal install     # Install rlpc to $PATH
+$ cabal haddock     # Build the API docs w/ Haddock
+$ make -C docs html # Build the primary docs w/ Sphinx
+```
+
+### Use
+```sh
+# Compile and evaluate t.hs
+$ rlpc t.hs
+# Compile and evaluate t.hs, with evaluation info dumped to stderr
+$ rlpc -ddump-eval t.hs
+# Compile and evaluate t.hs, with evaluation info dumped to t.log
+$ rlpc -ddump-eval -l t.log t.hs
+# Print the raw structure describing the compiler options and die
+# (option parsing still must succeed in order to print)
+$ rlpc -ddump-opts t.hs
 ```
 
 ### Potential Features
@@ -66,3 +79,14 @@ Listed in order of importance.
     - [ ] Generic example programs
     - [ ] Parser
 
+### December Release Plan
+- [ ] Tests
+    - [ ] Core lexer
+    - [ ] Core parser
+    - [ ] Evaluation model
+- [ ] Benchmarks
+- [ ] Stable Core lexer
+- [ ] Stable Core parser
+- [ ] Stable evaluation model
+    - [ ] Garbage Collection
+- [ ] Stable documentation for the evaluation model
