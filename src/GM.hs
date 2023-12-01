@@ -20,6 +20,7 @@ import Text.Printf
 import Text.PrettyPrint             hiding ((<>))
 import Text.PrettyPrint.HughesPJ    (maybeParens)
 import Data.Foldable                (traverse_)
+import Debug.Trace
 import System.IO                    (Handle, hPutStrLn)
 import Data.Heap
 import Core
@@ -320,6 +321,21 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiled
                             <> compileC (argOffset 1 g) f
                             <> [MkAp]
         -- << [ref/compileC]
+
+        compileC g (Let NonRec bs e) =
+                mconcat binders <> compileC g' e <> [Slide d]
+            where
+                d = length bs
+                (g',binders) = mapAccumL compileBinder (argOffset d g) addressed
+                -- kinda gross. revisit this
+                addressed = bs `zip` reverse [0 .. d-1]
+
+                compileBinder :: Env -> (Binding, Int) -> (Env, Code)
+                compileBinder m (k := v,a) = (m',c)
+                    where
+                        m' = (k,a) : m
+                        -- make note that we use m rather than m'!
+                        c = compileC m v
 
         -- | offset each address in the environment by n
         argOffset :: Int -> Env -> Env
