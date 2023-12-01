@@ -4,6 +4,9 @@
 imitating Haskell.
 
 ### Build Info
+* rlp is built using [Cabal](https://www.haskell.org/ghcup/)
+* rlp's documentation is built using [Sphinx](https://www.sphinx-doc.org/en/master/)
+
 ```sh
 $ cabal build       # build the rlpc compiler
 $ cabal install     # install rlpc to $PATH
