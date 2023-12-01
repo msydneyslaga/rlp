@@ -20,16 +20,22 @@ Listed in order of importance.
 - [ ] Backend
     - [x] Core language
         - [x] AST
-    - [ ] Low-level evaluation model (STG)
-        - [x] Syntax
+    - [x] Low-level execution model (TI)
         - [x] Arithmetic
+        - [x] Conditionals
+        - [x] Garbage Collection
+    - [x] Low-level execution model (GM)
+        - [ ] Arithmetic
+        - [ ] Conditionals
+        - [ ] Garbage Collection
     - [ ] Emitter
         - [ ] Code-gen (target yet to be decided)
         - [ ] Core language emitter
     - [ ] Core linter (Type-checker)
-    - [ ] Optimiser
+    - [ ] Optimisation pass
         - [ ] Let-floating
         - [ ] TCO
+        - [ ] DCE
 - [ ] Frontend
     - [ ] High-level language
         - [ ] AST
@@ -41,7 +47,7 @@ Listed in order of importance.
     - [ ] CLI
 - [ ] Documentation (mostly for presentation)
     - [ ] State transition rules
-    - [ ] How does an STG work?
+    - [ ] How does the evaluation model work?
     - [ ] CLI usage
     - [ ] Tail call optimisation
     - [x] Parsing rlp
