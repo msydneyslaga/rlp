@@ -1,6 +1,6 @@
-=========================
-TI State Transition Rules
-=========================
+============================================
+Template Instantiator State Transition Rules
+============================================
 
 Evaluation is complete when a single :code:`NNum` remains on the stack and the
 dump is empty.
