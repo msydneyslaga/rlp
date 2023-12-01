@@ -49,7 +49,7 @@ Listed in order of importance.
         - [x] Conditionals
         - [x] Structured data
         - [x] Garbage collection
-    - [x] Low-level execution model (GM)
+    - [ ] Low-level execution model (GM)
         - [ ] Arithmetic
         - [ ] Conditionals
         - [ ] Structured data
