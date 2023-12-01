@@ -71,7 +71,7 @@ Listed in order of importance.
         - [ ] Constraint solver
         - [ ] `do`-notation
     - [ ] CLI
-- [ ] Documentation (mostly for presentation)
+- [ ] Documentation
     - [ ] State transition rules
     - [ ] How does the evaluation model work?
     - [ ] CLI usage
