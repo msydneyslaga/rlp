@@ -5,7 +5,7 @@ The *G-Machine*
 Motivation
 **********
 
-Our initial model, the *Template Instantiation Machine* (TIM) was a very
+Our initial model, the *Template Instantiator* (TI) was a very
 straightforward solution to compilation, but its core design has a major
 Achilles' heel, being that Compilation is interleaved with evaluation -- The
 heap nodes for supercombinators hold uninstantiated expressions, i.e. raw ASTs
@@ -43,11 +43,11 @@ The process of instantiating a supercombinator goes something like this
 
 4. Push the address to the newly instantiated body onto the stack.
 
-.. literalinclude:: /../../src/TIM.hs
+.. literalinclude:: /../../src/TI.hs
    :dedent:
    :start-after: -- >> [ref/scStep]
    :end-before: -- << [ref/scStep]
-   :caption: src/TIM.hs
+   :caption: src/TI.hs
 
 Instantiating the supercombinator's body in this way is the root of our
 Achilles' heel. Traversing a tree structure is a very non-linear task unfit for
@@ -125,15 +125,12 @@ Core Transition Rules
 .. math::
    \gmrule
    { \mathtt{Push} \; n : i
-   & a_0 : \ldots : a_{n+1} : s
+   & a_0 : \ldots : a_n : s
    & h
-   \begin{bmatrix}
-        a_{n+1} : \mathtt{NAp} \; a_n \; a'_n
-   \end{bmatrix}
    & m
    }
    { i
-   & a'_n : a_0 : \ldots : a_{n+1} : s
+   & a_n : a_0 : \ldots : a_n : s
    & h
    & m
    }
@@ -190,9 +187,9 @@ Core Transition Rules
    & m
    }
 
-8. When a global node is on top of the stack (and the correct number of
-   arguments have been provided), :code:`Unwind` jumps to the supercombinator's
-   code (:math:`\beta`-reduction)
+8. When a supercombinator is on top of the stack (and the correct number of
+   arguments have been provided), :code:`Unwind` sets up the stack and jumps to
+   the supercombinator's code (:math:`\beta`-reduction)
 
 .. math::
    \gmrule
@@ -200,12 +197,15 @@ Core Transition Rules
    & a_0 : \ldots : a_n : s
    & h
    \begin{bmatrix}
-        a_0 : \mathtt{NGlobal} \; n \; c
+        a_0 : \mathtt{NGlobal} \; n \; c \\
+        a_1 : \mathtt{NAp} \; a_0 \; e_1 \\
+        \vdots \\
+        a_n : \mathtt{NAp} \; a_{n-1} \; e_n \\
    \end{bmatrix}
    & m
    }
    { c
-   & a_0 : \ldots : a_n : s
+   & e_1 : \ldots : e_n : a_n : s
    & h
    & m
    }
@@ -263,6 +263,26 @@ Core Transition Rules
    { \mathtt{Unwind} : \nillist
    & a' : s
    & h
+   & m
+   }
+
+12. Allocate uninitialised heap space
+
+.. math::
+   \gmrule
+   { \mathtt{Alloc} \; n : i
+   & s
+   & h
+   & m
+   }
+   { i
+   & a_1 : \ldots : a_n : s
+   & h
+   \begin{bmatrix}
+        a_1 : \mathtt{NUninitialised} \\
+        \vdots \\
+        a_n : \mathtt{NUninitialised} \\
+   \end{bmatrix}
    & m
    }
 
