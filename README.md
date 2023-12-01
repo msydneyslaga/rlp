@@ -47,10 +47,12 @@ Listed in order of importance.
     - [x] Low-level execution model (TI)
         - [x] Arithmetic
         - [x] Conditionals
-        - [x] Garbage Collection
+        - [x] Structured data
+        - [x] Garbage collection
     - [x] Low-level execution model (GM)
         - [ ] Arithmetic
         - [ ] Conditionals
+        - [ ] Structured data
         - [ ] Garbage Collection
     - [ ] Emitter
         - [ ] Code-gen (target yet to be decided)
