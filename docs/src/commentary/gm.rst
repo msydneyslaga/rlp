@@ -266,6 +266,26 @@ Core Transition Rules
    & m
    }
 
+12. Allocate uninitialised heap space
+
+.. math::
+   \gmrule
+   { \mathtt{Alloc} \; n : i
+   & s
+   & h
+   & m
+   }
+   { i
+   & a_1 : \ldots : a_n : s
+   & h
+   \begin{bmatrix}
+        a_1 : \mathtt{NUninitialised} \\
+        \vdots \\
+        a_n : \mathtt{NUninitialised} \\
+   \end{bmatrix}
+   & m
+   }
+
 Extension Rules
 ---------------
 

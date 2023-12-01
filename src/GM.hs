@@ -22,7 +22,7 @@ import Text.PrettyPrint.HughesPJ    (maybeParens)
 import Data.Foldable                (traverse_)
 import Debug.Trace
 import System.IO                    (Handle, hPutStrLn)
-import Data.Heap
+import Data.Heap                    as Heap
 import Core
 ----------------------------------------------------------------------------------
 
@@ -48,6 +48,7 @@ data Instr = Unwind
            | Slide Int
            | Update Int
            | Pop Int
+           | Alloc Int
            deriving (Show, Eq)
 
 data Node = NNum Int
@@ -57,6 +58,7 @@ data Node = NNum Int
           -- the pre-compiled code :3
           | NGlobal Int Code
           | NInd Addr
+          | NUninitialised
           deriving (Show, Eq)
 
 data Stats = Stats
@@ -124,6 +126,7 @@ step st = case head (st ^. gmCode) of
     Slide      n -> slide      n st
     Pop        n -> pop        n st
     Update     n -> update     n st
+    Alloc      n -> alloc      n st
     where
 
         pushGlobal :: Name -> GmState -> GmState
@@ -155,7 +158,7 @@ step st = case head (st ^. gmCode) of
                      & gmStats . stsAllocations %~ succ --
                 where
                     s' = a : s
-                    (h',a) = alloc h (NNum n)
+                    (h',a) = Heap.alloc h (NNum n)
                     m' = (n',a) : m
             where
                 m = st ^. gmEnv
@@ -174,8 +177,8 @@ step st = case head (st ^. gmCode) of
         --         s = st ^. gmStack
         --         h = st ^. gmHeap
 
-                s' = a : s
-                (h',a) = alloc h (NNum n)
+        --         s' = a : s
+        --         (h',a) = alloc h (NNum n)
 
         mkAp :: GmState -> GmState
         mkAp st = st
@@ -189,7 +192,7 @@ step st = case head (st ^. gmCode) of
                 h = st ^. gmHeap
                 
                 s' = a : ss
-                (h',a) = alloc h (NAp f x)
+                (h',a) = Heap.alloc h (NAp f x)
 
         -- a `Push n` instruction pushes the address of (n+1)-th argument onto
         -- the stack.
@@ -227,12 +230,28 @@ step st = case head (st ^. gmCode) of
                 (e:s) = st ^. gmStack
                 an = s !! n
                 h' = st ^. gmHeap
-                    & Data.Heap.update an (NInd e)
+                    & Heap.update an (NInd e)
 
         pop :: Int -> GmState -> GmState
         pop n st = st
                  & gmCode  %~ drop 1
                  & gmStack %~ drop n
+
+        alloc :: Int -> GmState -> GmState
+        alloc n st = st
+                   & gmCode  %~ drop 1
+                   & gmStack .~ s'
+                   & gmHeap  .~ h'
+            where
+                s = st ^. gmStack
+                h = st ^. gmHeap
+                s' = ns ++ s
+                (h',ns) = allocNode n h
+
+                allocNode :: Int -> GmHeap -> (GmHeap, [Addr])
+                allocNode 0 g = (g,[])
+                allocNode k g = allocNode (k-1) g' & _2 %~ (a:)
+                    where (g',a) = Heap.alloc g NUninitialised
 
         -- the complex heart of the G-machine
         unwind :: GmState -> GmState
@@ -331,11 +350,25 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiled
                 addressed = bs `zip` reverse [0 .. d-1]
 
                 compileBinder :: Env -> (Binding, Int) -> (Env, Code)
-                compileBinder m (k := v,a) = (m',c)
+                compileBinder m (k := v, a) = (m',c)
                     where
                         m' = (k,a) : m
                         -- make note that we use m rather than m'!
                         c = compileC m v
+
+        compileC g (Let Rec bs e) = Alloc d : initialisers <> body <> [Slide d]
+            where
+                d = length bs
+                g' = fmap toEnv addressed ++ argOffset d g
+                toEnv (k := _, a) = (k,a)
+                -- kinda gross. revisit this
+                addressed = bs `zip` reverse [0 .. d-1]
+
+                initialisers = mconcat $ compileBinder <$> addressed
+                body = compileC g' e
+
+                compileBinder :: (Binding, Int) -> Code
+                compileBinder (k := v, a) = compileC g' v <> [Update a]
 
         -- | offset each address in the environment by n
         argOffset :: Int -> Env -> Env
@@ -431,6 +464,7 @@ showNodeAtP p st a = case hLookup a h of
         where pprec = maybeParens (p > 0)
     Just (NInd a)        -> pprec $ "NInd -> " <> showNodeAtP (p+1) st a
         where pprec = maybeParens (p > 0)
+    Just NUninitialised  -> "<uninitialised>"
     Nothing              -> "<invalid address>"
     where h = st ^. gmHeap
 
