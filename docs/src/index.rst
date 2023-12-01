@@ -17,3 +17,10 @@ Contents
 
    commentary/*
 
+.. toctree::
+   :maxdepth: 1
+   :caption: References
+   :glob:
+
+   references/*
+

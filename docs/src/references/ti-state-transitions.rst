@@ -1,8 +1,6 @@
-The *Template Instantiation Machine*
-====================================
-
-WIP. This will hopefully be expanded into a thorough walkthrough of the state
-machine.
+=========================
+TI State Transition Rules
+=========================
 
 Evaluation is complete when a single :code:`NNum` remains on the stack and the
 dump is empty.
