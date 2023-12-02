@@ -42,7 +42,7 @@ imgmath_latex_preamble = r'''
     \end{tblr} }
 
 \newcommand{\gmrule}[2]
-    {\begin{tblr}{|rrrll|}
+    {\begin{tblr}{|rrrrll|}
          \hline
          & #1 \\
          \implies & #2 \\

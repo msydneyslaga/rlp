@@ -12,6 +12,7 @@ Core Transition Rules
    \gmrule
    { \mathtt{PushGlobal} \; f : i
    & s
+   & d
    & h
    & m
    \begin{bmatrix}
@@ -20,6 +21,7 @@ Core Transition Rules
    }
    { i
    & a : s
+   & d
    & h
    & m
    }
@@ -31,11 +33,13 @@ Core Transition Rules
    \gmrule
    { \mathtt{PushInt} \; n : i
    & s
+   & d
    & h
    & m
    }
    { i
    & a : s
+   & d
    & h
    \begin{bmatrix}
         a : \mathtt{NNum} \; n
@@ -51,11 +55,13 @@ Core Transition Rules
    \gmrule
    { \mathtt{MkAp} : i
    & f : x : s
+   & d
    & h
    & m
    }
    { i
    & a : s
+   & d
    & h
    \begin{bmatrix}
         a : \mathtt{NAp} \; f \; x
@@ -69,11 +75,13 @@ Core Transition Rules
    \gmrule
    { \mathtt{Push} \; n : i
    & a_0 : \ldots : a_n : s
+   & d
    & h
    & m
    }
    { i
    & a_n : a_0 : \ldots : a_n : s
+   & d
    & h
    & m
    }
@@ -84,11 +92,13 @@ Core Transition Rules
    \gmrule
    { \mathtt{Slide} \; n : i
    & a_0 : \ldots : a_n : s
+   & d
    & h
    & m
    }
    { i
    & a_0 : s
+   & d
    & h
    & m
    }
@@ -100,6 +110,7 @@ Core Transition Rules
    \gmrule
    { \mathtt{Unwind} : \nillist
    & a : s
+   & d
    & h
    \begin{bmatrix}
         a : \mathtt{NNum} \; n
@@ -108,6 +119,7 @@ Core Transition Rules
    }
    { \nillist
    & a : s
+   & d
    & h
    & m
    }
@@ -118,6 +130,7 @@ Core Transition Rules
    \gmrule
    { \mathtt{Unwind} : \nillist
    & a : s
+   & d
    & h
    \begin{bmatrix}
         a : \mathtt{NAp} \; f \; x
@@ -126,6 +139,7 @@ Core Transition Rules
    }
    { \mathtt{Unwind} : \nillist
    & f : a : s
+   & d
    & h
    & m
    }
@@ -138,6 +152,7 @@ Core Transition Rules
    \gmrule
    { \mathtt{Unwind} : \nillist
    & a_0 : \ldots : a_n : s
+   & d
    & h
    \begin{bmatrix}
         a_0 : \mathtt{NGlobal} \; n \; c \\
@@ -149,6 +164,7 @@ Core Transition Rules
    }
    { c
    & e_1 : \ldots : e_n : a_n : s
+   & d
    & h
    & m
    }
@@ -159,6 +175,7 @@ Core Transition Rules
    \gmrule
    { \mathtt{Update} \; n : i
    & e : f : a_1 : \ldots : a_n : s
+   & d
    & h
    \begin{bmatrix}
         a_1 : \mathtt{NAp} \; f \; e \\
@@ -169,6 +186,7 @@ Core Transition Rules
    }
    { i
    & f : a_1 : \ldots : a_n : s
+   & d
    & h
    \begin{bmatrix}
         a_n : \mathtt{NInd} \; e
@@ -182,11 +200,13 @@ Core Transition Rules
    \gmrule
    { \mathtt{Pop} \; n : i
    & a_1 : \ldots : a_n : s
+   & d
    & h
    & m
    }
    { i
    & s
+   & d
    & h
    & m
    }
@@ -197,6 +217,7 @@ Core Transition Rules
    \gmrule
    { \mathtt{Unwind} : \nillist
    & a : s
+   & d
    & h
    \begin{bmatrix}
         a : \mathtt{NInd} \; a'
@@ -205,6 +226,7 @@ Core Transition Rules
    }
    { \mathtt{Unwind} : \nillist
    & a' : s
+   & d
    & h
    & m
    }
@@ -215,17 +237,56 @@ Core Transition Rules
    \gmrule
    { \mathtt{Alloc} \; n : i
    & s
+   & d
    & h
    & m
    }
    { i
    & a_1 : \ldots : a_n : s
+   & d
    & h
    \begin{bmatrix}
         a_1 : \mathtt{NUninitialised} \\
         \vdots \\
         a_n : \mathtt{NUninitialised} \\
    \end{bmatrix}
+   & m
+   }
+
+13. When unwinding, if the top of the stack is in WHNF, pop the dump
+
+.. math::
+   \gmrule
+   { \mathtt{Unwind} : \nillist
+   & a : s
+   & \langle i', s' \rangle : d
+   & h
+   \begin{bmatrix}
+        a : \mathtt{NNum} \; n
+   \end{bmatrix}
+   & m
+   }
+   { i'
+   & a : s'
+   & d
+   & h
+   & m
+   }
+
+14. Evaluate the top of the stack to WHNF
+
+.. math::
+   \gmrule
+   { \mathtt{Eval} : i
+   & a : s
+   & d
+   & h
+   & m
+   }
+   { i
+   & a : \nillist
+   & \langle i, s \rangle
+   & h
    & m
    }
 

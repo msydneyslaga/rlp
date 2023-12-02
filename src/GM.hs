@@ -29,6 +29,7 @@ import Core
 data GmState = GmState
     { _gmCode   :: Code
     , _gmStack  :: Stack
+    , _gmDump   :: Dump
     , _gmHeap   :: GmHeap
     , _gmEnv    :: Env
     , _gmStats  :: Stats
@@ -37,6 +38,7 @@ data GmState = GmState
 
 type Code = [Instr]
 type Stack = [Addr]
+type Dump = [(Code, Stack)]
 type Env = [(Name, Addr)]
 type GmHeap = Heap Node
 
@@ -49,6 +51,9 @@ data Instr = Unwind
            | Update Int
            | Pop Int
            | Alloc Int
+           | Eval
+           | Add
+           | Mul
            deriving (Show, Eq)
 
 data Node = NNum Int
@@ -291,7 +296,7 @@ step st = case head (st ^. gmCode) of
 ----------------------------------------------------------------------------------
 
 compile :: Program -> GmState
-compile p = GmState c [] h g sts
+compile p = GmState c [] [] h g sts
     where
         -- find the entry point and start unwinding
         c = [PushGlobal "main", Unwind]
@@ -405,6 +410,8 @@ showState st = vcat
         , info $ showStack st
         , "-- Heap --------------------"
         , info $ showHeap st
+        , "-- Dump --------------------"
+        , info $ showDump st
         ]
     where
         stnum = st ^. (gmStats . stsReductions)
@@ -429,13 +436,34 @@ showStack st = vcat $ uncurry showEntry <$> si
         -- stack with labeled indices
         si = [0..] `zip` s
 
-        digitalWidth = length . show
-        maxWidth = digitalWidth $ maximum (addresses h)
-        showIndex n = pad <> int n <> ": "
-            where pad = text (replicate (maxWidth - digitalWidth n) ' ')
+        w = maxWidth (addresses h)
+        showIndex n = padInt w n <> ": "
 
         showEntry :: Int -> Addr -> Doc
         showEntry n a = showIndex n <> showNodeAt st a
+
+showDump :: GmState -> Doc
+showDump st = vcat $ uncurry showEntry <$> di
+    where
+        h = st ^. gmHeap
+        d = st ^. gmDump
+        di = [0..] `zip` d
+
+        showIndex n = padInt w n <> ": "
+        w = maxWidth (fst <$> di)
+
+        showEntry :: Int -> (Code, Stack) -> Doc
+        showEntry n (c,s) = showIndex n
+                         <> nest pprTabstop (showCode c)
+
+padInt :: Int -> Int -> Doc
+padInt m n = text (replicate (m - digitalWidth n) ' ') <> int n
+
+maxWidth :: [Int] -> Int
+maxWidth ns = digitalWidth $ maximum ns
+
+digitalWidth :: Int -> Int
+digitalWidth = length . show
 
 showHeap :: GmState -> Doc
 showHeap st = vcat $ showEntry <$> addresses h
@@ -483,7 +511,7 @@ showCode c = "Code" <+> braces instrs
 showInstr :: Instr -> Doc
 showInstr i = text $ show i
 
-test = GmState c s h'' g sts
+test = GmState c s d h'' g sts
     where
         c = [Push 4, Push 5, Slide 2, Unwind]
         s = [a0,a1,a2]
@@ -492,5 +520,6 @@ test = GmState c s h'' g sts
         (h'',a2) = alloc h' $ NAp a0 a1
         g = [ ("f", a0)
             ]
+        d = []
         sts = def
 
