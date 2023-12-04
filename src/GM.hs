@@ -373,7 +373,7 @@ primitive2 box unbox f st
         & advanceCode
         & gmStats . stsPrimReductions %~ succ
     where
-        (ax:ay:s) = st ^. gmStack
+        (ay:ax:s) = st ^. gmStack
         putNewStack = gmStack .~ s
         x = unbox ax st
         y = unbox ay st
