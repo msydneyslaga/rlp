@@ -37,14 +37,14 @@ data Expr = Var Name
           | Lam [Name] Expr
           | App Expr Expr
           | IntE Int
-          deriving (Show, Lift)
+          deriving (Show, Lift, Eq)
 
 infixl 2 :$
 pattern (:$) :: Expr -> Expr -> Expr
 pattern f :$ x = App f x
 
 data Binding = Binding Name Expr
-    deriving (Show, Lift)
+    deriving (Show, Lift, Eq)
 
 infixl 1 :=
 pattern (:=) :: Name -> Expr -> Binding
@@ -55,12 +55,12 @@ data Rec = Rec
          deriving (Show, Eq, Lift)
 
 data Alter = Alter Int [Name] Expr
-    deriving (Show, Lift)
+    deriving (Show, Lift, Eq)
 
 type Name = String
 
 data ScDef = ScDef Name [Name] Expr
-    deriving (Show, Lift)
+    deriving (Show, Lift, Eq)
 
 data Module = Module (Maybe (Name, [Name])) Program
     deriving (Show, Lift)

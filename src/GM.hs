@@ -310,6 +310,15 @@ step st = case head (st ^. gmCode) of
             NAp f x     -> st
                          -- leave the Unwind instr; continue unwinding
                          & gmStack %~ (f:)
+
+            NGlobal k c
+                | n < k -> st
+                         & gmCode  .~ i
+                         & gmStack .~ s
+                         & gmDump  .~ d
+                where
+                    ((i,s) : d) = st ^. gmDump
+                    n = st ^. gmStack & length
             -- assumes length s < d (i.e. enough args have been supplied)
             NGlobal n c -> st
                          -- 'jump' to global's code by replacing our current
@@ -348,6 +357,7 @@ primitive1 box unbox f st
         & f
         & box (st & gmStack .~ s)
         & advanceCode
+        & gmStats . stsPrimReductions %~ succ
     where
         putNewStack = gmStack .~ s
         (a:s) = st ^. gmStack
@@ -361,6 +371,7 @@ primitive2 :: (GmState -> b -> GmState) -- boxing function
 primitive2 box unbox f st
         = st'
         & advanceCode
+        & gmStats . stsPrimReductions %~ succ
     where
         (ax:ay:s) = st ^. gmStack
         putNewStack = gmStack .~ s
@@ -434,10 +445,11 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
         -- << [ref/compileSc]
 
         compileR :: Env -> Expr -> Code
-        compileR g e = compileC g e <> [Update d, Pop d, Unwind]
+        compileR g e = compileE g e <> [Update d, Pop d, Unwind]
             where
                 d = length g
 
+        -- compile an expression in a lazy context
         compileC :: Env -> Expr -> Code
         compileC g (Var k)
             | k `elem` domain  = [Push n]
@@ -482,6 +494,52 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
 
                 compileBinder :: (Binding, Int) -> Code
                 compileBinder (k := v, a) = compileC g' v <> [Update a]
+
+        -- compile an expression in a strict context such that a pointer to the
+        -- expression is left on top of the stack in WHNF
+        compileE :: Env -> Expr -> Code
+        compileE g (IntE n) = [PushInt n]
+        compileE g (Let NonRec bs e) =
+                -- we use compileE instead of compileC
+                mconcat binders <> compileE g' e <> [Slide d]
+            where
+                d = length bs
+                (g',binders) = mapAccumL compileBinder (argOffset d g) addressed
+                -- kinda gross. revisit this
+                addressed = bs `zip` reverse [0 .. d-1]
+
+                compileBinder :: Env -> (Binding, Int) -> (Env, Code)
+                compileBinder m (k := v, a) = (m',c)
+                    where
+                        m' = (k,a) : m
+                        -- make note that we use m rather than m'!
+                        c = compileC m v
+
+        compileE g (Let Rec bs e) =
+                Alloc d : initialisers <> body <> [Slide d]
+            where
+                d = length bs
+                g' = fmap toEnv addressed ++ argOffset d g
+                toEnv (k := _, a) = (k,a)
+                -- kinda gross. revisit this
+                addressed = bs `zip` reverse [0 .. d-1]
+                initialisers = mconcat $ compileBinder <$> addressed
+
+                -- we use compileE instead of compileC
+                body = compileE g' e
+
+                -- we use compileE instead of compileC
+                compileBinder :: (Binding, Int) -> Code
+                compileBinder (k := v, a) = compileC g' v <> [Update a]
+
+        -- special cases for prim functions
+        compileE g ("negate#" :$ a) = compileE g a <>                 [Neg]
+        compileE g ("+#" :$ a :$ b) = compileE g a <> compileE g b <> [Add]
+        compileE g ("-#" :$ a :$ b) = compileE g a <> compileE g b <> [Sub]
+        compileE g ("*#" :$ a :$ b) = compileE g a <> compileE g b <> [Mul]
+        compileE g ("/#" :$ a :$ b) = compileE g a <> compileE g b <> [Div]
+
+        compileE g e = compileC g e ++ [Eval]
 
         -- | offset each address in the environment by n
         argOffset :: Int -> Env -> Env

@@ -147,6 +147,29 @@ Core Transition Rules
       & m
       }
 
+#. Again, building on the previous rules, this rule makes the machine consider
+   unapplied supercombinators to be in WHNF
+
+   .. math::
+      \gmrule
+      { \mathtt{Unwind} : \nillist
+      & a_0 : \ldots : a_n : \nillist
+      & \langle i, s \rangle : d
+      & h
+      \begin{bmatrix}
+            a_0 : \mathtt{NGlobal} \; k \; c
+      \end{bmatrix}
+      & m
+      }
+      { i
+      & a_n : s
+      & d
+      & h
+      & m \\
+      \SetCell[c=2]{c}
+      \text{when $n < k$}
+      }
+
 #. If an application is on top of the stack, :code:`Unwind` continues unwinding
 
    .. math::
@@ -339,7 +362,7 @@ Core Transition Rules
       \end{bmatrix}
       & m
       }
-   
+
 ***************
 Extension Rules
 ***************
