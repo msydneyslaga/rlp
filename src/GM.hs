@@ -391,8 +391,8 @@ advanceCode = gmCode %~ drop 1
 compile :: Program -> GmState
 compile p = GmState c [] [] h g sts
     where
-        -- find the entry point and start unwinding
-        c = [PushGlobal "main", Unwind]
+        -- find the entry point and evaluate it
+        c = [PushGlobal "main", Eval]
         (h,g) = buildInitialHeap p
         sts = def
 
