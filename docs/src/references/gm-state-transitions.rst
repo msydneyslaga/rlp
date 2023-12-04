@@ -284,9 +284,9 @@ Core Transition Rules
    & h
    & m
    }
-   { i
+   { \mathtt{Unwind} : \nillist
    & a : \nillist
-   & \langle i, s \rangle
+   & \langle i, s \rangle : d
    & h
    & m
    }
