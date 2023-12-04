@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>G-Machine State Transition Rules &#8212; rl&#39;  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=039e1c02" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Template Instantiator State Transition Rules" href="ti-state-transitions.html" />
+    <link rel="prev" title="The Template Instantiator" href="../commentary/ti.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="g-machine-state-transition-rules">
+<h1>G-Machine State Transition Rules<a class="headerlink" href="#g-machine-state-transition-rules" title="Link to this heading">¶</a></h1>
+<section id="core-transition-rules">
+<h2>Core Transition Rules<a class="headerlink" href="#core-transition-rules" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p>Lookup a global by name and push its value onto the stack</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/18d81e1fc22e6feb876a993fe30fd9e8336f5bf6.svg" alt="\gmrule
+{ \mathtt{PushGlobal} \; f : i
+&amp; s
+&amp; d
+&amp; h
+&amp; m
+\begin{bmatrix}
+     f : a
+\end{bmatrix}
+}
+{ i
+&amp; a : s
+&amp; d
+&amp; h
+&amp; m
+}"/></p>
+</div><ol class="arabic simple" start="2">
+<li><p>Allocate an int node on the heap, and push the address of the newly created
+node onto the stack</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/ed6af2733291dcf5001173a8dbaf8f59c817212a.svg" alt="\gmrule
+{ \mathtt{PushInt} \; n : i
+&amp; s
+&amp; d
+&amp; h
+&amp; m
+}
+{ i
+&amp; a : s
+&amp; d
+&amp; h
+\begin{bmatrix}
+     a : \mathtt{NNum} \; n
+\end{bmatrix}
+&amp; m
+}"/></p>
+</div><ol class="arabic simple" start="3">
+<li><p>Allocate an application node on the heap, applying the top of the stack to
+the address directly below it. The address of the application node is pushed
+onto the stack.</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/607985174357bbbea2e2b47ab0694b2d21a71b35.svg" alt="\gmrule
+{ \mathtt{MkAp} : i
+&amp; f : x : s
+&amp; d
+&amp; h
+&amp; m
+}
+{ i
+&amp; a : s
+&amp; d
+&amp; h
+\begin{bmatrix}
+     a : \mathtt{NAp} \; f \; x
+\end{bmatrix}
+&amp; m
+}"/></p>
+</div><ol class="arabic simple" start="4">
+<li><p>Push a function’s argument onto the stack</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/643dd082a2b49d9ebdb87533aac62fdd342f4fd5.svg" alt="\gmrule
+{ \mathtt{Push} \; n : i
+&amp; a_0 : \ldots : a_n : s
+&amp; d
+&amp; h
+&amp; m
+}
+{ i
+&amp; a_n : a_0 : \ldots : a_n : s
+&amp; d
+&amp; h
+&amp; m
+}"/></p>
+</div><ol class="arabic simple" start="5">
+<li><p>Tidy up the stack after instantiating a supercombinator</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/f02d55fb6c249a7da5a9df6b7e5c96ab6be7672b.svg" alt="\gmrule
+{ \mathtt{Slide} \; n : i
+&amp; a_0 : \ldots : a_n : s
+&amp; d
+&amp; h
+&amp; m
+}
+{ i
+&amp; a_0 : s
+&amp; d
+&amp; h
+&amp; m
+}"/></p>
+</div><ol class="arabic simple" start="6">
+<li><p>If a number is on top of the stack, <code class="code docutils literal notranslate"><span class="pre">Unwind</span></code> leaves the machine in a
+halt state</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/f9a521977b1461b53094f1bae24aa6d1bb757b07.svg" alt="\gmrule
+{ \mathtt{Unwind} : \nillist
+&amp; a : s
+&amp; d
+&amp; h
+\begin{bmatrix}
+     a : \mathtt{NNum} \; n
+\end{bmatrix}
+&amp; m
+}
+{ \nillist
+&amp; a : s
+&amp; d
+&amp; h
+&amp; m
+}"/></p>
+</div><ol class="arabic simple" start="7">
+<li><p>If an application is on top of the stack, <code class="code docutils literal notranslate"><span class="pre">Unwind</span></code> continues unwinding</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/b04167eaade600ab592e2a4441ffc27f5268cccf.svg" alt="\gmrule
+{ \mathtt{Unwind} : \nillist
+&amp; a : s
+&amp; d
+&amp; h
+\begin{bmatrix}
+     a : \mathtt{NAp} \; f \; x
+\end{bmatrix}
+&amp; m
+}
+{ \mathtt{Unwind} : \nillist
+&amp; f : a : s
+&amp; d
+&amp; h
+&amp; m
+}"/></p>
+</div><ol class="arabic simple" start="8">
+<li><p>When a supercombinator is on top of the stack (and the correct number of
+arguments have been provided), <code class="code docutils literal notranslate"><span class="pre">Unwind</span></code> sets up the stack and jumps to
+the supercombinator’s code (<img class="math" src="../_images/math/90592e982322fa08f1b8ae0e6bcdaca11fc8de59.svg" alt="\beta" style="vertical-align: -4px"/>-reduction)</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/2dc5e48f0f26f08073e6e1cdd70ff876c6ec2434.svg" alt="\gmrule
+{ \mathtt{Unwind} : \nillist
+&amp; a_0 : \ldots : a_n : s
+&amp; d
+&amp; h
+\begin{bmatrix}
+     a_0 : \mathtt{NGlobal} \; n \; c \\
+     a_1 : \mathtt{NAp} \; a_0 \; e_1 \\
+     \vdots \\
+     a_n : \mathtt{NAp} \; a_{n-1} \; e_n \\
+\end{bmatrix}
+&amp; m
+}
+{ c
+&amp; e_1 : \ldots : e_n : a_n : s
+&amp; d
+&amp; h
+&amp; m
+}"/></p>
+</div><ol class="arabic simple" start="9">
+<li><p>Pop the stack, and update the nth node to point to the popped address</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/e299a147e6e958303111e813e82a3507ded25437.svg" alt="\gmrule
+{ \mathtt{Update} \; n : i
+&amp; e : f : a_1 : \ldots : a_n : s
+&amp; d
+&amp; h
+\begin{bmatrix}
+     a_1 : \mathtt{NAp} \; f \; e \\
+     \vdots \\
+     a_n : \mathtt{NAp} \; a_{n-1} \; e_n
+\end{bmatrix}
+&amp; m
+}
+{ i
+&amp; f : a_1 : \ldots : a_n : s
+&amp; d
+&amp; h
+\begin{bmatrix}
+     a_n : \mathtt{NInd} \; e
+\end{bmatrix}
+&amp; m
+}"/></p>
+</div><ol class="arabic simple" start="10">
+<li><p>Pop the stack.</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/aec9099fc8c459eb433947bd6c9cc0f96fe38f98.svg" alt="\gmrule
+{ \mathtt{Pop} \; n : i
+&amp; a_1 : \ldots : a_n : s
+&amp; d
+&amp; h
+&amp; m
+}
+{ i
+&amp; s
+&amp; d
+&amp; h
+&amp; m
+}"/></p>
+</div><ol class="arabic simple" start="11">
+<li><p>Follow indirections while unwinding</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/7648bfc0796ff33966fbc002c446b2242d296fd9.svg" alt="\gmrule
+{ \mathtt{Unwind} : \nillist
+&amp; a : s
+&amp; d
+&amp; h
+\begin{bmatrix}
+     a : \mathtt{NInd} \; a'
+\end{bmatrix}
+&amp; m
+}
+{ \mathtt{Unwind} : \nillist
+&amp; a' : s
+&amp; d
+&amp; h
+&amp; m
+}"/></p>
+</div><ol class="arabic simple" start="12">
+<li><p>Allocate uninitialised heap space</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/5380d8227d0a06608b108a26b4a618972b4b7e28.svg" alt="\gmrule
+{ \mathtt{Alloc} \; n : i
+&amp; s
+&amp; d
+&amp; h
+&amp; m
+}
+{ i
+&amp; a_1 : \ldots : a_n : s
+&amp; d
+&amp; h
+\begin{bmatrix}
+     a_1 : \mathtt{NUninitialised} \\
+     \vdots \\
+     a_n : \mathtt{NUninitialised} \\
+\end{bmatrix}
+&amp; m
+}"/></p>
+</div><ol class="arabic simple" start="13">
+<li><p>When unwinding, if the top of the stack is in WHNF, pop the dump</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/2417422cdf63ed202b16462208f8a62630f99679.svg" alt="\gmrule
+{ \mathtt{Unwind} : \nillist
+&amp; a : s
+&amp; \langle i', s' \rangle : d
+&amp; h
+\begin{bmatrix}
+     a : \mathtt{NNum} \; n
+\end{bmatrix}
+&amp; m
+}
+{ i'
+&amp; a : s'
+&amp; d
+&amp; h
+&amp; m
+}"/></p>
+</div><ol class="arabic simple" start="14">
+<li><p>Evaluate the top of the stack to WHNF</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/e56dfd5625638bc4ad9867951a7818cf20c88a2f.svg" alt="\gmrule
+{ \mathtt{Eval} : i
+&amp; a : s
+&amp; d
+&amp; h
+&amp; m
+}
+{ i'
+&amp; a : \nillist
+&amp; \langle i, s \rangle
+&amp; h
+&amp; m
+}"/></p>
+</div></section>
+<section id="extension-rules">
+<h2>Extension Rules<a class="headerlink" href="#extension-rules" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p>A sneaky trick to enable sharing of <code class="code docutils literal notranslate"><span class="pre">NNum</span></code> nodes. We note that the
+global environment is a mapping of <code class="code docutils literal notranslate"><span class="pre">Name</span></code> objects (i.e. identifiers) to
+heap addresses. Strings of digits are not considered valid identifiers! We
+abuse this by modifying Core Rule 2 to update the global environment with the
+new node’s address. Consider how this rule might impact garbage collection
+(remember that the environment is intended for <em>globals</em>).</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/5a00c38ab6f040dfa75be56918953af44dc11637.svg" alt="\gmrule
+{ \mathtt{PushInt} \; n : i
+&amp; s
+&amp; h
+&amp; m
+}
+{ i
+&amp; a : s
+&amp; h
+\begin{bmatrix}
+     a : \mathtt{NNum} \; n
+\end{bmatrix}
+&amp; m
+\begin{bmatrix}
+     n' : a
+\end{bmatrix}
+\\
+\SetCell[c=5]{c}
+\text{where $n'$ is the base-10 string rep. of $n$}
+}"/></p>
+</div><ol class="arabic simple" start="2">
+<li><p>In order for Extension Rule 1. to be effective, we are also required to take
+action when a number already exists in the environment:</p></li>
+</ol>
+<div class="math">
+<p><img src="../_images/math/3fc332dc07916d83f75fcddf6da06a7734032ee9.svg" alt="\transrule
+{ \mathtt{PushInt} \; n : i
+&amp; s
+&amp; h
+&amp; m
+\begin{bmatrix}
+     n' : a
+\end{bmatrix}
+}
+{ i
+&amp; a : s
+&amp; h
+&amp; m
+\\
+\SetCell[c=5]{c}
+\text{where $n'$ is the base-10 string rep. of $n$}
+}"/></p>
+</div></section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">rl'</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Index</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Commentary</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../commentary/gm.html">The <em>G-Machine</em></a></li>
+<li class="toctree-l1"><a class="reference internal" href="../commentary/layout-lexing.html">Lexing, Parsing, and Layouts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../commentary/ti.html">The <em>Template Instantiator</em></a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">References</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">G-Machine State Transition Rules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ti-state-transitions.html">Template Instantiator State Transition Rules</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="../commentary/ti.html" title="previous chapter">The <em>Template Instantiator</em></a></li>
+      <li>Next: <a href="ti-state-transitions.html" title="next chapter">Template Instantiator State Transition Rules</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, madeleine sydney ślaga.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="../_sources/references/gm-state-transition-rules.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

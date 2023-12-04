@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Lexing, Parsing, and Layouts &#8212; rl&#39;  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=039e1c02" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="The Template Instantiator" href="ti.html" />
+    <link rel="prev" title="The G-Machine" href="gm.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="lexing-parsing-and-layouts">
+<h1>Lexing, Parsing, and Layouts<a class="headerlink" href="#lexing-parsing-and-layouts" title="Link to this heading">¶</a></h1>
+<p>The C-style languages of my previous experiences have all had quite trivial
+lexical analysis stages, peaking in complexity when I streamed tokens lazily in
+C. The task of tokenising a C-style language is very simple in description: you
+ignore all whitespace and point out what you recognise. If you don’t recognise
+something, check if it’s a literal or an identifier. Should it be neither,
+return an error.</p>
+<p>On paper, both lexing and parsing a Haskell-like language seem to pose a few
+greater challenges. Listed by ascending intimidation factor, some of the
+potential roadblocks on my mind before making an attempt were:</p>
+<ul class="simple">
+<li><p>Operators; Haskell has not only user-defined infix operators, but user-defined
+precedence levels and associativities. I recall using an algorithm that looked
+up infix, prefix, postfix, and even mixfix operators up in a global table to
+call their appropriate parser (if their precedence was appropriate, also
+stored in the table). I never modified the table at runtime, however this
+could be a very nice solution for Haskell.</p></li>
+<li><p>Context-sensitive keywords; Haskell allows for some words to be used as identifiers in
+appropriate contexts, such as <code class="code docutils literal notranslate"><span class="pre">family</span></code>, <code class="code docutils literal notranslate"><span class="pre">role</span></code>, <code class="code docutils literal notranslate"><span class="pre">as</span></code>.
+Reading a <a class="reference external" href="https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/coding-style#2-using-notes">note</a> found in <a class="reference external" href="https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Parser/Lexer.x#L1133">GHC’s lexer</a>,
+it appears that keywords are only considered in bodies for which their use is
+relevant, e.g. <code class="code docutils literal notranslate"><span class="pre">family</span></code> and <code class="code docutils literal notranslate"><span class="pre">role</span></code> in type declarations,
+<code class="code docutils literal notranslate"><span class="pre">as</span></code> after <code class="code docutils literal notranslate"><span class="pre">case</span></code>; <code class="code docutils literal notranslate"><span class="pre">if</span></code>, <code class="code docutils literal notranslate"><span class="pre">then</span></code>, and <code class="code docutils literal notranslate"><span class="pre">else</span></code> in
+expressions, etc.</p></li>
+<li><p>Whitespace sensitivity; While I was comfortable with the idea of a system
+similar to Python’s INDENT/DEDENT tokens, Haskell seemed to use whitespace to
+section code in a way that <em>felt</em> different.</p></li>
+</ul>
+<p>After a bit of thought and research, whitespace sensitivity in the form of
+<em>layouts</em> as Haskell and I will refer to them as, are easily the scariest thing
+on this list – however they are achievable!</p>
+<section id="a-lexical-primer-python">
+<h2>A Lexical Primer: Python<a class="headerlink" href="#a-lexical-primer-python" title="Link to this heading">¶</a></h2>
+<p>We will compare and contrast with Python’s lexical analysis. Much to my dismay,
+Python uses newlines and indentation to separate statements and resolve scope
+instead of the traditional semicolons and braces found in C-style languages (we
+may generally refer to these C-style languages as <em>explicitly-sectioned</em>).
+Internally during tokenisation, when the Python lexer begins a new line, they
+compare the indentation of the new line with that of the previous and apply the
+following rules:</p>
+<ol class="arabic simple">
+<li><p>If the new line has greater indentation than the previous, insert an INDENT
+token and push the new line’s indentation level onto the indentation stack
+(the stack is initialised with an indentation level of zero).</p></li>
+<li><p>If the new line has lesser indentation than the previous, pop the stack until
+the top of the stack is greater than the new line’s indentation level. A
+DEDENT token is inserted for each level popped.</p></li>
+<li><p>If the indentation is equal, insert a NEWLINE token to terminate the previous
+line, and leave it at that!</p></li>
+</ol>
+<p>Parsing Python with the INDENT, DEDENT, and NEWLINE tokens is identical to
+parsing a language with braces and semicolons. This is a solution pretty in line
+with Python’s philosophy of the “one correct answer” (TODO: this needs a
+source). In developing our <em>layout</em> rules, we will follow in the pattern of
+translating the whitespace-sensitive source language to an explicitly sectioned
+language.</p>
+</section>
+<section id="but-what-about-haskell">
+<h2>But What About Haskell?<a class="headerlink" href="#but-what-about-haskell" title="Link to this heading">¶</a></h2>
+<p>We saw that Python, the most notable example of an implicitly sectioned
+language, is pretty simple to lex. Why then am I so afraid of Haskell’s layouts?
+To be frank, I’m far less scared after asking myself this – however there are
+certainly some new complexities that Python needn’t concern. Haskell has
+implicit line <em>continuation</em>: forms written over multiple lines; indentation
+styles often seen in Haskell are somewhat esoteric compared to Python’s
+“s/[{};]//”.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="c1">-- line continuation</span>
+<span class="nf">something</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">this</span><span class="w"> </span><span class="n">is</span><span class="w"> </span><span class="n">a</span>
+<span class="w">    </span><span class="n">single</span><span class="w"> </span><span class="n">expression</span>
+
+<span class="c1">-- an extremely common style found in haskell</span>
+<span class="kr">data</span><span class="w"> </span><span class="kt">Python</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="kt">Users</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="n">are</span><span class="w">        </span><span class="ow">::</span><span class="w"> </span><span class="kt">Crying</span>
+<span class="w">    </span><span class="p">,</span><span class="w"> </span><span class="n">right</span><span class="w">      </span><span class="ow">::</span><span class="w"> </span><span class="kt">About</span>
+<span class="w">    </span><span class="p">,</span><span class="w"> </span><span class="n">now</span><span class="w">        </span><span class="ow">::</span><span class="w"> </span><span class="kt">Sorry</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="c1">-- another formatting oddity</span>
+<span class="c1">-- note that this is not a single</span>
+<span class="c1">-- continued line! `look at`,</span>
+<span class="c1">-- `this`, and `alignment` are all</span>
+<span class="c1">-- separate expressions!</span>
+<span class="nf">anotherThing</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="kr">do</span><span class="w"> </span><span class="n">look</span><span class="w"> </span><span class="n">at</span>
+<span class="w">                  </span><span class="n">this</span>
+<span class="w">                  </span><span class="n">alignment</span>
+</pre></div>
+</div>
+<p>But enough fear, lets actually think about implementation. Firstly, some
+formality: what do we mean when we say layout? We will define layout as the
+rules we apply to an implicitly-sectioned language in order to yield one that is
+explicitly-sectioned. We will also define indentation of a lexeme as the column
+number of its first character.</p>
+<p>Thankfully for us, our entry point is quite clear; layouts only appear after a
+select few keywords, (with a minor exception; TODO: elaborate) being <code class="code docutils literal notranslate"><span class="pre">let</span></code>
+(followed by supercombinators), <code class="code docutils literal notranslate"><span class="pre">where</span></code> (followed by supercombinators),
+<code class="code docutils literal notranslate"><span class="pre">do</span></code> (followed by expressions), and <code class="code docutils literal notranslate"><span class="pre">of</span></code> (followed by alternatives)
+(TODO: all of these terms need linked glossary entries). In order to manage the
+cascade of layout contexts, our lexer will record a stack for which each element
+is either <img class="math" src="../_images/math/66eb37710389b629d7ffa626fb55276426bef938.svg" alt="\varnothing" style="vertical-align: -2px"/>, denoting an explicit layout written with braces
+and semicolons, or a <img class="math" src="../_images/math/d04fe0dc2dd02e9d27dfd46e93827894feb96d1f.svg" alt="\langle n \rangle" style="vertical-align: -5px"/>, denoting an implicitly laid-out
+layout where the start of each item belonging to the layout is indented
+<img class="math" src="../_images/math/4713e4c065d6aabec3acece28c5ecc882faa119a.svg" alt="n" style="vertical-align: 0px"/> columns.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="c1">-- layout stack: []</span>
+<span class="kr">module</span><span class="w"> </span><span class="nn">M</span><span class="w"> </span><span class="kr">where</span><span class="w"> </span><span class="c1">-- layout stack: [∅]</span>
+
+<span class="nf">f</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="kr">let</span><span class="w"> </span><span class="c1">-- layout keyword; remember indentation of next token</span>
+<span class="w">          </span><span class="n">y</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">w</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">w</span><span class="w"> </span><span class="c1">-- layout stack: [∅, &lt;10&gt;]</span>
+<span class="w">          </span><span class="n">w</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">x</span>
+<span class="w">          </span><span class="c1">-- layout ends here</span>
+<span class="w">      </span><span class="kr">in</span><span class="w"> </span><span class="kr">do</span><span class="w"> </span><span class="c1">-- layout keyword; next token is a brace!</span>
+<span class="w">          </span><span class="p">{</span><span class="w"> </span><span class="c1">-- layout stack: [∅]</span>
+<span class="w">              </span><span class="n">print</span><span class="w"> </span><span class="n">y</span><span class="p">;</span>
+<span class="w">              </span><span class="n">print</span><span class="w"> </span><span class="n">x</span><span class="p">;</span>
+<span class="w">          </span><span class="p">}</span>
+</pre></div>
+</div>
+<p>Finally, we also need the concept of “virtual” brace tokens, which as far as
+we’re concerned at this moment are exactly like normal brace tokens, except
+implicitly inserted by the compiler. With the presented ideas in mind, we may
+begin to introduce a small set of informal rules describing the lexer’s handling
+of layouts, the first being:</p>
+<ol class="arabic simple">
+<li><p>If a layout keyword is followed by the token ‘{’, push <img class="math" src="../_images/math/66eb37710389b629d7ffa626fb55276426bef938.svg" alt="\varnothing" style="vertical-align: -2px"/>
+onto the layout context stack. Otherwise, push <img class="math" src="../_images/math/d04fe0dc2dd02e9d27dfd46e93827894feb96d1f.svg" alt="\langle n \rangle" style="vertical-align: -5px"/> onto
+the layout context stack where <img class="math" src="../_images/math/4713e4c065d6aabec3acece28c5ecc882faa119a.svg" alt="n" style="vertical-align: 0px"/> is the indentation of the token
+following the layout keyword. Additionally, the lexer is to insert a virtual
+opening brace after the token representing the layout keyword.</p></li>
+</ol>
+<p>Consider the following observations from that previous code sample:</p>
+<ul class="simple">
+<li><p>Function definitions should belong to a layout, each of which may start at
+column 1.</p></li>
+<li><p>A layout can enclose multiple bodies, as seen in the <code class="code docutils literal notranslate"><span class="pre">let</span></code>-bindings and
+the <code class="code docutils literal notranslate"><span class="pre">do</span></code>-expression.</p></li>
+<li><p>Semicolons should <em>terminate</em> items, rather than <em>separate</em> them.</p></li>
+</ul>
+<p>Our current focus is the semicolons. In an implicit layout, items are on
+separate lines each aligned with the previous. A naïve implementation would be
+to insert the semicolon token when the EOL is reached, but this proves unideal
+when you consider the alignment requirement. In our implementation, our lexer
+will wait until the first token on a new line is reached, then compare
+indentation and insert a semicolon if appropriate. This comparison – the
+nondescript measurement of “more, less, or equal indentation” rather than a
+numeric value – is referred to as <em>offside</em> by myself internally and the
+Haskell report describing layouts. We informally formalise this rule as follows:</p>
+<ol class="arabic simple" start="2">
+<li><p>When the first token on a line is preceeded only by whitespace, if the
+token’s first grapheme resides on a column number <img class="math" src="../_images/math/422ce4de46a354723a0f5b33995d885c86bb0e70.svg" alt="m" style="vertical-align: 0px"/> equal to the
+indentation level of the enclosing context – i.e. the <img class="math" src="../_images/math/c067c4215cbfc6897d6e5eaf14ded0dc221b972c.svg" alt="\langle n
+\rangle" style="vertical-align: -5px"/> on top of the layout stack. Should no such context exist on the
+stack, assume <img class="math" src="../_images/math/3fa33eeafbc80a0bcf2766e8f56e9cb2b6148e79.svg" alt="m &gt; n" style="vertical-align: -1px"/>.</p></li>
+</ol>
+<p>We have an idea of how to begin layouts, delimit the enclosed items, and last
+we’ll need to end layouts. This is where the distinction between virtual and
+non-virtual brace tokens comes into play. The lexer needs only partial concern
+towards closing layouts; the complete responsibility is shared with the parser.
+This will be elaborated on in the next section. For now, we will be content with
+naïvely inserting a virtual closing brace when a token is indented right of the
+layout.</p>
+<ol class="arabic simple" start="3">
+<li><p>Under the same conditions as rule 2., when <img class="math" src="../_images/math/d696439e8724d5b54e9b4b344b9c99d0facc8b7c.svg" alt="m &lt; n" style="vertical-align: -1px"/> the lexer shall
+insert a virtual closing brace and pop the layout stack.</p></li>
+</ol>
+<p>This rule covers some cases including the top-level, however, consider
+tokenising the <code class="code docutils literal notranslate"><span class="pre">in</span></code> in a <code class="code docutils literal notranslate"><span class="pre">let</span></code>-expression. If our lexical analysis
+framework only allows for lexing a single token at a time, we cannot return both
+a virtual right-brace and a <code class="code docutils literal notranslate"><span class="pre">in</span></code>. Under this model, the lexer may simply
+pop the layout stack and return the <code class="code docutils literal notranslate"><span class="pre">in</span></code> token. As we’ll see in the next
+section, as long as the lexer keeps track of its own context (i.e. the stack),
+the parser will cope just fine without the virtual end-brace.</p>
+</section>
+<section id="parsing-lonely-braces">
+<h2>Parsing Lonely Braces<a class="headerlink" href="#parsing-lonely-braces" title="Link to this heading">¶</a></h2>
+<p>When viewed in the abstract, parsing and tokenising are near-identical tasks yet
+the two are very often decomposed into discrete systems with very different
+implementations. Lexers operate on streams of text and tokens, while parsers
+are typically far less linear, using a parse stack or recursing top-down. A
+big reason for this separation is state management: the parser aims to be as
+context-free as possible, while the lexer tends to burden the necessary
+statefulness. Still, the nature of a stream-oriented lexer makes backtracking
+difficult and quite inelegant.</p>
+<p>However, simply declaring a parse error to be not an error at all
+counterintuitively proves to be an elegant solution our layout problem which
+minimises backtracking and state in both the lexer and the parser. Consider the
+following definitions found in rlp’s BNF:</p>
+<pre>
+<strong id="grammar-token-rlp-VOpen">VOpen </strong> ::=  <code class="xref docutils literal notranslate"><span class="pre">vopen</span></code>
+<strong id="grammar-token-rlp-VClose">VClose</strong> ::=  <code class="xref docutils literal notranslate"><span class="pre">vclose</span></code> | <code class="xref docutils literal notranslate"><span class="pre">error</span></code>
+</pre>
+<p>A parse error is recovered and treated as a closing brace. Another point of note
+in the BNF is the difference between virtual and non-virtual braces (TODO: i
+don’t like that the BNF is formatted without newlines :/):</p>
+<pre>
+<strong id="grammar-token-rlp-LetExpr">LetExpr</strong> ::=  <code class="xref docutils literal notranslate"><span class="pre">let</span></code> VOpen Bindings VClose <code class="xref docutils literal notranslate"><span class="pre">in</span></code> Expr | <code class="xref docutils literal notranslate"><span class="pre">let</span></code> `{` Bindings `}` <code class="xref docutils literal notranslate"><span class="pre">in</span></code> Expr
+</pre>
+<p>This ensures that non-virtual braces are closed explicitly.</p>
+<p>This set of rules is adequete enough to satisfy our basic concerns about line
+continations and layout lists. For a more pedantic description of the layout
+system, see <a class="reference external" href="https://www.haskell.org/onlinereport/haskell2010/haskellch10.html">chapter 10</a> of the
+2010 Haskell Report, which I heavily referenced here.</p>
+<section id="references">
+<h3>References<a class="headerlink" href="#references" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/reference/lexical_analysis.html">Python’s lexical analysis</a></p></li>
+<li><p><a class="reference external" href="https://www.haskell.org/onlinereport/haskell2010/haskellch10.html">Haskell syntax reference</a></p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">rl'</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Index</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Commentary</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="gm.html">The <em>G-Machine</em></a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Lexing, Parsing, and Layouts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ti.html">The <em>Template Instantiator</em></a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">References</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../references/gm-state-transition-rules.html">G-Machine State Transition Rules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../references/ti-state-transitions.html">Template Instantiator State Transition Rules</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="gm.html" title="previous chapter">The <em>G-Machine</em></a></li>
+      <li>Next: <a href="ti.html" title="next chapter">The <em>Template Instantiator</em></a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, madeleine sydney ślaga.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="../_sources/commentary/layout-lexing.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

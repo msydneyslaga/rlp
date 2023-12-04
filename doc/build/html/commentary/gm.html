@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>The G-Machine &#8212; rl&#39;  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=039e1c02" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Lexing, Parsing, and Layouts" href="layout-lexing.html" />
+    <link rel="prev" title="Glossary" href="../glossary.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="the-g-machine">
+<h1>The <em>G-Machine</em><a class="headerlink" href="#the-g-machine" title="Link to this heading">¶</a></h1>
+<section id="motivation">
+<h2>Motivation<a class="headerlink" href="#motivation" title="Link to this heading">¶</a></h2>
+<p>Our initial model, the <em>Template Instantiator</em> (TI) was a very
+straightforward solution to compilation, but its core design has a major
+Achilles’ heel, being that Compilation is interleaved with evaluation – The
+heap nodes for supercombinators hold uninstantiated expressions, i.e. raw ASTs
+straight from the parser. When a supercombinator is found on the stack during
+evaluation, the template expression is instantiated (compiled) on the spot.</p>
+<div class="math">
+<p><img src="../_images/math/20219b0570be52c3f596972c4cd5461a162cccf9.svg" alt="\transrule
+{ a_0 : a_1 : \ldots : a_n : s
+&amp; d
+&amp; h
+\begin{bmatrix}
+     a_0 : \mathtt{NSupercomb} \; [x_1,\ldots,x_n] \; e
+\end{bmatrix}
+&amp; g
+}
+{ a_n : s
+&amp; d
+&amp; h'
+&amp; g
+\\
+&amp; \SetCell[c=3]{c}
+\text{where } h' = \mathtt{instantiateU} \; e \; a_n \; h \; g
+}"/></p>
+</div><p>The process of instantiating a supercombinator goes something like this</p>
+<ol class="arabic simple">
+<li><p>Augment the environment with bindings to the arguments.</p></li>
+<li><p>Using the local augmented environment, instantiate the supercombinator body
+on the heap.</p></li>
+<li><p>Remove the nodes applying the supercombinator to its arguments from the
+stack.</p></li>
+<li><p>Push the address to the newly instantiated body onto the stack.</p></li>
+</ol>
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text">src/TI.hs</span><a class="headerlink" href="#id1" title="Link to this code">¶</a></div>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">scStep</span><span class="w"> </span><span class="ow">::</span><span class="w"> </span><span class="kt">Name</span><span class="w"> </span><span class="ow">-&gt;</span><span class="w"> </span><span class="p">[</span><span class="kt">Name</span><span class="p">]</span><span class="w"> </span><span class="ow">-&gt;</span><span class="w"> </span><span class="kt">Expr</span><span class="w"> </span><span class="ow">-&gt;</span><span class="w"> </span><span class="kt">TiState</span><span class="w"> </span><span class="ow">-&gt;</span><span class="w"> </span><span class="kt">TiState</span>
+<span class="nf">scStep</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="p">(</span><span class="kt">TiState</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="n">g</span><span class="w"> </span><span class="n">sts</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span>
+<span class="w">    </span><span class="kt">TiState</span><span class="w"> </span><span class="n">s&#39;</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="n">h&#39;</span><span class="w"> </span><span class="n">g</span><span class="w"> </span><span class="n">sts</span>
+<span class="w">    </span><span class="kr">where</span>
+<span class="w">        </span><span class="n">s&#39;</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">rootAddr</span><span class="w"> </span><span class="kt">:</span><span class="w"> </span><span class="n">drop</span><span class="w"> </span><span class="p">(</span><span class="n">length</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="n">s</span><span class="w">  </span><span class="c1">-- 3., 4.</span>
+<span class="w">        </span><span class="n">h&#39;</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">instantiateU</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="n">rootAddr</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="n">env</span><span class="w">      </span><span class="c1">-- 2.</span>
+<span class="w">        </span><span class="n">rootAddr</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="o">!!</span><span class="w"> </span><span class="n">length</span><span class="w"> </span><span class="n">as</span>
+
+<span class="w">        </span><span class="n">env</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">argBinds</span><span class="w"> </span><span class="o">++</span><span class="w"> </span><span class="n">g</span><span class="w">                     </span><span class="c1">-- 1.</span>
+<span class="w">        </span><span class="n">argBinds</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="p">`</span><span class="n">zip</span><span class="p">`</span><span class="w"> </span><span class="n">argAddrs</span>
+<span class="w">        </span><span class="n">argAddrs</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">getArgs</span><span class="w"> </span><span class="n">h</span><span class="w"> </span><span class="n">s</span>
+</pre></div>
+</div>
+</div>
+<p>Instantiating the supercombinator’s body in this way is the root of our
+Achilles’ heel. Traversing a tree structure is a very non-linear task unfit for
+an assembly target. The goal of our new G-Machine is to compile a <em>linear
+sequence of instructions</em> which instantiate the expression at execution.</p>
+</section>
+<section id="trees-and-vines-in-theory">
+<h2>Trees and Vines, in Theory<a class="headerlink" href="#trees-and-vines-in-theory" title="Link to this heading">¶</a></h2>
+<p>WIP.</p>
+</section>
+<section id="evaluation-slurping-vines">
+<h2>Evaluation: Slurping Vines<a class="headerlink" href="#evaluation-slurping-vines" title="Link to this heading">¶</a></h2>
+<p>WIP.</p>
+<section id="laziness">
+<h3>Laziness<a class="headerlink" href="#laziness" title="Link to this heading">¶</a></h3>
+<p>WIP.</p>
+<ul class="simple">
+<li><p>Instead of <code class="code docutils literal notranslate"><span class="pre">Slide</span> <span class="pre">(n+1);</span> <span class="pre">Unwind</span></code>, do <code class="code docutils literal notranslate"><span class="pre">Update</span> <span class="pre">n;</span> <span class="pre">Pop</span> <span class="pre">n;</span> <span class="pre">Unwind</span></code></p></li>
+</ul>
+</section>
+</section>
+<section id="compilation-squashing-trees">
+<h2>Compilation: Squashing Trees<a class="headerlink" href="#compilation-squashing-trees" title="Link to this heading">¶</a></h2>
+<p>WIP.</p>
+<p>Notice that we do not keep a (local) environment at run-time. The environment
+only exists at compile-time to map local names to stack indices. When compiling
+a supercombinator, the arguments are enumerated from zero (the top of the
+stack), and passed to <code class="code docutils literal notranslate"><span class="pre">compileR</span></code> as an environment.</p>
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text">src/GM.hs</span><a class="headerlink" href="#id2" title="Link to this code">¶</a></div>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="c1">-- type CompiledSC = (Name, Int, Code)</span>
+
+<span class="nf">compileSc</span><span class="w"> </span><span class="ow">::</span><span class="w"> </span><span class="kt">ScDef</span><span class="w"> </span><span class="ow">-&gt;</span><span class="w"> </span><span class="kt">CompiledSC</span>
+<span class="nf">compileSc</span><span class="w"> </span><span class="p">(</span><span class="kt">ScDef</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">,</span><span class="w"> </span><span class="n">compileR</span><span class="w"> </span><span class="n">env</span><span class="w"> </span><span class="n">b</span><span class="p">)</span>
+<span class="w">    </span><span class="kr">where</span>
+<span class="w">        </span><span class="n">env</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="p">`</span><span class="n">zip</span><span class="p">`</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="o">..</span><span class="p">]</span>
+<span class="w">        </span><span class="n">d</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">length</span><span class="w"> </span><span class="n">as</span>
+</pre></div>
+</div>
+</div>
+<p>Of course, variables being indexed relative to the top of the stack means that
+they will become inaccurate the moment we push or pop the stack a single time.
+The way around this is quite simple: simply offset the stack when w</p>
+<div class="literal-block-wrapper docutils container" id="id3">
+<div class="code-block-caption"><span class="caption-text">src/GM.hs</span><a class="headerlink" href="#id3" title="Link to this code">¶</a></div>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">compileC</span><span class="w"> </span><span class="n">g</span><span class="w"> </span><span class="p">(</span><span class="kt">App</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="ow">=</span><span class="w"> </span><span class="n">compileC</span><span class="w"> </span><span class="n">g</span><span class="w"> </span><span class="n">x</span>
+<span class="w">                    </span><span class="o">&lt;&gt;</span><span class="w"> </span><span class="n">compileC</span><span class="w"> </span><span class="p">(</span><span class="n">argOffset</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="n">g</span><span class="p">)</span><span class="w"> </span><span class="n">f</span>
+<span class="w">                    </span><span class="o">&lt;&gt;</span><span class="w"> </span><span class="p">[</span><span class="kt">MkAp</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">rl'</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Index</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Commentary</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">The <em>G-Machine</em></a></li>
+<li class="toctree-l1"><a class="reference internal" href="layout-lexing.html">Lexing, Parsing, and Layouts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ti.html">The <em>Template Instantiator</em></a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">References</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../references/gm-state-transitions.html">G-Machine State Transition Rules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../references/ti-state-transitions.html">Template Instantiator State Transition Rules</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="../glossary.html" title="previous chapter">Glossary</a></li>
+      <li>Next: <a href="layout-lexing.html" title="next chapter">Lexing, Parsing, and Layouts</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, madeleine sydney ślaga.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="../_sources/commentary/gm.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
