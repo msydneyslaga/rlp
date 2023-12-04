@@ -253,7 +253,8 @@ Core Transition Rules
    & m
    }
 
-13. When unwinding, if the top of the stack is in WHNF, pop the dump
+13. When unwinding, if the top of the stack is in WHNF (currently this just
+    means a number), pop the dump
 
 .. math::
    \gmrule
@@ -295,21 +296,24 @@ Extension Rules
 ***************
 
 1. A sneaky trick to enable sharing of :code:`NNum` nodes. We note that the
-   global environment is a mapping of :code:`Name` objects (i.e. identifiers) to
-   heap addresses. Strings of digits are not considered valid identifiers! We
-   abuse this by modifying Core Rule 2 to update the global environment with the
-   new node's address. Consider how this rule might impact garbage collection
+   global environment is a mapping of plain old strings to heap addresses.
+   Strings of digits are not considered valid identifiers, so putting them on
+   the global environment will never conflict with a supercombinator! We abuse
+   this by modifying Core Rule 2 to update the global environment with the new
+   node's address. Consider how this rule might impact garbage collection
    (remember that the environment is intended for *globals*).
 
 .. math::
    \gmrule
    { \mathtt{PushInt} \; n : i
    & s
+   & d
    & h
    & m
    }
    { i
    & a : s
+   & d
    & h
    \begin{bmatrix}
         a : \mathtt{NNum} \; n
@@ -327,9 +331,10 @@ Extension Rules
    action when a number already exists in the environment:
 
 .. math::
-   \transrule
+   \gmrule
    { \mathtt{PushInt} \; n : i
    & s
+   & d
    & h
    & m
    \begin{bmatrix}
@@ -338,6 +343,7 @@ Extension Rules
    }
    { i
    & a : s
+   & d
    & h
    & m
    \\
