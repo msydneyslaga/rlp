@@ -20,9 +20,9 @@ import Text.Printf
 import Text.PrettyPrint             hiding ((<>))
 import Text.PrettyPrint.HughesPJ    (maybeParens)
 import Data.Foldable                (traverse_)
-import Debug.Trace
+import Control.Arrow                ((>>>))
 import System.IO                    (Handle, hPutStrLn)
-import Data.Heap                    as Heap
+import Data.Heap
 import Core
 ----------------------------------------------------------------------------------
 
@@ -52,8 +52,12 @@ data Instr = Unwind
            | Pop Int
            | Alloc Int
            | Eval
+           -- primitive ops
+           | Neg
            | Add
+           | Sub
            | Mul
+           | Div
            deriving (Show, Eq)
 
 data Node = NNum Int
@@ -123,21 +127,27 @@ isFinal st = null $ st ^. gmCode
 
 step :: GmState -> GmState
 step st = case head (st ^. gmCode) of
-    Unwind       -> unwind       st
-    PushGlobal n -> pushGlobal n st
-    PushInt    n -> pushInt    n st
-    Push       n -> push       n st
-    MkAp         -> mkAp         st
-    Slide      n -> slide      n st
-    Pop        n -> pop        n st
-    Update     n -> update     n st
-    Alloc      n -> alloc      n st
+    Unwind       -> unwindI       st
+    PushGlobal n -> pushGlobalI n st
+    PushInt    n -> pushIntI    n st
+    Push       n -> pushI       n st
+    MkAp         -> mkApI         st
+    Slide      n -> slideI      n st
+    Pop        n -> popI        n st
+    Update     n -> updateI     n st
+    Alloc      n -> allocI      n st
+    Eval         -> evalI         st
+    Neg          -> negI          st
+    Add          -> addI          st
+    Sub          -> subI          st
+    Mul          -> mulI          st
+    Div          -> divI          st
     where
 
-        pushGlobal :: Name -> GmState -> GmState
-        pushGlobal k st = st
-                        & gmCode  %~ drop 1
-                        & gmStack .~ s'
+        pushGlobalI :: Name -> GmState -> GmState
+        pushGlobalI k st = st
+                         & gmCode  %~ drop 1
+                         & gmStack .~ s'
             where
                 s = st ^. gmStack
                 m = st ^. gmEnv
@@ -147,8 +157,8 @@ step st = case head (st ^. gmCode) of
                         $ lookup k m
 
         -- Extension Rules 1,2 (sharing)
-        pushInt :: Int -> GmState -> GmState
-        pushInt n st = case lookup n' m of
+        pushIntI :: Int -> GmState -> GmState
+        pushIntI n st = case lookup n' m of
             Just a  -> st
                      & gmCode  %~ drop 1
                      & gmStack .~ s'
@@ -163,7 +173,7 @@ step st = case head (st ^. gmCode) of
                      & gmStats . stsAllocations %~ succ --
                 where
                     s' = a : s
-                    (h',a) = Heap.alloc h (NNum n)
+                    (h',a) = alloc h (NNum n)
                     m' = (n',a) : m
             where
                 m = st ^. gmEnv
@@ -172,12 +182,12 @@ step st = case head (st ^. gmCode) of
                 n' = show n
 
         -- Core Rule 2. (no sharing)
-        -- pushInt :: Int -> GmState -> GmState
-        -- pushInt n st = st
-        --              & gmCode  %~ drop 1
-        --              & gmStack .~ s'
-        --              & gmHeap  .~ h'
-        --              & gmStats . stsAllocations %~ succ
+        -- pushIntI :: Int -> GmState -> GmState
+        -- pushIntI n st = st
+        --               & gmCode  %~ drop 1
+        --               & gmStack .~ s'
+        --               & gmHeap  .~ h'
+        --               & gmStats . stsAllocations %~ succ
         --     where
         --         s = st ^. gmStack
         --         h = st ^. gmHeap
@@ -185,26 +195,26 @@ step st = case head (st ^. gmCode) of
         --         s' = a : s
         --         (h',a) = alloc h (NNum n)
 
-        mkAp :: GmState -> GmState
-        mkAp st = st
-                & gmCode  %~ drop 1
-                & gmStack .~ s'
-                & gmHeap  .~ h'
-                -- record the application we allocated
-                & gmStats . stsAllocations %~ succ
+        mkApI :: GmState -> GmState
+        mkApI st = st
+                 & gmCode  %~ drop 1
+                 & gmStack .~ s'
+                 & gmHeap  .~ h'
+                 -- record the application we allocated
+                 & gmStats . stsAllocations %~ succ
             where
                 (f:x:ss) = st ^. gmStack
                 h = st ^. gmHeap
                 
                 s' = a : ss
-                (h',a) = Heap.alloc h (NAp f x)
+                (h',a) = alloc h (NAp f x)
 
         -- a `Push n` instruction pushes the address of (n+1)-th argument onto
         -- the stack.
-        push :: Int -> GmState -> GmState
-        push n st = st
-                  & gmCode  %~ drop 1
-                  & gmStack %~ (a:)
+        pushI :: Int -> GmState -> GmState
+        pushI n st = st
+                   & gmCode  %~ drop 1
+                   & gmStack %~ (a:)
             where
                 h = st ^. gmHeap
                 s = st ^. gmStack
@@ -218,35 +228,35 @@ step st = case head (st ^. gmCode) of
         --  1: f                  1: f x y
         --  2: f x
         --  3: f x y
-        slide :: Int -> GmState -> GmState
-        slide n st = st
-                   & gmCode  %~ drop 1
-                   & gmStack .~ s'
+        slideI :: Int -> GmState -> GmState
+        slideI n st = st
+                    & gmCode  %~ drop 1
+                    & gmStack .~ s'
             where
                 (a:s) = st ^. gmStack
                 s' = a : drop n s
 
-        update :: Int -> GmState -> GmState
-        update n st = st
-                    & gmCode  %~ drop 1
-                    & gmStack .~ s
-                    & gmHeap  .~ h'
-            where
+        updateI :: Int -> GmState -> GmState
+        updateI n st = st
+                     & gmCode  %~ drop 1
+                     & gmStack .~ s
+                     & gmHeap  .~ h'
+             where
                 (e:s) = st ^. gmStack
                 an = s !! n
                 h' = st ^. gmHeap
-                    & Heap.update an (NInd e)
+                    & update an (NInd e)
 
-        pop :: Int -> GmState -> GmState
-        pop n st = st
-                 & gmCode  %~ drop 1
-                 & gmStack %~ drop n
+        popI :: Int -> GmState -> GmState
+        popI n st = st
+                  & gmCode  %~ drop 1
+                  & gmStack %~ drop n
 
-        alloc :: Int -> GmState -> GmState
-        alloc n st = st
-                   & gmCode  %~ drop 1
-                   & gmStack .~ s'
-                   & gmHeap  .~ h'
+        allocI :: Int -> GmState -> GmState
+        allocI n st = st
+                    & gmCode  %~ drop 1
+                    & gmStack .~ s'
+                    & gmHeap  .~ h'
             where
                 s = st ^. gmStack
                 h = st ^. gmHeap
@@ -256,14 +266,47 @@ step st = case head (st ^. gmCode) of
                 allocNode :: Int -> GmHeap -> (GmHeap, [Addr])
                 allocNode 0 g = (g,[])
                 allocNode k g = allocNode (k-1) g' & _2 %~ (a:)
-                    where (g',a) = Heap.alloc g NUninitialised
+                    where (g',a) = alloc g NUninitialised
+
+        evalI :: GmState -> GmState
+        evalI st = st
+                 -- Unwind performs the actual evaluation; we just set the stage
+                 -- so Unwind knows what to do
+                 & gmCode  .~ [Unwind]
+                 -- leave lone scrutinee on stk to be eval'd by Unwind
+                 & gmStack .~ [a]
+                 -- push remaining code & stk to dump
+                 & gmDump  %~ ((i,s):)
+            where
+                (_:i) = st ^. gmCode
+                (a:s) = st ^. gmStack
+
+        negI :: GmState -> GmState
+        negI = primitive1 boxInt unboxInt negate
+
+        addI, subI, mulI, divI :: GmState -> GmState
+        addI = primitive2 boxInt unboxInt (+)
+        subI = primitive2 boxInt unboxInt (-)
+        mulI = primitive2 boxInt unboxInt (*)
+        divI = primitive2 boxInt unboxInt div
 
         -- the complex heart of the G-machine
-        unwind :: GmState -> GmState
-        unwind st = case hLookupUnsafe a h of
+        unwindI :: GmState -> GmState
+        unwindI st = case hLookupUnsafe a h of
             NNum n      -> st
-                         -- halt; discard all further instructions
-                         & gmCode .~ []
+                         & gmCode  .~ i'
+                         & gmStack .~ s'
+                         & gmDump  .~ d'
+                where
+                    s = st ^. gmStack
+                    (i',s',d') = case st ^. gmDump of
+                        -- if the dump is non-empty, restore the instruction
+                        -- queue and stack, and pop the dump
+                        ((ii,ss):d) -> (ii,a:ss,d)
+                        -- if the dump is empty, clear the instruction queue and
+                        -- leave the stack as is
+                        []    -> ([], s, [])
+
             NAp f x     -> st
                          -- leave the Unwind instr; continue unwinding
                          & gmStack %~ (f:)
@@ -293,6 +336,56 @@ step st = case head (st ^. gmCode) of
                 a = head s
                 h = st ^. gmHeap
 
+
+-- TODO: this desperately needs documentation
+primitive1 :: (GmState -> b -> GmState) -- boxing function
+           -> (Addr -> GmState -> a)    -- unboxing function
+           -> (a -> b)                  -- operator
+           -> GmState -> GmState        -- state transition
+primitive1 box unbox f st
+        = st
+        & unbox a
+        & f
+        & box (st & gmStack .~ s)
+        & advanceCode
+    where
+        putNewStack = gmStack .~ s
+        (a:s) = st ^. gmStack
+        r = box (putNewStack st) (f (unbox a st))
+
+-- TODO: this desperately needs documentation
+primitive2 :: (GmState -> b -> GmState) -- boxing function
+           -> (Addr -> GmState -> a)    -- unboxing function
+           -> (a -> a -> b)             -- operator
+           -> GmState -> GmState        -- state transition
+primitive2 box unbox f st
+        = st'
+        & advanceCode
+    where
+        (ax:ay:s) = st ^. gmStack
+        putNewStack = gmStack .~ s
+        x = unbox ax st
+        y = unbox ay st
+        st' = box (putNewStack st) (f x y)
+
+boxInt :: GmState -> Int -> GmState
+boxInt st n = st
+            & gmHeap  .~ h'
+            & gmStack %~ (a:)
+    where
+        h = st ^. gmHeap
+        (h',a) = alloc h (NNum n)
+
+unboxInt :: Addr -> GmState -> Int
+unboxInt a st = case hLookup a h of
+        Just (NNum n) -> n
+        Just _        -> error "unboxInt received a non-int"
+        Nothing       -> error "unboxInt received an invalid address"
+    where h = st ^. gmHeap
+
+advanceCode :: GmState -> GmState
+advanceCode = gmCode %~ drop 1
+
 ----------------------------------------------------------------------------------
 
 compile :: Program -> GmState
@@ -305,10 +398,25 @@ compile p = GmState c [] [] h g sts
 
 type CompiledSC = (Name, Int, Code)
 
-buildInitialHeap :: Program -> (GmHeap, Env)
-buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiled
+compiledPrims :: [CompiledSC]
+compiledPrims =
+    [ ("whnf#", 1, [Push 0, Eval, Update 1, Pop 1, Unwind])
+    -- , unop "negate#" Neg
+    , ("negate#", 1, [Push 0, Eval, Neg, Update 1, Pop 1, Unwind])
+    , binop "+#" Add
+    , binop "-#" Sub
+    , binop "*#" Mul
+    , binop "/#" Div
+    ]
     where
-        compiled = fmap compileSc ss
+        unop k i = (k, 1, [Push 0, Eval, i, Update 1, Pop 1, Unwind])
+
+        binop k i = (k, 2, [Push 1, Eval, Push 1, Eval, i, Update 2, Pop 2, Unwind])
+
+buildInitialHeap :: Program -> (GmHeap, Env)
+buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
+    where
+        compiledScs = fmap compileSc ss <> compiledPrims
 
         -- note that we don't count sc allocations in the stats
         allocateSc :: GmHeap -> CompiledSC -> (GmHeap, (Name, Addr))
