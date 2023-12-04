@@ -43,6 +43,8 @@ infixl 2 :$
 pattern (:$) :: Expr -> Expr -> Expr
 pattern f :$ x = App f x
 
+{-# COMPLETE Binding :: Binding #-}
+{-# COMPLETE (:=) :: Binding #-}
 data Binding = Binding Name Expr
     deriving (Show, Lift, Eq)
 

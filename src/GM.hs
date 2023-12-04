@@ -11,7 +11,7 @@ module GM
     where
 ----------------------------------------------------------------------------------
 import Data.Default.Class
-import Data.List                    (mapAccumL, intersperse)
+import Data.List                    (mapAccumL)
 import Data.Maybe                   (fromMaybe)
 import Data.Tuple                   (swap)
 import Lens.Micro
@@ -20,8 +20,8 @@ import Text.Printf
 import Text.PrettyPrint             hiding ((<>))
 import Text.PrettyPrint.HughesPJ    (maybeParens)
 import Data.Foldable                (traverse_)
-import Control.Arrow                ((>>>))
 import System.IO                    (Handle, hPutStrLn)
+import Data.String                  (IsString)
 import Data.Heap
 import Core
 ----------------------------------------------------------------------------------
@@ -126,46 +126,46 @@ isFinal :: GmState -> Bool
 isFinal st = null $ st ^. gmCode
 
 step :: GmState -> GmState
-step st = case head (st ^. gmCode) of
-    Unwind       -> unwindI       st
-    PushGlobal n -> pushGlobalI n st
-    PushInt    n -> pushIntI    n st
-    Push       n -> pushI       n st
-    MkAp         -> mkApI         st
-    Slide      n -> slideI      n st
-    Pop        n -> popI        n st
-    Update     n -> updateI     n st
-    Alloc      n -> allocI      n st
-    Eval         -> evalI         st
-    Neg          -> negI          st
-    Add          -> addI          st
-    Sub          -> subI          st
-    Mul          -> mulI          st
-    Div          -> divI          st
+step state = case head (state ^. gmCode) of
+    Unwind       -> unwindI       state
+    PushGlobal n -> pushGlobalI n state
+    PushInt    n -> pushIntI    n state
+    Push       n -> pushI       n state
+    MkAp         -> mkApI         state
+    Slide      n -> slideI      n state
+    Pop        n -> popI        n state
+    Update     n -> updateI     n state
+    Alloc      n -> allocI      n state
+    Eval         -> evalI         state
+    Neg          -> negI          state
+    Add          -> addI          state
+    Sub          -> subI          state
+    Mul          -> mulI          state
+    Div          -> divI          state
     where
 
         pushGlobalI :: Name -> GmState -> GmState
         pushGlobalI k st = st
-                         & gmCode  %~ drop 1
+                         & advanceCode
                          & gmStack .~ s'
             where
                 s = st ^. gmStack
                 m = st ^. gmEnv
 
                 s' = a : s
-                a = fromMaybe (error $ "undefined var: " <> show k)
-                        $ lookup k m
+                a = lookup k m
+                  & fromMaybe (error $ "undefined var: " <> show k)
 
         -- Extension Rules 1,2 (sharing)
         pushIntI :: Int -> GmState -> GmState
         pushIntI n st = case lookup n' m of
             Just a  -> st
-                     & gmCode  %~ drop 1
+                     & advanceCode
                      & gmStack .~ s'
                 where
                     s' = a : s
             Nothing -> st
-                     & gmCode  %~ drop 1
+                     & advanceCode
                      & gmStack .~ s'
                      & gmHeap  .~ h'
                      & gmEnv   .~ m'
@@ -184,7 +184,7 @@ step st = case head (st ^. gmCode) of
         -- Core Rule 2. (no sharing)
         -- pushIntI :: Int -> GmState -> GmState
         -- pushIntI n st = st
-        --               & gmCode  %~ drop 1
+        --               & advanceCode
         --               & gmStack .~ s'
         --               & gmHeap  .~ h'
         --               & gmStats . stsAllocations %~ succ
@@ -197,7 +197,7 @@ step st = case head (st ^. gmCode) of
 
         mkApI :: GmState -> GmState
         mkApI st = st
-                 & gmCode  %~ drop 1
+                 & advanceCode
                  & gmStack .~ s'
                  & gmHeap  .~ h'
                  -- record the application we allocated
@@ -213,10 +213,9 @@ step st = case head (st ^. gmCode) of
         -- the stack.
         pushI :: Int -> GmState -> GmState
         pushI n st = st
-                   & gmCode  %~ drop 1
+                   & advanceCode
                    & gmStack %~ (a:)
             where
-                h = st ^. gmHeap
                 s = st ^. gmStack
                 a = s !! n
 
@@ -230,7 +229,7 @@ step st = case head (st ^. gmCode) of
         --  3: f x y
         slideI :: Int -> GmState -> GmState
         slideI n st = st
-                    & gmCode  %~ drop 1
+                    & advanceCode
                     & gmStack .~ s'
             where
                 (a:s) = st ^. gmStack
@@ -238,7 +237,7 @@ step st = case head (st ^. gmCode) of
 
         updateI :: Int -> GmState -> GmState
         updateI n st = st
-                     & gmCode  %~ drop 1
+                     & advanceCode
                      & gmStack .~ s
                      & gmHeap  .~ h'
              where
@@ -249,12 +248,12 @@ step st = case head (st ^. gmCode) of
 
         popI :: Int -> GmState -> GmState
         popI n st = st
-                  & gmCode  %~ drop 1
+                  & advanceCode
                   & gmStack %~ drop n
 
         allocI :: Int -> GmState -> GmState
         allocI n st = st
-                    & gmCode  %~ drop 1
+                    & advanceCode
                     & gmStack .~ s'
                     & gmHeap  .~ h'
             where
@@ -293,31 +292,30 @@ step st = case head (st ^. gmCode) of
         -- the complex heart of the G-machine
         unwindI :: GmState -> GmState
         unwindI st = case hLookupUnsafe a h of
-            NNum n      -> st
+            NNum _      -> st
                          & gmCode  .~ i'
                          & gmStack .~ s'
                          & gmDump  .~ d'
                 where
-                    s = st ^. gmStack
                     (i',s',d') = case st ^. gmDump of
                         -- if the dump is non-empty, restore the instruction
                         -- queue and stack, and pop the dump
                         ((ii,ss):d) -> (ii,a:ss,d)
                         -- if the dump is empty, clear the instruction queue and
                         -- leave the stack as is
-                        []    -> ([], s, [])
+                        []          -> ([], s, [])
 
-            NAp f x     -> st
+            NAp f _     -> st
                          -- leave the Unwind instr; continue unwinding
                          & gmStack %~ (f:)
 
-            NGlobal k c
+            NGlobal k _
                 | n < k -> st
-                         & gmCode  .~ i
-                         & gmStack .~ s
-                         & gmDump  .~ d
+                         & gmCode  .~ i'
+                         & gmStack .~ s'
+                         & gmDump  .~ d'
                 where
-                    ((i,s) : d) = st ^. gmDump
+                    ((i',s') : d') = st ^. gmDump
                     n = st ^. gmStack & length
             -- assumes length s < d (i.e. enough args have been supplied)
             NGlobal n c -> st
@@ -330,21 +328,25 @@ step st = case head (st ^. gmCode) of
                     args = getArgs $ take (n+1) s
 
                     getArgs :: Stack -> [Addr]
+                    getArgs []     = []
                     getArgs (_:ss) = fmap arg ss
                         where
                             arg (hViewUnsafe h -> NAp _ x) = x
+                            arg (hViewUnsafe h -> _) =
+                                error "expected application"
 
             -- follow indirection
-            NInd a      -> st
+            NInd a'     -> st
                          -- leave the Unwind instr; continue unwinding.
                          -- follow the indirection; replace the address on the
                          -- stack with the pointee
-                         & gmStack . _head .~ a
+                         & gmStack . _head .~ a'
+
+            _           -> error "invalid state"
             where
                 s = st ^. gmStack
                 a = head s
                 h = st ^. gmHeap
-
 
 -- TODO: this desperately needs documentation
 primitive1 :: (GmState -> b -> GmState) -- boxing function
@@ -359,9 +361,7 @@ primitive1 box unbox f st
         & advanceCode
         & gmStats . stsPrimReductions %~ succ
     where
-        putNewStack = gmStack .~ s
         (a:s) = st ^. gmStack
-        r = box (putNewStack st) (f (unbox a st))
 
 -- TODO: this desperately needs documentation
 primitive2 :: (GmState -> b -> GmState) -- boxing function
@@ -397,6 +397,10 @@ unboxInt a st = case hLookup a h of
 advanceCode :: GmState -> GmState
 advanceCode = gmCode %~ drop 1
 
+pop :: [a] -> [a]
+pop (_:xs) = xs
+pop []     = []
+
 ----------------------------------------------------------------------------------
 
 compile :: Program -> GmState
@@ -413,7 +417,8 @@ compiledPrims :: [CompiledSC]
 compiledPrims =
     [ ("whnf#", 1, [Push 0, Eval, Update 1, Pop 1, Unwind])
     -- , unop "negate#" Neg
-    , ("negate#", 1, [Push 0, Eval, Neg, Update 1, Pop 1, Unwind])
+    -- , ("negate#", 1, [Push 0, Eval, Neg, Update 1, Pop 1, Unwind])
+    , unop "negate#" Neg
     , binop "+#" Add
     , binop "-#" Sub
     , binop "*#" Mul
@@ -458,7 +463,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 n = fromMaybe (error $ "undeclared var: " <> k) $ lookup k g
                 domain = fmap fst g
 
-        compileC g (IntE n)  = [PushInt n]
+        compileC _ (IntE n)  = [PushInt n]
 
         -- >> [ref/compileC]
         compileC g (App f x) = compileC g x
@@ -493,12 +498,14 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 body = compileC g' e
 
                 compileBinder :: (Binding, Int) -> Code
-                compileBinder (k := v, a) = compileC g' v <> [Update a]
+                compileBinder (_ := v, a) = compileC g' v <> [Update a]
+
+        compileC _ _ = error "yet to be implemented!"
 
         -- compile an expression in a strict context such that a pointer to the
         -- expression is left on top of the stack in WHNF
         compileE :: Env -> Expr -> Code
-        compileE g (IntE n) = [PushInt n]
+        compileE _ (IntE n) = [PushInt n]
         compileE g (Let NonRec bs e) =
                 -- we use compileE instead of compileC
                 mconcat binders <> compileE g' e <> [Slide d]
@@ -530,7 +537,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
 
                 -- we use compileE instead of compileC
                 compileBinder :: (Binding, Int) -> Code
-                compileBinder (k := v, a) = compileC g' v <> [Update a]
+                compileBinder (_ := v, a) = compileC g' v <> [Update a]
 
         -- special cases for prim functions
         compileE g ("negate#" :$ a) = compileE g a <>                 [Neg]
@@ -556,7 +563,6 @@ qquotes d = "`" <> d <> "'"
 showStats :: Stats -> Doc
 showStats sts = "==== Stats ============" $$ stats
     where
-        info = nest pprTabstop
         stats = text $ printf
             "Reductions      : %5d\n\
             \Prim Reductions : %5d\n\
@@ -569,9 +575,10 @@ showStats sts = "==== Stats ============" $$ stats
 
 showState :: GmState -> Doc
 showState st = vcat
-        [ "==== GmState " <> int stnum <> " ===="
+        [ "==== GmState " <> int stnum <> " "
+            <> text (replicate (28 - 13 - 1 - digitalWidth stnum) '=')
         , "-- Next instructions -------"
-        , info $ showNextCode c
+        , info $ showCodeShort c
         , "-- Stack -------------------"
         , info $ showStack st
         , "-- Heap --------------------"
@@ -586,12 +593,21 @@ showState st = vcat
         -- indent data
         info = nest pprTabstop
 
-showNextCode :: Code -> Doc
-showNextCode c = brackets c'
+showCodeShort :: Code -> Doc
+showCodeShort c = braces c'
     where
-        c' | length c > 3 = list (showInstr <$> take 3 c) <> ", ..."
+        c' | length c > 3 = list (showInstr <$> take 3 c) <> "; ..."
            | otherwise    = list (showInstr <$> c)
+        list = hcat . punctuate "; "
+
+showStackShort :: Stack -> Doc
+showStackShort s = brackets s'
+    where
+           -- no access to heap, otherwise we'd use showNodeAt
+        s' | length s > 3 = list (showEntry <$> take 3 s) <> ", ..."
+           | otherwise    = list (showEntry <$> s)
         list = hcat . punctuate ", "
+        showEntry = text . show
 
 showStack :: GmState -> Doc
 showStack st = vcat $ uncurry showEntry <$> si
@@ -611,7 +627,6 @@ showStack st = vcat $ uncurry showEntry <$> si
 showDump :: GmState -> Doc
 showDump st = vcat $ uncurry showEntry <$> di
     where
-        h = st ^. gmHeap
         d = st ^. gmDump
         di = [0..] `zip` d
 
@@ -619,8 +634,10 @@ showDump st = vcat $ uncurry showEntry <$> di
         w = maxWidth (fst <$> di)
 
         showEntry :: Int -> (Code, Stack) -> Doc
-        showEntry n (c,s) = showIndex n
-                         <> nest pprTabstop (showCode c)
+        showEntry n (c,s) = showIndex n <> nest pprTabstop entry
+            where
+                entry = ("Stack : " <> showCodeShort c)
+                     $$ ("Code  : " <> showStackShort s)
 
 padInt :: Int -> Int -> Doc
 padInt m n = text (replicate (m - digitalWidth n) ' ') <> int n
@@ -632,14 +649,13 @@ digitalWidth :: Int -> Int
 digitalWidth = length . show
 
 showHeap :: GmState -> Doc
-showHeap st = vcat $ showEntry <$> addresses h
+showHeap st = vcat $ showEntry <$> addrs
     where
-        digitalWidth = length . show
-        maxWidth = digitalWidth $ maximum (addresses h)
-        showAddr n = pad <> int n <> ": "
-            where pad = text (replicate (maxWidth - digitalWidth n) ' ')
+        showAddr n = padInt w n <> ": "
 
+        w = maxWidth addrs
         h = st ^. gmHeap
+        addrs = addresses h
 
         showEntry :: Addr -> Doc
         showEntry a = showAddr a <> showNodeAt st a
@@ -650,16 +666,16 @@ showNodeAt = showNodeAtP 0
 showNodeAtP :: Int -> GmState -> Addr -> Doc
 showNodeAtP p st a = case hLookup a h of
     Just (NNum n)        -> int n <> "#"
-    Just (NGlobal d c)   -> text name
+    Just (NGlobal _ _)   -> text name
         where
             g = st ^. gmEnv
-            name = fromMaybe "<unknown>" $ lookup a (swap <$> g)
+            name = fromMaybe errTxtInvalidAddress $ lookup a (swap <$> g)
     Just (NAp f x)       -> pprec $ showNodeAtP (p+1) st f <+> showNodeAtP (p+1) st x
         where pprec = maybeParens (p > 0)
-    Just (NInd a)        -> pprec $ "NInd -> " <> showNodeAtP (p+1) st a
+    Just (NInd a')       -> pprec $ "NInd -> " <> showNodeAtP (p+1) st a'
         where pprec = maybeParens (p > 0)
     Just NUninitialised  -> "<uninitialised>"
-    Nothing              -> "<invalid address>"
+    Nothing              -> errTxtInvalidAddress
     where h = st ^. gmHeap
 
 showSc :: GmState -> (Name, Addr) -> Doc
@@ -668,7 +684,12 @@ showSc st (k,a) = "Supercomb " <> qquotes (text k) <> colon
     where
         code = case hLookup a (st ^. gmHeap) of
             Just (NGlobal _ c) -> showCode c
-            Nothing            -> "<invalid address/node>"
+            Just _             -> errTxtInvalidObject
+            Nothing            -> errTxtInvalidAddress
+
+errTxtInvalidObject, errTxtInvalidAddress :: (IsString a) => a
+errTxtInvalidObject = "<invalid object>"
+errTxtInvalidAddress = "<invalid address>"
 
 showCode :: Code -> Doc
 showCode c = "Code" <+> braces instrs
@@ -676,16 +697,4 @@ showCode c = "Code" <+> braces instrs
 
 showInstr :: Instr -> Doc
 showInstr i = text $ show i
-
-test = GmState c s d h'' g sts
-    where
-        c = [Push 4, Push 5, Slide 2, Unwind]
-        s = [a0,a1,a2]
-        (h,a0) = alloc mempty $ NGlobal 2 [Push 2,Push 3,MkAp,Slide 2,Unwind]
-        (h',a1) = alloc h $ NNum 4
-        (h'',a2) = alloc h' $ NAp a0 a1
-        g = [ ("f", a0)
-            ]
-        d = []
-        sts = def
 

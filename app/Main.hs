@@ -11,7 +11,6 @@ import System.Exit              (exitSuccess)
 import Core
 import TI
 import GM
-import Lens.Micro
 import Lens.Micro.Mtl
 ----------------------------------------------------------------------------------
 
