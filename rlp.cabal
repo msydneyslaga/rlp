@@ -22,10 +22,10 @@ library
                     , TI
                     , GM
                     , Compiler.RLPC
+                    , Core.Syntax
 
     other-modules:    Data.Heap
                     , Data.Pretty
-                    , Core.Syntax
                     , Core.Parse
                     , Core.TH
                     , Core.Examples
@@ -70,12 +70,12 @@ executable rlpc
 test-suite rlp-test
     import:           warnings
     default-language: GHC2021
-    -- other-modules:
-    -- other-extensions:
-    type:             exitcode-stdio-1.0
-    hs-source-dirs:   tst
-    main-is:          Main.hs
-    build-depends:
-        base ^>=4.18.0.0,
-        rlp
+    -- import: deps, test-deps
+    type: exitcode-stdio-1.0
+    hs-source-dirs: tst
+    main-is: Main.hs
+    build-depends: base ^>=4.18.0.0
+                 , rlp
+                 , QuickCheck
+    other-modules: Arith
 

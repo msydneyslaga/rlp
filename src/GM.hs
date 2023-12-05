@@ -7,6 +7,8 @@ Description : The G-Machine
 {-# LANGUAGE OverloadedStrings #-}
 module GM
     ( hdbgProg
+    , evalProg
+    , Node(..)
     )
     where
 ----------------------------------------------------------------------------------
@@ -88,6 +90,15 @@ makeLenses ''Stats
 pure []
 
 ----------------------------------------------------------------------------------
+
+evalProg :: Program -> Maybe (Node, Stats)
+evalProg p = res <&> (,sts)
+    where
+        final = eval (compile p) & last
+        h = final ^. gmHeap
+        sts = final ^. gmStats
+        resAddr = final ^. gmStack ^? _head
+        res = resAddr >>= flip hLookup h
 
 hdbgProg :: Program -> Handle -> IO (Node, Stats)
 hdbgProg p hio = do
