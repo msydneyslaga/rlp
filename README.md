@@ -50,7 +50,7 @@ Listed in order of importance.
         - [x] Structured data
         - [x] Garbage collection
     - [ ] Low-level execution model (GM)
-        - [ ] Arithmetic
+        - [x] Arithmetic
         - [ ] Conditionals
         - [ ] Structured data
         - [ ] Garbage Collection
