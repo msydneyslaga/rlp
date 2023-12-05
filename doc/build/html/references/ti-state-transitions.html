@@ -13,7 +13,7 @@
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="prev" title="G-Machine State Transition Rules" href="gm-state-transition-rules.html" />
+    <link rel="prev" title="G-Machine State Transition Rules" href="gm-state-transitions.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
   
@@ -35,7 +35,7 @@
 <p>Evaluation is complete when a single <code class="code docutils literal notranslate"><span class="pre">NNum</span></code> remains on the stack and the
 dump is empty.</p>
 <div class="math">
-<p><img src="../_images/math/90d7e53e2606d1ffdcc0d85fcc0be2db9b919797.svg" alt="\transrule
+<p><img src="../_images/math/96cf11c4b33f0179fcb72d62060f25fc6fa8b550.svg" alt="\transrule
 { a : \nillist
 &amp; \nillist
 &amp; h
@@ -48,7 +48,7 @@ dump is empty.</p>
 }"/></p>
 </div><p>Dereference an indirection passed as an argument to a function.</p>
 <div class="math">
-<p><img src="../_images/math/2e21d478eedaa358bccb9aa3c57a5b290e671863.svg" alt="\transrule
+<p><img src="../_images/math/ecdbb83ab452d27fcd79c1567929508177d87f1f.svg" alt="\transrule
      {a : s &amp; d &amp; h
         \begin{bmatrix}
             a : \mathtt{NAp} \; a_1 \; a_2 \\
@@ -57,16 +57,16 @@ dump is empty.</p>
      {a : s &amp; d &amp; h[a : \mathtt{NAp} \; a_1 \; a_3] &amp; g}"/></p>
 </div><p>Dereference an indirection on top of the stack.</p>
 <div class="math">
-<p><img src="../_images/math/d30cef88d057bcc5920fca7d63d0682f802d9006.svg" alt="\transrule
+<p><img src="../_images/math/f51999c7c2b53f5ff66f0d4f339a64b99dccbbc0.svg" alt="\transrule
      {p : s &amp; d &amp; h
          \begin{bmatrix}
              p : \mathtt{NInd} \; a
          \end{bmatrix} &amp; g}
      {a : s &amp; d &amp; h &amp; g}"/></p>
-</div><p>Perform a unary operation <img class="math" src="../_images/math/6bdb1b0b4006f5b62d10449cd280f311f4cf12f8.svg" alt="o(n)" style="vertical-align: -5px"/> with internal <code class="code docutils literal notranslate"><span class="pre">Prim</span></code> constructor
+</div><p>Perform a unary operation <img class="math" src="../_images/math/11e676863b0ccfe854bc89167c23a5bd514bf5f9.svg" alt="o(n)" style="vertical-align: -5px"/> with internal <code class="code docutils literal notranslate"><span class="pre">Prim</span></code> constructor
 <code class="code docutils literal notranslate"><span class="pre">O</span></code> on an argument in normal form.</p>
 <div class="math">
-<p><img src="../_images/math/e4dc66520823a07e0df31b43dda92f9b2ea9e792.svg" alt="\transrule
+<p><img src="../_images/math/c2ff2f8e287ecf001479d047291f611c49ae7bde.svg" alt="\transrule
      { f : a : s
      &amp; d
      &amp; h
@@ -88,7 +88,7 @@ dump is empty.</p>
 </div><p>Evaluate the argument of a unary operation with internal <code class="code docutils literal notranslate"><span class="pre">Prim</span></code>
 constructor <code class="code docutils literal notranslate"><span class="pre">O</span></code>.</p>
 <div class="math">
-<p><img src="../_images/math/620e45afe56ccc0dae7d9566d244b13bb6cb0631.svg" alt="\transrule
+<p><img src="../_images/math/226b15d1faaf510988b3ca3cb75ddd6c120c53ea.svg" alt="\transrule
      { f : a : \nillist
      &amp; d
      &amp; h
@@ -105,7 +105,7 @@ constructor <code class="code docutils literal notranslate"><span class="pre">O<
      }"/></p>
 </div><p>Restore the stack when a sub-computation has completed.</p>
 <div class="math">
-<p><img src="../_images/math/4d427448f9b8b54db19e316c805033a7abfe11d2.svg" alt="\transrule
+<p><img src="../_images/math/1c0e1003d2e9980d635c8e79475e53226b5e7264.svg" alt="\transrule
 { a : \nillist
 &amp; s : d
 &amp; h
@@ -119,9 +119,9 @@ constructor <code class="code docutils literal notranslate"><span class="pre">O<
 &amp; h
 &amp; g
 }"/></p>
-</div><p>Reduce a supercombinator and update the root with the <img class="math" src="../_images/math/90592e982322fa08f1b8ae0e6bcdaca11fc8de59.svg" alt="\beta" style="vertical-align: -4px"/>-reduced form</p>
+</div><p>Reduce a supercombinator and update the root with the <img class="math" src="../_images/math/4e04b3f70eef23aff9592405c5b32293f5f8f3d0.svg" alt="\beta" style="vertical-align: -4px"/>-reduced form</p>
 <div class="math">
-<p><img src="../_images/math/20219b0570be52c3f596972c4cd5461a162cccf9.svg" alt="\transrule
+<p><img src="../_images/math/80185f417c32abbbd850f4429d27d4111dd55ce6.svg" alt="\transrule
 { a_0 : a_1 : \ldots : a_n : s
 &amp; d
 &amp; h
@@ -138,10 +138,10 @@ constructor <code class="code docutils literal notranslate"><span class="pre">O<
 &amp; \SetCell[c=3]{c}
 \text{where } h' = \mathtt{instantiateU} \; e \; a_n \; h \; g
 }"/></p>
-</div><p>Perform a binary operation <img class="math" src="../_images/math/c9ac657e040edf18bbbf248d15d73ab640a93f2d.svg" alt="o(x,y)" style="vertical-align: -5px"/> associated with internal <code class="code docutils literal notranslate"><span class="pre">Prim</span></code>
+</div><p>Perform a binary operation <img class="math" src="../_images/math/70ba514f09b40f948e1a3673347f656c7dc33f27.svg" alt="o(x,y)" style="vertical-align: -5px"/> associated with internal <code class="code docutils literal notranslate"><span class="pre">Prim</span></code>
 constructor <code class="code docutils literal notranslate"><span class="pre">O</span></code> on two <code class="code docutils literal notranslate"><span class="pre">NNum</span></code> s both in normal form.</p>
 <div class="math">
-<p><img src="../_images/math/7c31cda93cce15a6bef0ecb07b4221f15d15cc9f.svg" alt="\transrule
+<p><img src="../_images/math/703648dab56048f07869054b5257b846f55a4dec.svg" alt="\transrule
 { f : a_1 : a_2 : s
 &amp; d
 &amp; h
@@ -163,7 +163,7 @@ constructor <code class="code docutils literal notranslate"><span class="pre">O<
 </div><p>In a conditional primitive, perform the reduction if the condition has been
 evaluated as True (<code class="code docutils literal notranslate"><span class="pre">NData</span> <span class="pre">1</span> <span class="pre">[]</span></code>).</p>
 <div class="math">
-<p><img src="../_images/math/1543958253280895e6abea369c0f9abf4898649c.svg" alt="\transrule
+<p><img src="../_images/math/d9911cffb6ee41316d3f017754491dab76c920a9.svg" alt="\transrule
 { f : a_1 : a_2 : a_3 : s
 &amp; d
 &amp; h
@@ -184,7 +184,7 @@ evaluated as True (<code class="code docutils literal notranslate"><span class="
 </div><p>In a conditional primitive, perform the reduction if the condition has been
 evaluated as False (<code class="code docutils literal notranslate"><span class="pre">NData</span> <span class="pre">0</span> <span class="pre">[]</span></code>).</p>
 <div class="math">
-<p><img src="../_images/math/6d95eec30809d2f72c4d645e69ee6ba5fd3f0767.svg" alt="\transrule
+<p><img src="../_images/math/11e48d7396763a8f0e16cba061b46966844e3191.svg" alt="\transrule
 { f : a_1 : a_2 : a_3 : s
 &amp; d
 &amp; h
@@ -204,7 +204,7 @@ evaluated as False (<code class="code docutils literal notranslate"><span class=
 }"/></p>
 </div><p>In a conditional primitive, evaluate the condition.</p>
 <div class="math">
-<p><img src="../_images/math/625a1ccce064b171eb9d5ec015e07d234ef26c74.svg" alt="\transrule
+<p><img src="../_images/math/4480a4e8409efd17a2bb57789e584bba66af268c.svg" alt="\transrule
 { f : a_1 : \nillist
 &amp; d
 &amp; h
@@ -221,7 +221,7 @@ evaluated as False (<code class="code docutils literal notranslate"><span class=
 }"/></p>
 </div><p>Construct <code class="code docutils literal notranslate"><span class="pre">NData</span></code> out of a constructor and its arguments</p>
 <div class="math">
-<p><img src="../_images/math/b0285722e6eed4a0fa69945efe4dfe0fbe124582.svg" alt="\transrule
+<p><img src="../_images/math/8d27e16980b44cbe4694fb91353c71239780608d.svg" alt="\transrule
 { c : a_1 : \ldots : a_n : \nillist
 &amp; d
 &amp; h
@@ -245,7 +245,7 @@ evaluated as False (<code class="code docutils literal notranslate"><span class=
 <h2>Pairs<a class="headerlink" href="#pairs" title="Link to this heading">¶</a></h2>
 <p>Evaluate the first argument if necessary</p>
 <div class="math">
-<p><img src="../_images/math/478aeca314882e29dc3a52d64624061fb36948f0.svg" alt="\transrule
+<p><img src="../_images/math/292cba3e41608acd2957a5e9aa29ab8f2cbc346d.svg" alt="\transrule
 { c : a_1 : a_2 : \nillist
 &amp; d
 &amp; h
@@ -264,7 +264,7 @@ evaluated as False (<code class="code docutils literal notranslate"><span class=
 }"/></p>
 </div><p>Perform the reduction if the first argument is in normal form</p>
 <div class="math">
-<p><img src="../_images/math/c5937687478d980ab66b85de909dcb73d4bc9b13.svg" alt="\transrule
+<p><img src="../_images/math/34c5ba211557474d30a91f5ea6cf5692b3b88610.svg" alt="\transrule
 { c : a_1 : a_2 : s
 &amp; d
 &amp; h
@@ -290,7 +290,7 @@ evaluated as False (<code class="code docutils literal notranslate"><span class=
 <h2>Lists<a class="headerlink" href="#lists" title="Link to this heading">¶</a></h2>
 <p>Evaluate the scrutinee</p>
 <div class="math">
-<p><img src="../_images/math/5bd3cd582dce130ac602d5d805972076e5bc0f56.svg" alt="\transrule
+<p><img src="../_images/math/f653751fa1b1ef5e1eb9a12fbb4df556a501606f.svg" alt="\transrule
 { c : a_1 : a_2 : a_3 : \nillist
 &amp; d
 &amp; h
@@ -307,7 +307,7 @@ evaluated as False (<code class="code docutils literal notranslate"><span class=
 }"/></p>
 </div><p>If the scrutinee is <code class="code docutils literal notranslate"><span class="pre">Nil</span></code>, perform the appropriate reduction.</p>
 <div class="math">
-<p><img src="../_images/math/a6502e03af9f1e3d8a7dce9053c7125364a0cae5.svg" alt="\transrule
+<p><img src="../_images/math/fd3674c541392d348d835034f858018e7a614a41.svg" alt="\transrule
 { c : a_1 : a_2 : a_3 : s
 &amp; d
 &amp; h
@@ -360,7 +360,7 @@ evaluated as False (<code class="code docutils literal notranslate"><span class=
 </ul>
 <p class="caption" role="heading"><span class="caption-text">References</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="gm-state-transition-rules.html">G-Machine State Transition Rules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gm-state-transitions.html">G-Machine State Transition Rules</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Template Instantiator State Transition Rules</a></li>
 </ul>
 
@@ -368,7 +368,7 @@ evaluated as False (<code class="code docutils literal notranslate"><span class=
 <h3>Related Topics</h3>
 <ul>
   <li><a href="../index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="gm-state-transition-rules.html" title="previous chapter">G-Machine State Transition Rules</a></li>
+      <li>Previous: <a href="gm-state-transitions.html" title="previous chapter">G-Machine State Transition Rules</a></li>
   </ul></li>
 </ul>
 </div>

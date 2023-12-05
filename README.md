@@ -11,7 +11,7 @@ imitating Haskell.
 $ cabal build       # Build the rlpc compiler
 $ cabal install     # Install rlpc to $PATH
 $ cabal haddock     # Build the API docs w/ Haddock
-$ make -C docs html # Build the primary docs w/ Sphinx
+$ make -C doc html  # Build the primary docs w/ Sphinx
 ```
 
 ### Use

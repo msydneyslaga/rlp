@@ -363,6 +363,47 @@ Core Transition Rules
       & m
       }
 
+#. Pack a constructor if there are sufficient arguments
+
+   .. math::
+      \gmrule
+      { \mathtt{Pack} \; t \; n : i
+      & a_1 : \ldots : a_n : s
+      & d
+      & h
+      & m
+      }
+      { i
+      & a : s
+      & d
+      & h
+      \begin{bmatrix}
+            a : \mathtt{NConstr} \; t \; [a_1,\ldots,a_n]
+      \end{bmatrix}
+       & m
+      }
+
+#. Evaluate a case
+
+   .. math::
+      \gmrule
+      { \mathtt{CaseJump} \begin{bmatrix} t \to c \end{bmatrix} : i
+      & a : s
+      & d
+      & h
+      \begin{bmatrix}
+            a : \mathtt{NConstr} \; t \; v
+      \end{bmatrix}
+      & m
+      }
+      { c \concat i
+      & d
+      & h
+      & m
+      }
+
+
+
 ***************
 Extension Rules
 ***************

@@ -55,11 +55,10 @@ data Instr = Unwind
            | Alloc Int
            | Eval
            -- primitive ops
-           | Neg
-           | Add
-           | Sub
-           | Mul
-           | Div
+           | Neg | Add | Sub | Mul | Div
+           | Pack Int Int -- Pack Tag Arity
+           | CaseJump [(Int, Code)]
+           | Split Int
            deriving (Show, Eq)
 
 data Node = NNum Int
@@ -70,6 +69,7 @@ data Node = NNum Int
           | NGlobal Int Code
           | NInd Addr
           | NUninitialised
+          | NConstr Int [Addr] -- NConstr Tag Components
           deriving (Show, Eq)
 
 data Stats = Stats
@@ -707,5 +707,9 @@ showCode c = "Code" <+> braces instrs
     where instrs = vcat $ showInstr <$> c
 
 showInstr :: Instr -> Doc
+showInstr (CaseJump alts) = "CaseJump" $$ nest pprTabstop alternatives
+    where
+        showAlt (t,c) = "<" <> int t <> ">" <> showCodeShort c
+        alternatives = foldr (\a acc -> showAlt a $$ acc) mempty alts
 showInstr i = text $ show i
 

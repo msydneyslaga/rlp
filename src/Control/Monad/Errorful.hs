@@ -11,7 +11,6 @@ module Control.Monad.Errorful
     where
 ----------------------------------------------------------------------------------
 import Control.Monad.Trans
-import Control.Monad.Except
 import Data.Functor.Identity
 import Data.Coerce
 import Lens.Micro

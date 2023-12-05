@@ -38,7 +38,7 @@
 <ol class="arabic">
 <li><p>Lookup a global by name and push its value onto the stack</p>
 <div class="math">
-<p><img src="../_images/math/18d81e1fc22e6feb876a993fe30fd9e8336f5bf6.svg" alt="\gmrule
+<p><img src="../_images/math/60f03d9ff8b2e1f335d16830ee203156e6d3a0e0.svg" alt="\gmrule
 { \mathtt{PushGlobal} \; f : i
 &amp; s
 &amp; d
@@ -58,7 +58,7 @@
 <li><p>Allocate an int node on the heap, and push the address of the newly created
 node onto the stack</p>
 <div class="math">
-<p><img src="../_images/math/ed6af2733291dcf5001173a8dbaf8f59c817212a.svg" alt="\gmrule
+<p><img src="../_images/math/0fabf97e10f5c112eb5642765c57eee467a61a24.svg" alt="\gmrule
 { \mathtt{PushInt} \; n : i
 &amp; s
 &amp; d
@@ -79,7 +79,7 @@ node onto the stack</p>
 the address directly below it. The address of the application node is pushed
 onto the stack.</p>
 <div class="math">
-<p><img src="../_images/math/607985174357bbbea2e2b47ab0694b2d21a71b35.svg" alt="\gmrule
+<p><img src="../_images/math/9d2842813d1c6c9703d6ebe1e7eeaf0d7ae121a6.svg" alt="\gmrule
 { \mathtt{MkAp} : i
 &amp; f : x : s
 &amp; d
@@ -98,7 +98,7 @@ onto the stack.</p>
 </div></li>
 <li><p>Push a function’s argument onto the stack</p>
 <div class="math">
-<p><img src="../_images/math/643dd082a2b49d9ebdb87533aac62fdd342f4fd5.svg" alt="\gmrule
+<p><img src="../_images/math/172a9e6498882cf2bfd038cf83d83f03e4c0313f.svg" alt="\gmrule
 { \mathtt{Push} \; n : i
 &amp; a_0 : \ldots : a_n : s
 &amp; d
@@ -114,7 +114,7 @@ onto the stack.</p>
 </div></li>
 <li><p>Tidy up the stack after instantiating a supercombinator</p>
 <div class="math">
-<p><img src="../_images/math/f02d55fb6c249a7da5a9df6b7e5c96ab6be7672b.svg" alt="\gmrule
+<p><img src="../_images/math/4924a6c6d457db21cd5e02efdc8efd2af4210a19.svg" alt="\gmrule
 { \mathtt{Slide} \; n : i
 &amp; a_0 : \ldots : a_n : s
 &amp; d
@@ -133,7 +133,7 @@ top of the stack, <code class="code docutils literal notranslate"><span class="p
 where the dump is <strong>not</strong> empty, the instruction queue and stack is restored
 from the top.</p>
 <div class="math">
-<p><img src="../_images/math/2417422cdf63ed202b16462208f8a62630f99679.svg" alt="\gmrule
+<p><img src="../_images/math/efc4a40c79bae27675f22ac6011dde9806c845b9.svg" alt="\gmrule
 { \mathtt{Unwind} : \nillist
 &amp; a : s
 &amp; \langle i', s' \rangle : d
@@ -153,7 +153,7 @@ from the top.</p>
 <li><p>Bulding on the previous rule, in the case where the dump <strong>is</strong> empty, leave
 the machine in a halt state (i.e. with an empty instruction queue).</p>
 <div class="math">
-<p><img src="../_images/math/60f4e38bb9ff4a7bcb201e82cb956a3ccf064632.svg" alt="\gmrule
+<p><img src="../_images/math/fd11e2b1ffa20589ec72bb3f1ba70c82573f3f84.svg" alt="\gmrule
 { \mathtt{Unwind} : \nillist
 &amp; a : s
 &amp; \nillist
@@ -170,9 +170,31 @@ the machine in a halt state (i.e. with an empty instruction queue).</p>
 &amp; m
 }"/></p>
 </div></li>
+<li><p>Again, building on the previous rules, this rule makes the machine consider
+unapplied supercombinators to be in WHNF</p>
+<div class="math">
+<p><img src="../_images/math/36a64918095793044bc603da838873e5db145350.svg" alt="\gmrule
+{ \mathtt{Unwind} : \nillist
+&amp; a_0 : \ldots : a_n : \nillist
+&amp; \langle i, s \rangle : d
+&amp; h
+\begin{bmatrix}
+      a_0 : \mathtt{NGlobal} \; k \; c
+\end{bmatrix}
+&amp; m
+}
+{ i
+&amp; a_n : s
+&amp; d
+&amp; h
+&amp; m \\
+\SetCell[c=2]{c}
+\text{when $n &lt; k$}
+}"/></p>
+</div></li>
 <li><p>If an application is on top of the stack, <code class="code docutils literal notranslate"><span class="pre">Unwind</span></code> continues unwinding</p>
 <div class="math">
-<p><img src="../_images/math/b04167eaade600ab592e2a4441ffc27f5268cccf.svg" alt="\gmrule
+<p><img src="../_images/math/428dd88b1a0f02d8880a57efc2aff1aff732e58b.svg" alt="\gmrule
 { \mathtt{Unwind} : \nillist
 &amp; a : s
 &amp; d
@@ -191,9 +213,9 @@ the machine in a halt state (i.e. with an empty instruction queue).</p>
 </div></li>
 <li><p>When a supercombinator is on top of the stack (and the correct number of
 arguments have been provided), <code class="code docutils literal notranslate"><span class="pre">Unwind</span></code> sets up the stack and jumps to
-the supercombinator’s code (<img class="math" src="../_images/math/90592e982322fa08f1b8ae0e6bcdaca11fc8de59.svg" alt="\beta" style="vertical-align: -4px"/>-reduction)</p>
+the supercombinator’s code (<img class="math" src="../_images/math/4e04b3f70eef23aff9592405c5b32293f5f8f3d0.svg" alt="\beta" style="vertical-align: -4px"/>-reduction)</p>
 <div class="math">
-<p><img src="../_images/math/2dc5e48f0f26f08073e6e1cdd70ff876c6ec2434.svg" alt="\gmrule
+<p><img src="../_images/math/022f085a854e1a5039b4ce9ff514ae19e6e5731d.svg" alt="\gmrule
 { \mathtt{Unwind} : \nillist
 &amp; a_0 : \ldots : a_n : s
 &amp; d
@@ -215,7 +237,7 @@ the supercombinator’s code (<img class="math" src="../_images/math/90592e98232
 </div></li>
 <li><p>Pop the stack, and update the nth node to point to the popped address</p>
 <div class="math">
-<p><img src="../_images/math/e299a147e6e958303111e813e82a3507ded25437.svg" alt="\gmrule
+<p><img src="../_images/math/1e7730846a205754c25caa9bc83215d4c9a2fd0f.svg" alt="\gmrule
 { \mathtt{Update} \; n : i
 &amp; e : f : a_1 : \ldots : a_n : s
 &amp; d
@@ -239,7 +261,7 @@ the supercombinator’s code (<img class="math" src="../_images/math/90592e98232
 </div></li>
 <li><p>Pop the stack.</p>
 <div class="math">
-<p><img src="../_images/math/aec9099fc8c459eb433947bd6c9cc0f96fe38f98.svg" alt="\gmrule
+<p><img src="../_images/math/a8350470d1099f2c9d25787f232cd6d48128e2b9.svg" alt="\gmrule
 { \mathtt{Pop} \; n : i
 &amp; a_1 : \ldots : a_n : s
 &amp; d
@@ -255,7 +277,7 @@ the supercombinator’s code (<img class="math" src="../_images/math/90592e98232
 </div></li>
 <li><p>Follow indirections while unwinding</p>
 <div class="math">
-<p><img src="../_images/math/7648bfc0796ff33966fbc002c446b2242d296fd9.svg" alt="\gmrule
+<p><img src="../_images/math/7b51ed63c4f01626ae64caca9b8aa37ef8c04e3e.svg" alt="\gmrule
 { \mathtt{Unwind} : \nillist
 &amp; a : s
 &amp; d
@@ -274,7 +296,7 @@ the supercombinator’s code (<img class="math" src="../_images/math/90592e98232
 </div></li>
 <li><p>Allocate uninitialised heap space</p>
 <div class="math">
-<p><img src="../_images/math/5380d8227d0a06608b108a26b4a618972b4b7e28.svg" alt="\gmrule
+<p><img src="../_images/math/59c33027716f0d0c66a4cabdbb821415f2b561d5.svg" alt="\gmrule
 { \mathtt{Alloc} \; n : i
 &amp; s
 &amp; d
@@ -295,7 +317,7 @@ the supercombinator’s code (<img class="math" src="../_images/math/90592e98232
 </div></li>
 <li><p>Evaluate the top of the stack to WHNF</p>
 <div class="math">
-<p><img src="../_images/math/ce745b5797483cfcb6ff4816364d91d3d5b6e6c4.svg" alt="\gmrule
+<p><img src="../_images/math/99ee76fb86a35795feb0b604d9fa8f46e6bcbbc8.svg" alt="\gmrule
 { \mathtt{Eval} : i
 &amp; a : s
 &amp; d
@@ -309,9 +331,9 @@ the supercombinator’s code (<img class="math" src="../_images/math/90592e98232
 &amp; m
 }"/></p>
 </div></li>
-<li><p>Reduce a primitive binary operator <img class="math" src="../_images/math/43434266ad5b9f36d523d70ff88db5c4e9366b03.svg" alt="*" style="vertical-align: 0px"/>.</p>
+<li><p>Reduce a primitive binary operator <img class="math" src="../_images/math/a5e51bd4f30d980b8599ff18ffd339c6d844d9e8.svg" alt="*" style="vertical-align: 0px"/>.</p>
 <div class="math">
-<p><img src="../_images/math/176a0e2360b1e342041d8129c3a264321ae806ce.svg" alt="\gmrule
+<p><img src="../_images/math/6618a79153ccc671049ed4fb1f9cbf31b272d53c.svg" alt="\gmrule
 { * : i
 &amp; a_1 : a_2 : s
 &amp; d
@@ -332,9 +354,9 @@ the supercombinator’s code (<img class="math" src="../_images/math/90592e98232
 &amp; m
 }"/></p>
 </div></li>
-<li><p>Reduce a primitive unary operator <img class="math" src="../_images/math/604a42b94739b04fa9559a97c3703816bf57aa5c.svg" alt="\neg" style="vertical-align: 0px"/>.</p>
+<li><p>Reduce a primitive unary operator <img class="math" src="../_images/math/2d33478fc695c01e3ba58758bbdc809235dc6a3e.svg" alt="\neg" style="vertical-align: 0px"/>.</p>
 <div class="math">
-<p><img src="../_images/math/6de99ea1d6d13dbeedcdfcf7e3807cdd4f2e8594.svg" alt="\gmrule
+<p><img src="../_images/math/fd61456b36d2327ea4950605d2e282d6a362685c.svg" alt="\gmrule
 { \neg : i
 &amp; a : s
 &amp; d
@@ -354,25 +376,41 @@ the supercombinator’s code (<img class="math" src="../_images/math/90592e98232
 &amp; m
 }"/></p>
 </div></li>
-<li><p>Consider unapplied functions to be in WHNF</p>
+<li><p>Pack a constructor if there are sufficient arguments</p>
 <div class="math">
-<p><img src="../_images/math/702f28367db2bbf757f819d55f238962369384ad.svg" alt="\gmrule
-{ \mathtt{Unwind} : \nillist
-&amp; a_0 : \ldots : a_n : \nillist
-&amp; \langle i, s \rangle : d
+<p><img src="../_images/math/ceba2ed1f0be639cb0841ed19d1980c77657c74b.svg" alt="\gmrule
+{ \mathtt{Pack} \; t \; n : i
+&amp; a_1 : \ldots : a_n : s
+&amp; d
 &amp; h
-\begin{bmatrix}
-      a_0 : \mathtt{NGlobal} \; k \; c
-\end{bmatrix}
 &amp; m
 }
 { i
-&amp; a_n : s
+&amp; a : s
 &amp; d
 &amp; h
-&amp; m \\
-\SetCell[c=2]{c}
-\text{when $n &lt; k$}
+\begin{bmatrix}
+      a : \mathtt{NConstr} \; t \; [a_1,\ldots,a_n]
+\end{bmatrix}
+ &amp; m
+}"/></p>
+</div></li>
+<li><p>Evaluate a case</p>
+<div class="math">
+<p><img src="../_images/math/23e5e14aff97d56bdcb7e5847a5610baaa4b3040.svg" alt="\gmrule
+{ \mathtt{CaseJump} \begin{bmatrix} t \to c \end{bmatrix} : i
+&amp; a : s
+&amp; d
+&amp; h
+\begin{bmatrix}
+      a : \mathtt{NConstr} \; t \; v
+\end{bmatrix}
+&amp; m
+}
+{ c \concat i
+&amp; d
+&amp; h
+&amp; m
 }"/></p>
 </div></li>
 </ol>
@@ -388,7 +426,7 @@ this by modifying Core Rule 2 to update the global environment with the new
 node’s address. Consider how this rule might impact garbage collection
 (remember that the environment is intended for <em>globals</em>).</p>
 <div class="math">
-<p><img src="../_images/math/0fc7c9df5cc4f923f6953e615c1f28a6531c0b68.svg" alt="\gmrule
+<p><img src="../_images/math/e8e88c3770a0c3cf4169abbee703c4a6bcffc0f5.svg" alt="\gmrule
 { \mathtt{PushInt} \; n : i
 &amp; s
 &amp; d
@@ -414,7 +452,7 @@ node’s address. Consider how this rule might impact garbage collection
 <li><p>In order for the previous rule to be effective, we are also required to take
 action when a number already exists in the environment:</p>
 <div class="math">
-<p><img src="../_images/math/d56941a661a880391bd898f16e5dcf9c0b8a7e59.svg" alt="\gmrule
+<p><img src="../_images/math/321b47cc7986e581fdc26fb6b63195c1cf5409a2.svg" alt="\gmrule
 { \mathtt{PushInt} \; n : i
 &amp; s
 &amp; d

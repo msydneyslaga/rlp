@@ -50,6 +50,8 @@ imgmath_latex_preamble = r'''
     \end{tblr} }
 
 \newcommand{\nillist}{[\,]}
+
+\newcommand{\concat}{+\kern-1.3ex+\kern0.8ex}
 '''
 
 imgmath_image_format = 'svg'

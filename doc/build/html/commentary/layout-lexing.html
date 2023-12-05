@@ -130,10 +130,10 @@ select few keywords, (with a minor exception; TODO: elaborate) being <code class
 <code class="code docutils literal notranslate"><span class="pre">do</span></code> (followed by expressions), and <code class="code docutils literal notranslate"><span class="pre">of</span></code> (followed by alternatives)
 (TODO: all of these terms need linked glossary entries). In order to manage the
 cascade of layout contexts, our lexer will record a stack for which each element
-is either <img class="math" src="../_images/math/66eb37710389b629d7ffa626fb55276426bef938.svg" alt="\varnothing" style="vertical-align: -2px"/>, denoting an explicit layout written with braces
-and semicolons, or a <img class="math" src="../_images/math/d04fe0dc2dd02e9d27dfd46e93827894feb96d1f.svg" alt="\langle n \rangle" style="vertical-align: -5px"/>, denoting an implicitly laid-out
+is either <img class="math" src="../_images/math/6faf6a045e27fb9580834eb16635f0b1b12383f7.svg" alt="\varnothing" style="vertical-align: -2px"/>, denoting an explicit layout written with braces
+and semicolons, or a <img class="math" src="../_images/math/e5dd0a588910147c24912f9e7af7b4d0341033f0.svg" alt="\langle n \rangle" style="vertical-align: -5px"/>, denoting an implicitly laid-out
 layout where the start of each item belonging to the layout is indented
-<img class="math" src="../_images/math/4713e4c065d6aabec3acece28c5ecc882faa119a.svg" alt="n" style="vertical-align: 0px"/> columns.</p>
+<img class="math" src="../_images/math/dd0f75121d1d307be1181c273815e8532abda5ff.svg" alt="n" style="vertical-align: 0px"/> columns.</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="c1">-- layout stack: []</span>
 <span class="kr">module</span><span class="w"> </span><span class="nn">M</span><span class="w"> </span><span class="kr">where</span><span class="w"> </span><span class="c1">-- layout stack: [∅]</span>
 
@@ -154,9 +154,9 @@ implicitly inserted by the compiler. With the presented ideas in mind, we may
 begin to introduce a small set of informal rules describing the lexer’s handling
 of layouts, the first being:</p>
 <ol class="arabic simple">
-<li><p>If a layout keyword is followed by the token ‘{’, push <img class="math" src="../_images/math/66eb37710389b629d7ffa626fb55276426bef938.svg" alt="\varnothing" style="vertical-align: -2px"/>
-onto the layout context stack. Otherwise, push <img class="math" src="../_images/math/d04fe0dc2dd02e9d27dfd46e93827894feb96d1f.svg" alt="\langle n \rangle" style="vertical-align: -5px"/> onto
-the layout context stack where <img class="math" src="../_images/math/4713e4c065d6aabec3acece28c5ecc882faa119a.svg" alt="n" style="vertical-align: 0px"/> is the indentation of the token
+<li><p>If a layout keyword is followed by the token ‘{’, push <img class="math" src="../_images/math/6faf6a045e27fb9580834eb16635f0b1b12383f7.svg" alt="\varnothing" style="vertical-align: -2px"/>
+onto the layout context stack. Otherwise, push <img class="math" src="../_images/math/e5dd0a588910147c24912f9e7af7b4d0341033f0.svg" alt="\langle n \rangle" style="vertical-align: -5px"/> onto
+the layout context stack where <img class="math" src="../_images/math/dd0f75121d1d307be1181c273815e8532abda5ff.svg" alt="n" style="vertical-align: 0px"/> is the indentation of the token
 following the layout keyword. Additionally, the lexer is to insert a virtual
 opening brace after the token representing the layout keyword.</p></li>
 </ol>
@@ -179,10 +179,10 @@ numeric value – is referred to as <em>offside</em> by myself internally and th
 Haskell report describing layouts. We informally formalise this rule as follows:</p>
 <ol class="arabic simple" start="2">
 <li><p>When the first token on a line is preceeded only by whitespace, if the
-token’s first grapheme resides on a column number <img class="math" src="../_images/math/422ce4de46a354723a0f5b33995d885c86bb0e70.svg" alt="m" style="vertical-align: 0px"/> equal to the
-indentation level of the enclosing context – i.e. the <img class="math" src="../_images/math/c067c4215cbfc6897d6e5eaf14ded0dc221b972c.svg" alt="\langle n
+token’s first grapheme resides on a column number <img class="math" src="../_images/math/3fe28d6b2db64823422b040f22663ee146752df9.svg" alt="m" style="vertical-align: 0px"/> equal to the
+indentation level of the enclosing context – i.e. the <img class="math" src="../_images/math/e867fb287fff102859aafc9f9cdf2bdef24793c1.svg" alt="\langle n
 \rangle" style="vertical-align: -5px"/> on top of the layout stack. Should no such context exist on the
-stack, assume <img class="math" src="../_images/math/3fa33eeafbc80a0bcf2766e8f56e9cb2b6148e79.svg" alt="m &gt; n" style="vertical-align: -1px"/>.</p></li>
+stack, assume <img class="math" src="../_images/math/7752bffe36066cce1a71cee99ba78f9a8de27750.svg" alt="m &gt; n" style="vertical-align: -1px"/>.</p></li>
 </ol>
 <p>We have an idea of how to begin layouts, delimit the enclosed items, and last
 we’ll need to end layouts. This is where the distinction between virtual and
@@ -192,7 +192,7 @@ This will be elaborated on in the next section. For now, we will be content with
 naïvely inserting a virtual closing brace when a token is indented right of the
 layout.</p>
 <ol class="arabic simple" start="3">
-<li><p>Under the same conditions as rule 2., when <img class="math" src="../_images/math/d696439e8724d5b54e9b4b344b9c99d0facc8b7c.svg" alt="m &lt; n" style="vertical-align: -1px"/> the lexer shall
+<li><p>Under the same conditions as rule 2., when <img class="math" src="../_images/math/621c205d829260a0ef518dbf23fd02478575f1d5.svg" alt="m &lt; n" style="vertical-align: -1px"/> the lexer shall
 insert a virtual closing brace and pop the layout stack.</p></li>
 </ol>
 <p>This rule covers some cases including the top-level, however, consider
@@ -271,7 +271,7 @@ system, see <a class="reference external" href="https://www.haskell.org/onlinere
 </ul>
 <p class="caption" role="heading"><span class="caption-text">References</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../references/gm-state-transition-rules.html">G-Machine State Transition Rules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../references/gm-state-transitions.html">G-Machine State Transition Rules</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../references/ti-state-transitions.html">Template Instantiator State Transition Rules</a></li>
 </ul>
 
