@@ -1,9 +1,0 @@
-test page
-=========
-
-    this is a normal paragraph. what follows is a precompiled latex equation::
-
-.. math::
-      \transrule{a : s & d & h \begin{bmatrix} a : \mathtt{NAp} \; a_1 \; a_2 \\ a_2 : \mathtt{NInd} \; a_3 \end{bmatrix} & f}
-      {a : s & d & h[a : \mathtt{NAp} \; a_1 \; a_3] & f}
-
