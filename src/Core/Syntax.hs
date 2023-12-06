@@ -38,7 +38,7 @@ data Expr = Var Name
           | Lam [Name] Expr
           | App Expr Expr
           | IntE Int
-          deriving (Show, Lift, Eq)
+          deriving (Show, Read, Lift, Eq)
 
 infixl 2 :$
 pattern (:$) :: Expr -> Expr -> Expr
@@ -47,7 +47,7 @@ pattern f :$ x = App f x
 {-# COMPLETE Binding :: Binding #-}
 {-# COMPLETE (:=) :: Binding #-}
 data Binding = Binding Name Expr
-    deriving (Show, Lift, Eq)
+    deriving (Show, Read, Lift, Eq)
 
 infixl 1 :=
 pattern (:=) :: Name -> Expr -> Binding
@@ -55,10 +55,10 @@ pattern k := v = Binding k v
 
 data Rec = Rec
          | NonRec
-         deriving (Show, Eq, Lift)
+         deriving (Show, Read, Eq, Lift)
 
 data Alter = Alter Tag [Name] Expr
-    deriving (Show, Lift, Eq)
+    deriving (Show, Read, Lift, Eq)
 
 type Name = String
 type Tag = Int

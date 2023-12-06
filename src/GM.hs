@@ -163,7 +163,17 @@ step st = case head (st ^. gmCode) of
     Mul            -> mulI           
     Div            -> divI           
     Split      n   -> splitI        n
+    Pack       t n -> packI       t n
     where
+
+        packI :: Tag -> Int -> GmState
+        packI t n = st
+                  & advanceCode
+                  & gmStack %~ (a:)
+                  & gmHeap  .~ h'
+            where
+                (as,s) = splitAt n (st ^. gmStack)
+                (h',a) = alloc (st ^. gmHeap) $ NConstr t as
 
         pushGlobalI :: Name -> GmState
         pushGlobalI k = st
@@ -178,7 +188,23 @@ step st = case head (st ^. gmCode) of
                   & fromMaybe (error $ "undefined var: " <> show k)
 
         pushConstrI :: Tag -> Int -> GmState
-        pushConstrI = undefined
+        pushConstrI t n = st
+                        & advanceCode
+                        & gmStack %~ (a:)
+                        & gmEnv   .~ m'
+                        & gmHeap  .~ h'
+            where
+                s = st ^. gmStack
+                m = st ^. gmEnv
+                h = st ^. gmHeap
+                (a,m',h') = case lookupC t n m of
+                    -- address found in env; no need to update env or heap
+                    Just aa -> (aa,m,h)
+                    Nothing -> (aa,mm,hh)
+                        where
+                            (hh,aa) = alloc h (NGlobal n c)
+                            c = [Pack t n, Update 0, Unwind]
+                            mm = (ConstrKey t n, aa) : m
 
         -- Extension Rules 1,2 (sharing)
         pushIntI :: Int -> GmState
@@ -327,6 +353,19 @@ step st = case head (st ^. gmCode) of
         unwindI :: GmState
         unwindI = case hLookupUnsafe a h of
             NNum _      -> st
+                         & gmCode  .~ i'
+                         & gmStack .~ s'
+                         & gmDump  .~ d'
+                where
+                    (i',s',d') = case st ^. gmDump of
+                        -- if the dump is non-empty, restore the instruction
+                        -- queue and stack, and pop the dump
+                        ((ii,ss):d) -> (ii,a:ss,d)
+                        -- if the dump is empty, clear the instruction queue and
+                        -- leave the stack as is
+                        []          -> ([], s, [])
+
+            NConstr t n -> st
                          & gmCode  .~ i'
                          & gmStack .~ s'
                          & gmDump  .~ d'
@@ -537,8 +576,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 compileBinder (_ := v, a) = compileC g' v <> [Update a]
 
         -- kinda evil; better system eventually
-        compileC g (Con t n) = [PushGlobal p]
-            where p = idPack t n
+        compileC g (Con t n) = [PushConstr t n]
 
         compileC _ _ = error "yet to be implemented!"
 
@@ -607,8 +645,8 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
         argOffset :: Int -> Env -> Env
         argOffset n = each . _2 %~ (+n)
 
-        idPack :: Tag -> Int -> String
-        idPack t n = printf "Pack{%d,%d}" t n
+idPack :: Tag -> Int -> String
+idPack t n = printf "Pack{%d,%d}" t n
 
 ----------------------------------------------------------------------------------
 
@@ -728,11 +766,14 @@ showNodeAtP p st a = case hLookup a h of
         where
             g = st ^. gmEnv
             name = case lookup a (swap <$> g) of
-                Just (NameKey n) -> n
-                _                -> errTxtInvalidAddress
+                Just (NameKey n)     -> n
+                Just (ConstrKey t n) -> idPack t n
+                _                     -> errTxtInvalidAddress
     Just (NAp f x)       -> pprec $ showNodeAtP (p+1) st f <+> showNodeAtP (p+1) st x
         where pprec = maybeParens (p > 0)
     Just (NInd a')       -> pprec $ "NInd -> " <> showNodeAtP (p+1) st a'
+        where pprec = maybeParens (p > 0)
+    Just (NConstr t as)  -> pprec $ "NConstr" <+> int t <+> text (show as)
         where pprec = maybeParens (p > 0)
     Just NUninitialised  -> "<uninitialised>"
     Nothing              -> errTxtInvalidAddress

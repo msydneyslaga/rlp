@@ -6,7 +6,10 @@ This module implements the toolset common to the entire compiler, most notably
 errors and the family of RLPC monads.
 -}
 {-# LANGUAGE GeneralisedNewtypeDeriving, StandaloneDeriving #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
+-- only used for mtl instances
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DeriveGeneric, DerivingStrategies, DerivingVia #-}
 module Compiler.RLPC
     ( RLPC
@@ -29,12 +32,15 @@ module Compiler.RLPC
     , whenFlag
     , flagDDumpEval
     , flagDDumpOpts
+    , flagDDumpAST
+    , def
     )
 
     where
 ----------------------------------------------------------------------------------
 import Control.Arrow            ((>>>))
 import Control.Monad.Reader
+import Control.Monad.State      (MonadState(state))
 import Control.Monad.Errorful
 import Data.Functor.Identity
 import Data.Default.Class
@@ -51,9 +57,17 @@ import Lens.Micro.TH
 newtype RLPCT e m a = RLPCT {
         runRLPCT :: ReaderT RLPCOptions (ErrorfulT e m) a
     }
+    -- TODO: incorrect ussage of MonadReader. RLPC should have its own
+    -- environment access functions
     deriving (Functor, Applicative, Monad, MonadReader RLPCOptions)
 
 deriving instance (MonadIO m) => MonadIO (RLPCT e m)
+
+instance MonadTrans (RLPCT e) where
+    lift = RLPCT . lift . lift
+
+instance (MonadState s m) => MonadState s (RLPCT e m) where
+    state = lift . state
 
 type RLPC e = RLPCT e Identity
 
@@ -119,6 +133,7 @@ type DebugOpts = HashSet DebugFlag
 
 data DebugFlag = DDumpEval
                | DDumpOpts
+               | DDumpAST
                deriving (Show, Eq, Generic)
 
     -- deriving (Hashable)
@@ -142,4 +157,7 @@ flagDDumpEval = flagGetter DDumpEval
 
 flagDDumpOpts :: SimpleGetter RLPCOptions Bool
 flagDDumpOpts = flagGetter DDumpOpts
+
+flagDDumpAST :: SimpleGetter RLPCOptions Bool
+flagDDumpAST = flagGetter DDumpAST
 

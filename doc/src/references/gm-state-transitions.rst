@@ -103,10 +103,9 @@ Core Transition Rules
       & m
       }
 
-#. If the top of the stack is in WHNF (currently this just means a number) is on
-   top of the stack, :code:`Unwind` considers evaluation complete. In the case
-   where the dump is **not** empty, the instruction queue and stack is restored
-   from the top.
+#. If the top of the stack is in WHNF is on top of the stack, :code:`Unwind`
+   considers evaluation complete. In the case where the dump is **not** empty,
+   the instruction queue and stack is restored from the top.
 
    .. math::
       \gmrule
@@ -116,6 +115,26 @@ Core Transition Rules
       & h
       \begin{bmatrix}
            a : \mathtt{NNum} \; n
+      \end{bmatrix}
+      & m
+      }
+      { i'
+      & a : s'
+      & d
+      & h
+      & m
+      }
+
+#. Consider constructors to be in WHNF
+
+   .. math::
+      \gmrule
+      { \mathtt{Unwind} : \nillist
+      & a : s
+      & \langle i', s' \rangle : d
+      & h
+      \begin{bmatrix}
+           a : \mathtt{NConstr} \; t \; v
       \end{bmatrix}
       & m
       }
@@ -402,7 +421,77 @@ Core Transition Rules
       & m
       }
 
+#. Deconstruct a constructor
 
+   .. math::
+      \gmrule
+      { \mathtt{Split} \; n : i
+      & a : s
+      & d
+      & h
+      \begin{bmatrix}
+            a : \mathtt{NConstr} \; t \; [a_1,\ldots,a_n]
+      \end{bmatrix}
+      & m
+      }
+      { i
+      & a_1 : \ldots a_n : s
+      & d
+      & h
+      & m
+      }
+
+#. Allow constructors to behave as functions: look a constructor up in the
+   environment, and if push the address if found
+
+   .. math::
+      \gmrule
+      { \mathtt{PushConstr} \; p_{t,n} : i
+      & s
+      & d
+      & h
+      & m
+      \begin{bmatrix}
+            p_{t,n} : a
+      \end{bmatrix}
+      }
+      { i
+      & a : s
+      & d
+      & h
+      & m
+      }
+
+#. Expanding upon the previous rule: in the case that no such address is found,
+   update the environment
+
+   .. math::
+      \gmrule
+      { \mathtt{PushConstr} \; p_{t,n} : i
+      & s
+      & d
+      & h
+      & m
+      }
+      { i
+      & a : s
+      & d
+      & h
+      \begin{bmatrix}
+            a : g_{t,n}
+      \end{bmatrix}
+      & m
+      \begin{bmatrix}
+            p_{t,n} : a
+      \end{bmatrix}
+      \\
+      \SetCell[c=6]{c}
+      \text{where $p_{t,n}$ is a non-conflicting string rep. of
+          $\mathtt{Pack}\{t,n\}$,} \\
+      \SetCell[c=6]{c}
+      \text{and $g_{t,n} = \mathtt{NGlobal} \; n \;
+          [\mathtt{Pack} \; t \; n, \mathtt{Update} \; 0, \mathtt{Unwind}]$}
+      }
 
 ***************
 Extension Rules
@@ -436,7 +525,7 @@ Extension Rules
            n' : a
       \end{bmatrix}
       \\
-      \SetCell[c=5]{c}
+      \SetCell[c=6]{c}
       \text{where $n'$ is the base-10 string rep. of $n$}
       }
 

@@ -44,7 +44,7 @@ options = RLPCOptions
         <> value EvaluatorGM
         <> help "the intermediate layer used to model evaluation"
         )
-    <*> some (argument str (metavar "FILES..."))
+    <*> some (argument str $ metavar "FILES...")
     where
         infixr 9 #
         f # x = f x
@@ -62,6 +62,7 @@ debugFlagReader :: ReadM DebugFlag
 debugFlagReader = maybeReader $ \case
     "dump-eval"  -> Just DDumpEval
     "dump-opts"  -> Just DDumpOpts
+    "dump-ast"   -> Just DDumpAST
     _            -> Nothing
 
 ----------------------------------------------------------------------------------
@@ -79,13 +80,21 @@ main = do
 driver :: RLPCIO CompilerError ()
 driver = sequence_
     [ dshowFlags
+    , ddumpAST
     , ddumpEval
     ]
 
 dshowFlags :: RLPCIO CompilerError ()
 dshowFlags = whenFlag flagDDumpOpts do
     ask >>= liftIO . print
-    liftIO $ exitSuccess
+
+ddumpAST :: RLPCIO CompilerError ()
+ddumpAST = whenFlag flagDDumpAST $ forFiles_ \o f -> do
+    liftIO $ withFile f ReadMode $ \h -> do
+        s <- hGetContents h
+        case parseProg o s of
+            Right (a,_) -> hPutStrLn stderr $ show a
+            Left e -> error "todo errors lol"
 
 ddumpEval :: RLPCIO CompilerError ()
 ddumpEval = whenFlag flagDDumpEval do
@@ -104,11 +113,6 @@ ddumpEval = whenFlag flagDDumpEval do
                     Just f  -> liftIO $ withFile f WriteMode $ dumpEval a
                     Nothing -> liftIO $ dumpEval a stderr
 
-        parseProg :: RLPCOptions
-                  -> String
-                  -> Either SrcError (Program, [SrcError])
-        parseProg o = evalRLPC o . (lexCore >=> parseCoreProg)
-
         -- choose the appropriate model based on the compiler opts
         chooseEval = do
             ev <- view rlpcEvaluator
@@ -116,4 +120,17 @@ ddumpEval = whenFlag flagDDumpEval do
                 EvaluatorGM  -> v GM.hdbgProg
                 EvaluatorTI -> v TI.hdbgProg
             where v f p h = f p h *> pure ()
+
+parseProg :: RLPCOptions
+          -> String
+          -> Either SrcError (Program, [SrcError])
+parseProg o = evalRLPC o . (lexCore >=> parseCoreProg)
+
+forFiles_ :: (Monad m)
+          => (RLPCOptions -> FilePath -> RLPCT e m a)
+          -> RLPCT e m ()
+forFiles_ k = do
+    fs <- view rlpcInputFiles
+    o <- ask
+    forM_ fs (k o)
 

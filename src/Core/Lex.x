@@ -42,6 +42,7 @@ $octit     = 0-7
 $hexit     = [0-9 A-F a-f]
 $namechar  = [$alpha $digit \' \#]
 $symchar   = [$symbol \:]
+$nonwhite  = $printable # $white
 $nl        = [\n\r]
 $white_no_nl = $white # $nl
 
@@ -68,6 +69,7 @@ rlp :-
     "}"                     { constTok TokenRBrace }
     ";"                     { constTok TokenSemicolon }
     ","                     { constTok TokenComma }
+    "{-#"                   { constTok TokenLPragma `andBegin` pragma }
 
     "let"                   { constTok TokenLet }
     "letrec"                { constTok TokenLetrec }
@@ -92,6 +94,19 @@ rlp :-
 
     $white                  { skip }
     \n                      { skip }
+}
+
+<pragma>
+{
+    "#-}"                   { constTok TokenRPragma `andBegin` 0 }
+    "{"                     { constTok TokenLBrace }
+    "}"                     { constTok TokenRBrace }
+    ";"                     { constTok TokenSemicolon }
+
+    $white                  { skip }
+    \n                      { skip }
+
+    $nonwhite+              { lexWith TokenWord }
 }
 
 {
@@ -123,6 +138,9 @@ data CoreToken = TokenLet
                | TokenLBrace
                | TokenRBrace
                | TokenSemicolon
+               | TokenLPragma
+               | TokenRPragma
+               | TokenWord String
                | TokenEOF
                deriving Show
 
@@ -135,6 +153,7 @@ data SrcError = SrcError
 
 data SrcErrorType = SrcErrLexical String
                   | SrcErrParse
+                  | SrcErrUnknownPragma Name
                   deriving Show
 
 type Lexer = AlexInput -> Int -> Alex (Located CoreToken)

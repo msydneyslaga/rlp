@@ -44,6 +44,7 @@ import Data.Default.Class   (def)
       varsym          { Located _ _ _ (TokenVarSym $$) }
       conname         { Located _ _ _ (TokenConName $$) }
       consym          { Located _ _ _ (TokenConSym $$) }
+      word            { Located _ _ _ (TokenWord $$) }
       'λ'             { Located _ _ _ TokenLambda }
       '->'            { Located _ _ _ TokenArrow }
       '='             { Located _ _ _ TokenEquals }
@@ -51,6 +52,8 @@ import Data.Default.Class   (def)
       ')'             { Located _ _ _ TokenRParen }
       '{'             { Located _ _ _ TokenLBrace }
       '}'             { Located _ _ _ TokenRBrace }
+      '{-#'           { Located _ _ _ TokenLPragma }
+      '#-}'           { Located _ _ _ TokenRPragma }
       ';'             { Located _ _ _ TokenSemicolon }
       eof             { Located _ _ _ TokenEOF }
 
@@ -122,7 +125,15 @@ Expr1           :: { Expr }
 Expr1           : litint                        { IntE $1 }
                 | Id                            { Var $1 }
                 | PackCon                       { $1 }
+                | ExprPragma                    { $1 }
                 | '(' Expr ')'                  { $2 }
+
+ExprPragma      :: { Expr }
+ExprPragma      : '{-#' Words '#-}'      {% exprPragma $2 }
+
+Words           :: { [String] }
+Words           : word Words                    { $1 : $2 }
+                | word                          { [$1] }
 
 PackCon         :: { Expr }
 PackCon         : pack '{' litint ',' litint '}' { Con $3 $5 }
@@ -148,6 +159,7 @@ Con             : '(' consym ')'                    { $2 }
                 | conname                           { $1 }
 
 {
+
 parseError :: [Located CoreToken] -> RLPC SrcError a
 parseError (Located y x l _ : _) = addFatal err
     where err = SrcError
@@ -164,6 +176,18 @@ parseTmp = do
         Right (ts,_) -> pure ts
     where
         parse = evalRLPC def . (lexCore >=> parseCore)
+
+exprPragma :: [String] -> RLPC SrcError Expr
+exprPragma ("AST" : e) = astPragma e
+exprPragma _           = addFatal err
+    where err = SrcError
+            { _errSpan       = (0,0,0) -- TODO: span
+            , _errSeverity   = Warning
+            , _errDiagnostic = SrcErrUnknownPragma "" -- TODO: missing pragma
+            }
+
+astPragma :: [String] -> RLPC SrcError Expr
+astPragma = pure . read . unwords
 
 }
 
