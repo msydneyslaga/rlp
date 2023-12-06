@@ -76,6 +76,7 @@ rlp :-
     "module"                { constTok TokenModule }
     "in"                    { constTok TokenIn }
     "where"                 { constTok TokenWhere }
+    "Pack"                  { constTok TokenPack } -- temp
 
     "\\"                    { constTok TokenLambda }
     "λ"                     { constTok TokenLambda }
@@ -106,6 +107,7 @@ data CoreToken = TokenLet
                | TokenModule
                | TokenWhere
                | TokenComma
+               | TokenPack -- temp
                | TokenCase
                | TokenOf
                | TokenLambda

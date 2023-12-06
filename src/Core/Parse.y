@@ -36,6 +36,8 @@ import Data.Default.Class   (def)
       where           { Located _ _ _ TokenWhere }
       case            { Located _ _ _ TokenCase }
       of              { Located _ _ _ TokenOf }
+      ','             { Located _ _ _ TokenComma }
+      pack            { Located _ _ _ TokenPack } -- temp
       in              { Located _ _ _ TokenIn }
       litint          { Located _ _ _ (TokenLitInt $$) }
       varname         { Located _ _ _ (TokenVarName $$) }
@@ -119,7 +121,11 @@ Alter           : litint ParList '->' Expr      { Alter $1 $2 $4 }
 Expr1           :: { Expr }
 Expr1           : litint                        { IntE $1 }
                 | Id                            { Var $1 }
+                | PackCon                       { $1 }
                 | '(' Expr ')'                  { $2 }
+
+PackCon         :: { Expr }
+PackCon         : pack '{' litint ',' litint '}' { Con $3 $5 }
 
 Bindings        :: { [Binding] }
 Bindings        : Binding ';' Bindings          { $1 : $3 }
