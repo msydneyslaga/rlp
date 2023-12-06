@@ -406,7 +406,7 @@ Core Transition Rules
 
    .. math::
       \gmrule
-      { \mathtt{CaseJump} \begin{bmatrix} t \to c \end{bmatrix} : i
+      { \mathtt{CaseJump} \begin{bmatrix} t : c \end{bmatrix} : i
       & a : s
       & d
       & h

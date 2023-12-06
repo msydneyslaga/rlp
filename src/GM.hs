@@ -144,8 +144,6 @@ isFinal st = null $ st ^. gmCode
 
 step :: GmState -> GmState
 step st = case head (st ^. gmCode) of
-    -- TODO: clean this up. let transition functions use the 'state' parameter
-    -- instead of passing it to them.
     Unwind         -> unwindI        
     PushGlobal n   -> pushGlobalI   n
     PushConstr t n -> pushConstrI t n
@@ -164,7 +162,21 @@ step st = case head (st ^. gmCode) of
     Div            -> divI           
     Split      n   -> splitI        n
     Pack       t n -> packI       t n
+    CaseJump    as -> caseJumpI    as
     where
+
+        caseJumpI :: [(Tag, Code)] -> GmState
+        caseJumpI as = st
+                    & advanceCode
+                    & gmCode %~ (i'++)
+            where
+                h = st ^. gmHeap
+                s = st ^. gmStack
+                NConstr t ss = head s
+                             & hViewUnsafe h
+                i' = fromMaybe
+                    (error $ "unmatched tag: " <> show t)
+                    (lookup t as)
 
         packI :: Tag -> Int -> GmState
         packI t n = st
