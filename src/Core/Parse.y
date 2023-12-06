@@ -34,7 +34,8 @@ import Data.Default.Class   (def)
       letrec          { Located _ _ _ TokenLetrec }
       module          { Located _ _ _ TokenModule }
       where           { Located _ _ _ TokenWhere }
-      ','             { Located _ _ _ TokenComma }
+      case            { Located _ _ _ TokenCase }
+      of              { Located _ _ _ TokenOf }
       in              { Located _ _ _ TokenIn }
       litint          { Located _ _ _ (TokenLitInt $$) }
       varname         { Located _ _ _ (TokenVarName $$) }
@@ -85,6 +86,7 @@ Expr            :: { Expr }
 Expr            : LetExpr                       { $1 }
                 | 'λ' Binders '->' Expr         { Lam $2 $4 }
                 | Application                   { $1 }
+                | CaseExpr                      { $1 }
                 | Expr1                         { $1 }
 
 LetExpr         :: { Expr }
@@ -102,6 +104,17 @@ Application     : Expr1 AppArgs                 { foldl' App $1 $2 }
 AppArgs         :: { [Expr] }
 AppArgs         : Expr1 AppArgs                 { $1 : $2 }
                 | Expr1                         { [$1] }
+
+CaseExpr        :: { Expr }
+CaseExpr        : case Expr of '{' Alters '}'   { Case $2 $5 }
+
+Alters          :: { [Alter] }
+Alters          : Alter ';' Alters              { $1 : $3 }
+                | Alter ';'                     { [$1] }
+                | Alter                         { [$1] }
+
+Alter           :: { Alter }
+Alter           : litint ParList '->' Expr      { Alter $1 $2 $4 }
 
 Expr1           :: { Expr }
 Expr1           : litint                        { IntE $1 }

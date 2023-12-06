@@ -11,6 +11,7 @@ module Core.Syntax
     , Rec(..)
     , Alter(..)
     , Name
+    , Tag
     , ScDef(..)
     , Module(..)
     , Program(..)
@@ -31,7 +32,7 @@ import Language.Haskell.TH.Syntax   (Lift)
 ----------------------------------------------------------------------------------
 
 data Expr = Var Name
-          | Con Int Int -- Con Tag Arity
+          | Con Tag Int -- Con Tag Arity
           | Let Rec [Binding] Expr
           | Case Expr [Alter]
           | Lam [Name] Expr
@@ -56,10 +57,11 @@ data Rec = Rec
          | NonRec
          deriving (Show, Eq, Lift)
 
-data Alter = Alter Int [Name] Expr
+data Alter = Alter Tag [Name] Expr
     deriving (Show, Lift, Eq)
 
 type Name = String
+type Tag = Int
 
 data ScDef = ScDef Name [Name] Expr
     deriving (Show, Lift, Eq)
