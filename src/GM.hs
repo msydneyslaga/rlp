@@ -3,7 +3,7 @@ Module      : GM
 Description : The G-Machine
 -}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ViewPatterns, LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 module GM
     ( hdbgProg
@@ -14,7 +14,7 @@ module GM
 ----------------------------------------------------------------------------------
 import Data.Default.Class
 import Data.List                    (mapAccumL)
-import Data.Maybe                   (fromMaybe)
+import Data.Maybe                   (fromMaybe, mapMaybe)
 import Data.Tuple                   (swap)
 import Lens.Micro
 import Lens.Micro.TH
@@ -41,8 +41,12 @@ data GmState = GmState
 type Code = [Instr]
 type Stack = [Addr]
 type Dump = [(Code, Stack)]
-type Env = [(Name, Addr)]
+type Env = [(Key, Addr)]
 type GmHeap = Heap Node
+
+data Key = NameKey Name
+         | ConstrKey Tag Int
+         deriving (Show, Eq)
 
 data Instr = Unwind
            | PushGlobal Name
@@ -54,10 +58,10 @@ data Instr = Unwind
            | Pop Int
            | Alloc Int
            | Eval
-           -- primitive ops
+           -- arith
            | Neg | Add | Sub | Mul | Div
-           | Pack Int Int -- Pack Tag Arity
-           | CaseJump [(Int, Code)]
+           | Pack Tag Int -- Pack Tag Arity
+           | CaseJump [(Tag, Code)]
            | Split Int
            deriving (Show, Eq)
 
@@ -69,9 +73,10 @@ data Node = NNum Int
           | NGlobal Int Code
           | NInd Addr
           | NUninitialised
-          | NConstr Int [Addr] -- NConstr Tag Components
+          | NConstr Tag [Addr] -- NConstr Tag Components
           deriving (Show, Eq)
 
+-- TODO: log executed instructions
 data Stats = Stats
     { _stsReductions     :: Int
     , _stsPrimReductions :: Int
@@ -138,6 +143,8 @@ isFinal st = null $ st ^. gmCode
 
 step :: GmState -> GmState
 step state = case head (state ^. gmCode) of
+    -- TODO: clean this up. let transition functions use the 'state' parameter
+    -- instead of passing it to them.
     Unwind       -> unwindI       state
     PushGlobal n -> pushGlobalI n state
     PushInt    n -> pushIntI    n state
@@ -153,6 +160,7 @@ step state = case head (state ^. gmCode) of
     Sub          -> subI          state
     Mul          -> mulI          state
     Div          -> divI          state
+    Split      n -> splitI      n state
     where
 
         pushGlobalI :: Name -> GmState -> GmState
@@ -164,12 +172,12 @@ step state = case head (state ^. gmCode) of
                 m = st ^. gmEnv
 
                 s' = a : s
-                a = lookup k m
+                a = lookupN k m
                   & fromMaybe (error $ "undefined var: " <> show k)
 
         -- Extension Rules 1,2 (sharing)
         pushIntI :: Int -> GmState -> GmState
-        pushIntI n st = case lookup n' m of
+        pushIntI n st = case lookupN n' m of
             Just a  -> st
                      & advanceCode
                      & gmStack .~ s'
@@ -185,7 +193,7 @@ step state = case head (state ^. gmCode) of
                 where
                     s' = a : s
                     (h',a) = alloc h (NNum n)
-                    m' = (n',a) : m
+                    m' = (NameKey n', a) : m
             where
                 m = st ^. gmEnv
                 s = st ^. gmStack
@@ -216,7 +224,7 @@ step state = case head (state ^. gmCode) of
             where
                 (f:x:ss) = st ^. gmStack
                 h = st ^. gmHeap
-                
+
                 s' = a : ss
                 (h',a) = alloc h (NAp f x)
 
@@ -299,6 +307,16 @@ step state = case head (state ^. gmCode) of
         subI = primitive2 boxInt unboxInt (-)
         mulI = primitive2 boxInt unboxInt (*)
         divI = primitive2 boxInt unboxInt div
+
+        splitI :: Int -> GmState -> GmState
+        splitI n st = st
+                    & advanceCode
+                    & gmStack .~ s'
+            where
+                h = st ^. gmHeap
+                (a:s) = st ^. gmStack
+                s' = components ++ s
+                NConstr _ components = hLookupUnsafe a h
 
         -- the complex heart of the G-machine
         unwindI :: GmState -> GmState
@@ -446,8 +464,8 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
         compiledScs = fmap compileSc ss <> compiledPrims
 
         -- note that we don't count sc allocations in the stats
-        allocateSc :: GmHeap -> CompiledSC -> (GmHeap, (Name, Addr))
-        allocateSc h (n,d,c) = (h', (n, a))
+        allocateSc :: GmHeap -> CompiledSC -> (GmHeap, (Key, Addr))
+        allocateSc h (n,d,c) = (h', (NameKey n, a))
             where (h',a) = alloc h $ NGlobal d c
 
         -- >> [ref/compileSc]
@@ -456,7 +474,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
         compileSc :: ScDef -> CompiledSC
         compileSc (ScDef n as b) = (n, d, compileR env b)
             where
-                env = as `zip` [0..]
+                env = (NameKey <$> as) `zip` [0..]
                 d = length as
         -- << [ref/compileSc]
 
@@ -471,8 +489,10 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
             | k `elem` domain  = [Push n]
             | otherwise        = [PushGlobal k]
             where
-                n = fromMaybe (error $ "undeclared var: " <> k) $ lookup k g
-                domain = fmap fst g
+                n = fromMaybe (error $ "undeclared var: " <> k) $ lookupN k g
+                domain = f `mapMaybe` g
+                f (NameKey n, _) = Just n
+                f _              = Nothing
 
         compileC _ (IntE n)  = [PushInt n]
 
@@ -493,7 +513,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 compileBinder :: Env -> (Binding, Int) -> (Env, Code)
                 compileBinder m (k := v, a) = (m',c)
                     where
-                        m' = (k,a) : m
+                        m' = (NameKey k, a) : m
                         -- make note that we use m rather than m'!
                         c = compileC m v
 
@@ -501,7 +521,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
             where
                 d = length bs
                 g' = fmap toEnv addressed ++ argOffset d g
-                toEnv (k := _, a) = (k,a)
+                toEnv (k := _, a) = (NameKey k, a)
                 -- kinda gross. revisit this
                 addressed = bs `zip` reverse [0 .. d-1]
 
@@ -510,6 +530,10 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
 
                 compileBinder :: (Binding, Int) -> Code
                 compileBinder (_ := v, a) = compileC g' v <> [Update a]
+
+        -- kinda evil; better system eventually
+        compileC g (Con t n) = [PushGlobal p]
+            where p = idPack t n
 
         compileC _ _ = error "yet to be implemented!"
 
@@ -529,7 +553,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 compileBinder :: Env -> (Binding, Int) -> (Env, Code)
                 compileBinder m (k := v, a) = (m',c)
                     where
-                        m' = (k,a) : m
+                        m' = (NameKey k, a) : m
                         -- make note that we use m rather than m'!
                         c = compileC m v
 
@@ -538,7 +562,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
             where
                 d = length bs
                 g' = fmap toEnv addressed ++ argOffset d g
-                toEnv (k := _, a) = (k,a)
+                toEnv (k := _, a) = (NameKey k, a)
                 -- kinda gross. revisit this
                 addressed = bs `zip` reverse [0 .. d-1]
                 initialisers = mconcat $ compileBinder <$> addressed
@@ -550,18 +574,36 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 compileBinder :: (Binding, Int) -> Code
                 compileBinder (_ := v, a) = compileC g' v <> [Update a]
 
-        -- special cases for prim functions
+        -- special cases for prim functions; essentially inlining
         compileE g ("negate#" :$ a) = compileE g a <>                 [Neg]
         compileE g ("+#" :$ a :$ b) = compileE g a <> compileE g b <> [Add]
         compileE g ("-#" :$ a :$ b) = compileE g a <> compileE g b <> [Sub]
         compileE g ("*#" :$ a :$ b) = compileE g a <> compileE g b <> [Mul]
         compileE g ("/#" :$ a :$ b) = compileE g a <> compileE g b <> [Div]
 
+        compileE g (Case e as) = compileE g e <> [CaseJump (compileD g as)]
+        -- TODO: inline case for satiated Con applications
+        -- compileE g (Con t n) = 
+
         compileE g e = compileC g e ++ [Eval]
+
+        compileD :: Env -> [Alter] -> [(Tag, Code)]
+        compileD g as = fmap (compileA g) as
+
+        compileA :: Env -> Alter -> (Tag, Code)
+        compileA g (Alter t as e) = (t, [Split n] <> c <> [Slide n])
+            where
+                n = length as
+                binds = (NameKey <$> as) `zip` [0..]
+                g' = binds ++ argOffset n g
+                c = compileE g' e
 
         -- | offset each address in the environment by n
         argOffset :: Int -> Env -> Env
         argOffset n = each . _2 %~ (+n)
+
+        idPack :: Tag -> Int -> String
+        idPack t n = printf "Pack{%d,%d}" t n
 
 ----------------------------------------------------------------------------------
 
@@ -680,7 +722,9 @@ showNodeAtP p st a = case hLookup a h of
     Just (NGlobal _ _)   -> text name
         where
             g = st ^. gmEnv
-            name = fromMaybe errTxtInvalidAddress $ lookup a (swap <$> g)
+            name = case lookup a (swap <$> g) of
+                Just (NameKey n) -> n
+                _                -> errTxtInvalidAddress
     Just (NAp f x)       -> pprec $ showNodeAtP (p+1) st f <+> showNodeAtP (p+1) st x
         where pprec = maybeParens (p > 0)
     Just (NInd a')       -> pprec $ "NInd -> " <> showNodeAtP (p+1) st a'
@@ -712,4 +756,12 @@ showInstr (CaseJump alts) = "CaseJump" $$ nest pprTabstop alternatives
         showAlt (t,c) = "<" <> int t <> ">" <> showCodeShort c
         alternatives = foldr (\a acc -> showAlt a $$ acc) mempty alts
 showInstr i = text $ show i
+
+----------------------------------------------------------------------------------
+
+lookupN :: Name -> Env -> Maybe Addr
+lookupN k = lookup (NameKey k)
+
+lookupC :: Tag -> Int -> Env -> Maybe Addr
+lookupC t n = lookup (ConstrKey t n)
 
