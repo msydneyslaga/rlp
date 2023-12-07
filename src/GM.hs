@@ -658,7 +658,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
         argOffset n = each . _2 %~ (+n)
 
 idPack :: Tag -> Int -> String
-idPack t n = printf "Pack{%d,%d}" t n
+idPack t n = printf "Pack{%d %d}" t n
 
 ----------------------------------------------------------------------------------
 
@@ -781,15 +781,19 @@ showNodeAtP p st a = case hLookup a h of
                 Just (NameKey n)     -> n
                 Just (ConstrKey t n) -> idPack t n
                 _                     -> errTxtInvalidAddress
-    Just (NAp f x)       -> pprec $ showNodeAtP (p+1) st f <+> showNodeAtP (p+1) st x
-        where pprec = maybeParens (p > 0)
+    -- TODO: left-associativity
+    Just (NAp f x)       -> pprec $ showNodeAtP (p+1) st f
+                                <+> showNodeAtP (p+1) st x
     Just (NInd a')       -> pprec $ "NInd -> " <> showNodeAtP (p+1) st a'
-        where pprec = maybeParens (p > 0)
-    Just (NConstr t as)  -> pprec $ "NConstr" <+> int t <+> text (show as)
-        where pprec = maybeParens (p > 0)
+    Just (NConstr t as)  -> pprec $ "NConstr"
+                                <+> int t
+                                <+> brackets (list $ showNodeAtP 0 st <$> as)
+        where list = hcat . punctuate ", "
     Just NUninitialised  -> "<uninitialised>"
     Nothing              -> errTxtInvalidAddress
-    where h = st ^. gmHeap
+    where
+        h = st ^. gmHeap
+        pprec = maybeParens (p > 0)
 
 showSc :: GmState -> (Name, Addr) -> Doc
 showSc st (k,a) = "Supercomb " <> qquotes (text k) <> colon

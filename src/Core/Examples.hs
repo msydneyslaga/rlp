@@ -117,6 +117,18 @@ simple1 = [coreProg|
     main = s k k 3;
 |]
 
+caseBool1 = [coreProg|
+    _if c x y = case c of
+        { 1 -> x
+        ; 0 -> y
+        };
+
+    false = Pack{0 0};
+    true = Pack{1 0};
+
+    main = _if false ((+#) 2 3) ((*#) 4 5);
+|]
+
 corePrelude :: Module
 corePrelude = Module (Just ("Prelude", [])) $
     -- non-primitive defs

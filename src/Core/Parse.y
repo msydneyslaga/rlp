@@ -36,7 +36,6 @@ import Data.Default.Class   (def)
       where           { Located _ _ _ TokenWhere }
       case            { Located _ _ _ TokenCase }
       of              { Located _ _ _ TokenOf }
-      ','             { Located _ _ _ TokenComma }
       pack            { Located _ _ _ TokenPack } -- temp
       in              { Located _ _ _ TokenIn }
       litint          { Located _ _ _ (TokenLitInt $$) }
@@ -136,7 +135,7 @@ Words           : word Words                    { $1 : $2 }
                 | word                          { [$1] }
 
 PackCon         :: { Expr }
-PackCon         : pack '{' litint ',' litint '}' { Con $3 $5 }
+PackCon         : pack '{' litint litint '}'    { Con $3 $4 }
 
 Bindings        :: { [Binding] }
 Bindings        : Binding ';' Bindings          { $1 : $3 }
