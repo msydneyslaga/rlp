@@ -168,8 +168,8 @@ step st = case head (st ^. gmCode) of
 
         caseJumpI :: [(Tag, Code)] -> GmState
         caseJumpI as = st
-                    & advanceCode
-                    & gmCode %~ (i'++)
+                     & advanceCode
+                     & gmCode %~ (i'++)
             where
                 h = st ^. gmHeap
                 s = st ^. gmStack
@@ -184,6 +184,7 @@ step st = case head (st ^. gmCode) of
                   & advanceCode
                   & gmStack .~ s'
                   & gmHeap  .~ h'
+                  & gmStats . stsAllocations %~ succ
             where
                 (as,s) = splitAt n (st ^. gmStack)
                 s' = a:s
@@ -207,6 +208,7 @@ step st = case head (st ^. gmCode) of
                         & gmStack %~ (a:)
                         & gmEnv   .~ m'
                         & gmHeap  .~ h'
+                        & gmStats . stsAllocations %~ succ
             where
                 s = st ^. gmStack
                 m = st ^. gmEnv
@@ -397,10 +399,10 @@ step st = case head (st ^. gmCode) of
                          & gmStack %~ (f:)
 
             NGlobal n _
-                | k <= n -> traceWith (render . showState) $ st
-                         & gmCode  .~ i
-                         & gmStack .~ s'
-                         & gmDump  .~ d
+                | k <= n -> st
+                          & gmCode  .~ i
+                          & gmStack .~ s'
+                          & gmDump  .~ d
                 where
                     as = st ^. gmStack
                     s' = last as : s
@@ -473,6 +475,7 @@ boxInt :: GmState -> Int -> GmState
 boxInt st n = st
             & gmHeap  .~ h'
             & gmStack %~ (a:)
+            & gmStats . stsAllocations %~ succ
     where
         h = st ^. gmHeap
         (h',a) = alloc h (NNum n)
