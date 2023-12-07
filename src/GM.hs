@@ -396,15 +396,18 @@ step st = case head (st ^. gmCode) of
                          -- leave the Unwind instr; continue unwinding
                          & gmStack %~ (f:)
 
-            NGlobal k _
-                | n < k -> st
-                         & gmCode  .~ i'
+            NGlobal n _
+                | k <= n -> traceWith (render . showState) $ st
+                         & gmCode  .~ i
                          & gmStack .~ s'
-                         & gmDump  .~ d'
+                         & gmDump  .~ d
                 where
-                    ((i',s') : d') = st ^. gmDump
-                    n = st ^. gmStack & length
-            -- assumes length s < d (i.e. enough args have been supplied)
+                    as = st ^. gmStack
+                    s' = last as : s
+                    ((i,s) : d) = st ^. gmDump
+                    k = length as
+
+            -- assumes length s > d (i.e. enough args have been supplied)
             NGlobal n c -> st
                          -- 'jump' to global's code by replacing our current
                          -- code with `c`
