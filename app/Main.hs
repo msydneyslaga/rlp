@@ -45,6 +45,12 @@ options = RLPCOptions
         <> value EvaluatorGM
         <> help "the intermediate layer used to model evaluation"
         )
+    <*> option auto
+        (  long "heap-trigger"
+        <> metavar "INT"
+        <> help "the number of nodes allowed on the heap before\
+                \triggering the garbage collector"
+        )
     <*> some (argument str $ metavar "FILES...")
     where
         infixr 9 #

@@ -96,10 +96,11 @@ evalRLPCIO o m = do
     
 
 data RLPCOptions = RLPCOptions
-    { _rlpcLogFile    :: Maybe FilePath
-    , _rlpcDebugOpts  :: DebugOpts
-    , _rlpcEvaluator  :: Evaluator
-    , _rlpcInputFiles :: [FilePath]
+    { _rlpcLogFile     :: Maybe FilePath
+    , _rlpcDebugOpts   :: DebugOpts
+    , _rlpcEvaluator   :: Evaluator
+    , _rlpcHeapTrigger :: Int
+    , _rlpcInputFiles  :: [FilePath]
     }
     deriving Show
 
@@ -128,6 +129,7 @@ instance Default RLPCOptions where
         { _rlpcLogFile = Nothing
         , _rlpcDebugOpts = mempty
         , _rlpcEvaluator = EvaluatorGM
+        , _rlpcHeapTrigger = 200
         , _rlpcInputFiles = []
         }
 
@@ -137,9 +139,6 @@ data DebugFlag = DDumpEval
                | DDumpOpts
                | DDumpAST
                deriving (Show, Eq, Generic)
-
-    -- deriving (Hashable)
-    -- via Generically DebugFlag
 
 instance Hashable DebugFlag
 

@@ -15,6 +15,7 @@ module GM
 import Data.Default.Class
 import Data.List                    (mapAccumL)
 import Data.Maybe                   (fromMaybe, mapMaybe)
+import Data.Monoid                  (Endo(..))
 import Data.Tuple                   (swap)
 import Lens.Micro
 import Lens.Micro.TH
@@ -79,6 +80,7 @@ data Node = NNum Int
           | NInd Addr
           | NUninitialised
           | NConstr Tag [Addr] -- NConstr Tag Components
+          | NMarked Node
           deriving (Show, Eq)
 
 -- TODO: log executed instructions
@@ -140,6 +142,11 @@ eval st = st : rest
 
 doAdmin :: GmState -> GmState
 doAdmin st = st & gmStats . stsReductions %~ succ
+                & doGC
+    where
+        -- TODO: use heapTrigger option in RLPCOptions
+        heapTrigger = 50
+        doGC s = if (s ^. gmHeap & length) > heapTrigger then gc s else s
 
 -- the state is considered final if there is no more code to execute. very
 -- simple compared to TI
@@ -870,8 +877,47 @@ lookupC t n = lookup (ConstrKey t n)
 ----------------------------------------------------------------------------------
 
 gc :: GmState -> GmState
-gc st = undefined
+gc st = (sweepNodes . markNodes $ st)
+      & gmStats . stsGCCycles %~ succ
 
-findRoots :: GmState -> [Addr]
-findRoots st = undefined
+markNodes :: GmState -> GmState
+markNodes st = st & gmHeap %~ thread (markFrom <$> roots)
+    where
+        h = st ^. gmHeap
 
+        roots = dumpRoots ++ stackRoots ++ envRoots
+
+        dumpRoots, stackRoots, envRoots :: [Addr]
+        dumpRoots  = st ^.  gmDump  . each . _2
+        stackRoots = st ^.. gmStack . each
+        envRoots   = st ^.. gmEnv   . each . _2
+
+markFrom :: Addr -> GmHeap -> GmHeap
+markFrom a h = case hLookup a h of
+    Just (NMarked _)      -> h
+    Just n@(NNum _)       -> h & update a (NMarked n)
+    Just n@(NAp l r)      -> h & update a (NMarked n)
+                               & markFrom l
+                               & markFrom r
+    Just n@(NInd p)       -> h & update a (NMarked n)
+                               & markFrom p
+    Just n@(NConstr _ as) -> h & update a (NMarked n)
+                               & thread (fmap markFrom as)
+    Just n@NUninitialised -> h & update a (NMarked n)
+    -- should we scan for roots in NGlobal code?
+    Just n@(NGlobal _ _)  -> h & update a (NMarked n)
+
+    -- we silently ignore dangling pointers without a ruckus as findRoots may
+    -- scout the same address multiple times
+    Nothing               -> h
+
+sweepNodes :: GmState -> GmState
+sweepNodes st = st & gmHeap %~ thread (f <$> addresses h)
+    where
+        h = st ^. gmHeap
+        f a = case hLookupUnsafe a h of
+            NMarked n -> update a n
+            _         -> free a
+
+thread :: [a -> a] -> (a -> a)
+thread = appEndo . foldMap Endo
