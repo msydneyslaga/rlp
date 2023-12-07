@@ -74,6 +74,8 @@ Program         : ScDefs                        { Program $1 }
 
 ScDefs          :: { [ScDef] }
 ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
+                | ScDef ';'                     { [$1] }
+                | ScDef                         { [$1] }
                 | {- epsilon -}                 { [] }
 
 ScDef           :: { ScDef }

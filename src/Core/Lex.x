@@ -98,9 +98,6 @@ rlp :-
 <pragma>
 {
     "#-}"                   { constTok TokenRPragma `andBegin` 0 }
-    "{"                     { constTok TokenLBrace }
-    "}"                     { constTok TokenRBrace }
-    ";"                     { constTok TokenSemicolon }
 
     $white                  { skip }
     \n                      { skip }

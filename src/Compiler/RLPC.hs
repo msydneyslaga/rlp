@@ -35,10 +35,10 @@ module Compiler.RLPC
     , flagDDumpAST
     , def
     )
-
     where
 ----------------------------------------------------------------------------------
 import Control.Arrow            ((>>>))
+import Control.Exception
 import Control.Monad.Reader
 import Control.Monad.State      (MonadState(state))
 import Control.Monad.Errorful
@@ -83,13 +83,15 @@ evalRLPC :: RLPCOptions
          -> Either e (a, [e])
 evalRLPC o m = coerce $ evalRLPCT o m
 
-evalRLPCIO :: RLPCOptions
+evalRLPCIO :: (Exception e)
+           => RLPCOptions
            -> RLPCIO e a
            -> IO (a, [e])
 evalRLPCIO o m = do
     m' <- evalRLPCT o m
     case m' of
-        Left e -> error "need to impl io errors llol" -- TODO
+        -- TODO: errors
+        Left e -> throwIO e
         Right a -> pure a
     
 

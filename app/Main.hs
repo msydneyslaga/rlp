@@ -2,6 +2,7 @@
 module Main where
 ----------------------------------------------------------------------------------
 import Compiler.RLPC
+import Control.Exception
 import Options.Applicative      hiding (ParseError)
 import Control.Monad
 import Control.Monad.Reader
@@ -69,6 +70,9 @@ debugFlagReader = maybeReader $ \case
 
 -- temp
 data CompilerError = CompilerError String
+    deriving Show
+
+instance Exception CompilerError
 
 main :: IO ()
 main = do
