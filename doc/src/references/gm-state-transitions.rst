@@ -493,6 +493,30 @@ Core Transition Rules
           [\mathtt{Pack} \; t \; n, \mathtt{Update} \; 0, \mathtt{Unwind}]$}
       }
 
+#. (WIP) Deep eval. Evaluate a constructor and each of its components
+
+   .. math::
+      \gmrule
+      { \mathtt{DeepEval} : i
+      & a : s
+      & d
+      & h
+      \begin{bmatrix}
+            a : \mathtt{NConstr} \; t \; [a_1,\ldots,a_n]
+      \end{bmatrix}
+      & m
+      }
+      { i' \concat i
+      & a_1 : \ldots : a_n : s
+      & d
+      & h
+      & m
+      \\
+      \SetCell[c=6]{c}
+      \text{where $i' = \overbrace{[\mathtt{Eval}, \mathtt{DeepEval},\mathtt{Eval},
+          \mathtt{DeepEval},\ldots]}^n$}
+      }
+
 ***************
 Extension Rules
 ***************
