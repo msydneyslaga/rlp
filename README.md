@@ -51,8 +51,8 @@ Listed in order of importance.
         - [x] Garbage collection
     - [ ] Low-level execution model (GM)
         - [x] Arithmetic
-        - [ ] Conditionals
-        - [ ] Structured data
+        - [x] Conditionals
+        - [x] Structured data
         - [ ] Garbage Collection
     - [ ] Emitter
         - [ ] Code-gen (target yet to be decided)
