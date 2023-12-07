@@ -62,9 +62,12 @@ data Instr = Unwind
            | Eval
            -- arith
            | Neg | Add | Sub | Mul | Div
+           -- comparison
+           | Equals
            | Pack Tag Int -- Pack Tag Arity
            | CaseJump [(Tag, Code)]
            | Split Int
+           | Halt
            deriving (Show, Eq)
 
 data Node = NNum Int
@@ -161,10 +164,16 @@ step st = case head (st ^. gmCode) of
     Sub            -> subI           
     Mul            -> mulI           
     Div            -> divI           
+    Equals         -> equalsI           
     Split      n   -> splitI        n
     Pack       t n -> packI       t n
     CaseJump    as -> caseJumpI    as
+    Halt           -> haltI
     where
+
+        -- nuke the state
+        haltI :: GmState
+        haltI = error "halt#"
 
         caseJumpI :: [(Tag, Code)] -> GmState
         caseJumpI as = st
@@ -355,6 +364,9 @@ step st = case head (st ^. gmCode) of
         mulI = primitive2 boxInt unboxInt (*) st
         divI = primitive2 boxInt unboxInt div st
 
+        equalsI :: GmState
+        equalsI = primitive2 boxBool unboxInt (==) st
+
         splitI :: Int -> GmState
         splitI n = st
                  & advanceCode
@@ -465,7 +477,7 @@ primitive2 box unbox f st
         & advanceCode
         & gmStats . stsPrimReductions %~ succ
     where
-        (ay:ax:s) = st ^. gmStack
+        (ax:ay:s) = st ^. gmStack
         putNewStack = gmStack .~ s
         x = unbox ax st
         y = unbox ay st
@@ -485,6 +497,24 @@ unboxInt a st = case hLookup a h of
         Just (NNum n) -> n
         Just _        -> error "unboxInt received a non-int"
         Nothing       -> error "unboxInt received an invalid address"
+    where h = st ^. gmHeap
+
+boxBool :: GmState -> Bool -> GmState
+boxBool st p = st
+             & gmHeap  .~ h'
+             & gmStack %~ (a:)
+             & gmStats . stsAllocations %~ succ
+    where
+        h = st ^. gmHeap
+        (h',a) = alloc h (NConstr p' [])
+        p' = if p then 1 else 0
+
+unboxBool :: Addr -> GmState -> Bool
+unboxBool a st = case hLookup a h of
+        Just (NConstr 1 []) -> True
+        Just (NConstr 0 []) -> False
+        Just _              -> error "unboxInt received a non-int"
+        Nothing             -> error "unboxInt received an invalid address"
     where h = st ^. gmHeap
 
 advanceCode :: GmState -> GmState
@@ -509,13 +539,14 @@ type CompiledSC = (Name, Int, Code)
 compiledPrims :: [CompiledSC]
 compiledPrims =
     [ ("whnf#", 1, [Push 0, Eval, Update 1, Pop 1, Unwind])
-    -- , unop "negate#" Neg
+    , ("halt#", 0, [Halt])
     -- , ("negate#", 1, [Push 0, Eval, Neg, Update 1, Pop 1, Unwind])
     , unop "negate#" Neg
     , binop "+#" Add
     , binop "-#" Sub
     , binop "*#" Mul
     , binop "/#" Div
+    , binop "==#" Equals
     ]
     where
         unop k i = (k, 1, [Push 0, Eval, i, Update 1, Pop 1, Unwind])
@@ -595,8 +626,10 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 compileBinder :: (Binding, Int) -> Code
                 compileBinder (_ := v, a) = compileC g' v <> [Update a]
 
-        -- kinda evil; better system eventually
-        compileC g (Con t n) = [PushConstr t n]
+        compileC _ (Con t n) = [PushConstr t n]
+
+        compileC _ (Case _ _) =
+            error "case expressions may not appear in non-strict contexts :/"
 
         compileC _ _ = error "yet to be implemented!"
 
@@ -643,10 +676,9 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
         compileE g ("-#" :$ a :$ b) = compileE g a <> compileE g b <> [Sub]
         compileE g ("*#" :$ a :$ b) = compileE g a <> compileE g b <> [Mul]
         compileE g ("/#" :$ a :$ b) = compileE g a <> compileE g b <> [Div]
+        compileE g ("==#" :$ a :$ b) = compileE g a <> compileE g b <> [Equals]
 
         compileE g (Case e as) = compileE g e <> [CaseJump (compileD g as)]
-        -- TODO: inline case for satiated Con applications
-        -- compileE g (Con t n) = 
 
         compileE g e = compileC g e ++ [Eval]
 
@@ -834,4 +866,12 @@ lookupN k = lookup (NameKey k)
 
 lookupC :: Tag -> Int -> Env -> Maybe Addr
 lookupC t n = lookup (ConstrKey t n)
+
+----------------------------------------------------------------------------------
+
+gc :: GmState -> GmState
+gc st = undefined
+
+findRoots :: GmState -> [Addr]
+findRoots st = undefined
 
