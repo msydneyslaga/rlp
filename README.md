@@ -70,6 +70,7 @@ Listed in order of importance.
     - [ ] Translation to the core language
         - [ ] Constraint solver
         - [ ] `do`-notation
+        - [ ] Renamer
     - [ ] CLI
 - [ ] Documentation
     - [ ] State transition rules
