@@ -24,7 +24,7 @@ module Data.Heap
 ----------------------------------------------------------------------------------
 import Data.Map                     (Map, (!?))
 import Debug.Trace
-import Data.Map qualified as M
+import Data.Map.Strict              qualified as M
 import Data.List                    (intersect)
 import GHC.Stack                    (HasCallStack)
 ----------------------------------------------------------------------------------
@@ -60,10 +60,11 @@ instance Traversable Heap where
 
 alloc :: Heap a -> a -> (Heap a, Addr)
 alloc (Heap (u:us) m) v = (Heap us (M.insert u v m), u)
-alloc (Heap [] _)     _ = error "STG heap model ran out of memory..."
+alloc (Heap [] _)     _ = error "heap model ran out of memory..."
 
 update :: Addr -> a -> Heap a -> Heap a
 update k v (Heap u m) = Heap u (M.adjust (const v) k m)
+-- update k v (Heap u m) = Heap u (M.adjust (undefined) k m)
 
 adjust :: Addr -> (a -> a) -> Heap a -> Heap a
 adjust k f (Heap u m) = Heap u (M.adjust f k m)

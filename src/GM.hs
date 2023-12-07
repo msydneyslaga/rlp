@@ -25,6 +25,7 @@ import Data.Foldable                (traverse_)
 import System.IO                    (Handle, hPutStrLn)
 import Data.String                  (IsString)
 import Data.Heap
+import Debug.Trace
 import Core
 ----------------------------------------------------------------------------------
 
@@ -181,10 +182,11 @@ step st = case head (st ^. gmCode) of
         packI :: Tag -> Int -> GmState
         packI t n = st
                   & advanceCode
-                  & gmStack %~ (a:)
+                  & gmStack .~ s'
                   & gmHeap  .~ h'
             where
                 (as,s) = splitAt n (st ^. gmStack)
+                s' = a:s
                 (h',a) = alloc (st ^. gmHeap) $ NConstr t as
 
         pushGlobalI :: Name -> GmState
@@ -305,8 +307,8 @@ step st = case head (st ^. gmCode) of
              where
                 (e:s) = st ^. gmStack
                 an = s !! n
-                h' = st ^. gmHeap
-                    & update an (NInd e)
+                h = st ^. gmHeap
+                h' = h `seq` update an (NInd e) h
 
         popI :: Int -> GmState
         popI n = st
