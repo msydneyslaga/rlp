@@ -58,7 +58,7 @@ import Data.Default.Class   (def)
 
 %%
 
-Module          :: { Module }
+Module          :: { Module Name }
 Module          : module conname where Program Eof { Module (Just ($2, [])) $4 }
                 | Program Eof                      { Module Nothing $1 }
 
@@ -66,36 +66,36 @@ Eof             :: { () }
 Eof             : eof           { () }
                 | error         { () }
 
-StandaloneProgram :: { Program }
+StandaloneProgram :: { Program Name }
 StandaloneProgram : Program eof                 { $1 }
 
-Program         :: { Program }
+Program         :: { Program Name }
 Program         : ScDefs                        { Program $1 }
 
-ScDefs          :: { [ScDef] }
+ScDefs          :: { [ScDef Name] }
 ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
                 | ScDef ';'                     { [$1] }
                 | ScDef                         { [$1] }
                 | {- epsilon -}                 { [] }
 
-ScDef           :: { ScDef }
+ScDef           :: { ScDef Name }
 ScDef           : Var ParList '=' Expr          { ScDef $1 $2 $4 }
 
 ParList         :: { [Name] }
 ParList         : Var ParList                   { $1 : $2 }
                 | {- epsilon -}                 { [] }
 
-StandaloneExpr  :: { Expr }
+StandaloneExpr  :: { Expr Name }
 StandaloneExpr  : Expr eof                      { $1 }
 
-Expr            :: { Expr }
+Expr            :: { Expr Name }
 Expr            : LetExpr                       { $1 }
                 | 'λ' Binders '->' Expr         { Lam $2 $4 }
                 | Application                   { $1 }
                 | CaseExpr                      { $1 }
                 | Expr1                         { $1 }
 
-LetExpr         :: { Expr }
+LetExpr         :: { Expr Name }
 LetExpr         : let    '{'   Bindings '}'    in Expr { Let NonRec $3 $6 }
                 | letrec '{'   Bindings '}'    in Expr { Let Rec $3 $6 }
 
@@ -103,48 +103,48 @@ Binders         :: { [Name] }
 Binders         : Var Binders                  { $1 : $2 }
                 | Var                          { [$1] }
 
-Application     :: { Expr }
+Application     :: { Expr Name }
 Application     : Expr1 AppArgs                 { foldl' App $1 $2 }
 
 -- TODO: Application can probably be written as a single rule, without AppArgs
-AppArgs         :: { [Expr] }
+AppArgs         :: { [Expr Name] }
 AppArgs         : Expr1 AppArgs                 { $1 : $2 }
                 | Expr1                         { [$1] }
 
-CaseExpr        :: { Expr }
+CaseExpr        :: { Expr Name }
 CaseExpr        : case Expr of '{' Alters '}'   { Case $2 $5 }
 
-Alters          :: { [Alter] }
+Alters          :: { [Alter Name] }
 Alters          : Alter ';' Alters              { $1 : $3 }
                 | Alter ';'                     { [$1] }
                 | Alter                         { [$1] }
 
-Alter           :: { Alter }
-Alter           : litint ParList '->' Expr      { Alter $1 $2 $4 }
+Alter           :: { Alter Name }
+Alter           : litint ParList '->' Expr      { Alter (AltData $1) $2 $4 }
 
-Expr1           :: { Expr }
-Expr1           : litint                        { IntE $1 }
-                | Id                            { Var $1 }
+Expr1           :: { Expr Name }
+Expr1           : litint                        { LitE $ IntL $1 }
+                | Id                            { Var (Name $1) }
                 | PackCon                       { $1 }
                 | ExprPragma                    { $1 }
                 | '(' Expr ')'                  { $2 }
 
-ExprPragma      :: { Expr }
+ExprPragma      :: { Expr Name }
 ExprPragma      : '{-#' Words '#-}'      {% exprPragma $2 }
 
 Words           :: { [String] }
 Words           : word Words                    { $1 : $2 }
                 | word                          { [$1] }
 
-PackCon         :: { Expr }
+PackCon         :: { Expr Name }
 PackCon         : pack '{' litint litint '}'    { Con $3 $4 }
 
-Bindings        :: { [Binding] }
+Bindings        :: { [Binding Name] }
 Bindings        : Binding ';' Bindings          { $1 : $3 }
                 | Binding ';'                   { [$1] }
                 | Binding                       { [$1] }
 
-Binding         :: { Binding }
+Binding         :: { Binding Name }
 Binding         : Var '=' Expr                  { $1 := $3 }
 
 Id              :: { Name }
@@ -169,7 +169,7 @@ parseError (Located y x l _ : _) = addFatal err
             , _errDiagnostic = SrcErrParse
             }
 
-parseTmp :: IO Module
+parseTmp :: IO (Module Name)
 parseTmp = do
     s <- readFile "/tmp/t.hs"
     case parse s of
@@ -178,7 +178,7 @@ parseTmp = do
     where
         parse = evalRLPC def . (lexCore >=> parseCore)
 
-exprPragma :: [String] -> RLPC SrcError Expr
+exprPragma :: [String] -> RLPC SrcError (Expr Name)
 exprPragma ("AST" : e) = astPragma e
 exprPragma _           = addFatal err
     where err = SrcError
@@ -187,7 +187,7 @@ exprPragma _           = addFatal err
             , _errDiagnostic = SrcErrUnknownPragma "" -- TODO: missing pragma
             }
 
-astPragma :: [String] -> RLPC SrcError Expr
+astPragma :: [String] -> RLPC SrcError (Expr Name)
 astPragma = pure . read . unwords
 
 }

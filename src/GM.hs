@@ -30,6 +30,19 @@ import Debug.Trace
 import Core
 ----------------------------------------------------------------------------------
 
+hdbgProg = undefined
+evalProg = undefined
+
+data Node = NNum Int
+          | NAp Addr Addr
+          | NInd Addr
+          | NUninitialised
+          | NConstr Tag [Addr] -- NConstr Tag Components
+          | NMarked Node
+          deriving (Show, Eq)
+
+{-
+
 data GmState = GmState
     { _gmCode   :: Code
     , _gmStack  :: Stack
@@ -596,7 +609,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 f (NameKey n, _) = Just n
                 f _              = Nothing
 
-        compileC _ (IntE n)  = [PushInt n]
+        compileC _ (LitE l)  = compileCL l
 
         -- >> [ref/compileC]
         compileC g (App f x) = compileC g x
@@ -640,10 +653,16 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
 
         compileC _ _ = error "yet to be implemented!"
 
+        compileCL :: Literal -> Code
+        compileCL (IntL n) = [PushInt n]
+
+        compileEL :: Literal -> Code
+        compileEL (IntL n) = [PushInt n]
+
         -- compile an expression in a strict context such that a pointer to the
         -- expression is left on top of the stack in WHNF
         compileE :: Env -> Expr -> Code
-        compileE _ (IntE n) = [PushInt n]
+        compileE _ (LitE l) = compileEL l
         compileE g (Let NonRec bs e) =
                 -- we use compileE instead of compileC
                 mconcat binders <> compileE g' e <> [Slide d]
@@ -921,3 +940,5 @@ sweepNodes st = st & gmHeap %~ thread (f <$> addresses h)
 
 thread :: [a -> a] -> (a -> a)
 thread = appEndo . foldMap Endo
+
+--}

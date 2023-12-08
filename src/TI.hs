@@ -28,6 +28,10 @@ import Core.Examples
 import Core
 ----------------------------------------------------------------------------------
 
+hdbgProg = undefined
+
+{-
+
 data TiState = TiState Stack Dump TiHeap Env Stats
     deriving Show
 
@@ -610,4 +614,6 @@ gc st@(TiState s d h g sts) = TiState s d h' g sts
         as = findRoots st
         marked = h & appEndo (foldMap Endo $ markFrom <$> as)
         h' = scanHeap marked
+
+--}
 

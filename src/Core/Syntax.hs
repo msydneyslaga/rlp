@@ -5,8 +5,11 @@ Description : Core ASTs and the like
 {-# LANGUAGE PatternSynonyms, OverloadedStrings #-}
 module Core.Syntax
     ( Expr(..)
+    , Id(..)
+    , Literal(..)
     , pattern (:$)
     , Binding(..)
+    , AltCon(..)
     , pattern (:=)
     , Rec(..)
     , Alter(..)
@@ -15,6 +18,7 @@ module Core.Syntax
     , ScDef(..)
     , Module(..)
     , Program(..)
+    , CoreProgram
     , bindersOf
     , rhssOf
     , isAtomic
@@ -31,106 +35,68 @@ import Data.String
 import Language.Haskell.TH.Syntax   (Lift)
 ----------------------------------------------------------------------------------
 
-data Expr = Var Name
-          | Con Tag Int -- Con Tag Arity
-          | Let Rec [Binding] Expr
-          | Case Expr [Alter]
-          | Lam [Name] Expr
-          | App Expr Expr
-          | IntE Int
-          deriving (Show, Read, Lift, Eq)
+data Expr b = Var Id
+            | Con Tag Int -- Con Tag Arity
+            | Case (Expr b) [Alter b]
+            | Lam [b] (Expr b)
+            | Let Rec [Binding b] (Expr b)
+            | App (Expr b) (Expr b)
+            | LitE Literal
+            deriving (Show, Read, Lift)
+
+data Id = Name Name
+    deriving (Show, Read, Lift)
 
 infixl 2 :$
-pattern (:$) :: Expr -> Expr -> Expr
+pattern (:$) :: Expr b  -> Expr b  -> Expr b 
 pattern f :$ x = App f x
 
 {-# COMPLETE Binding :: Binding #-}
 {-# COMPLETE (:=) :: Binding #-}
-data Binding = Binding Name Expr
-    deriving (Show, Read, Lift, Eq)
+data Binding b = Binding b (Expr b)
+    deriving (Show, Read, Lift)
 
 infixl 1 :=
-pattern (:=) :: Name -> Expr -> Binding
+pattern (:=) :: b -> (Expr b) -> (Binding b)
 pattern k := v = Binding k v
+data Alter b = Alter AltCon [b] (Expr b)
+    deriving (Show, Read, Lift)
 
 data Rec = Rec
          | NonRec
          deriving (Show, Read, Eq, Lift)
 
-data Alter = Alter Tag [Name] Expr
-    deriving (Show, Read, Lift, Eq)
+data AltCon = AltData Tag
+            | AltLiteral Literal
+            | Default
+            deriving (Show, Read, Lift)
+
+data Literal = IntL Int
+    deriving (Show, Read, Lift)
 
 type Name = String
 type Tag = Int
 
-data ScDef = ScDef Name [Name] Expr
-    deriving (Show, Lift, Eq)
-
-data Module = Module (Maybe (Name, [Name])) Program
+data ScDef b = ScDef b [b] (Expr b)
     deriving (Show, Lift)
 
-newtype Program = Program [ScDef]
+data Module b = Module (Maybe (Name, [Name])) (Program b)
     deriving (Show, Lift)
 
-instance IsString Expr where
-    fromString = Var
+newtype Program b = Program [ScDef b]
+    deriving (Show, Lift)
+
+type CoreProgram = Program Name
+
+instance IsString (Expr b) where
+    fromString = Var . Name
 
 ----------------------------------------------------------------------------------
 
-instance Pretty Program where
-    -- TODO: module header
-    prettyPrec (Program ss) _ = mconcat $ intersperse "\n\n" $ fmap pretty ss
+instance Semigroup (Program b) where
+    (<>) = coerce $ (<>) @[ScDef b] 
 
-instance Pretty ScDef where
-    prettyPrec (ScDef n as e) _ =
-        mconcat (intersperse " " $ fmap IStr (n:as))
-        <> " = " <> pretty e <> IBreak
-
-instance Pretty Expr where
-    prettyPrec (Var k)      = withPrec maxBound $ IStr k
-    prettyPrec (IntE n)     = withPrec maxBound $ iShow n
-    prettyPrec (Con t a)    = withPrec maxBound $
-        "Pack{" <> iShow t <> " " <> iShow a <> "}"
-    prettyPrec (Let r bs e) = withPrec 0 $
-        IStr (if r == Rec then "letrec " else "let ")
-        <> binds <> IBreak
-        <> "in " <> pretty e
-        where
-            binds = mconcat (f <$> init bs)
-                 <> IIndent (pretty $ last bs)
-            f b = IIndent $ pretty b <> IBreak
-    prettyPrec (Lam ns e)   = withPrec 0 $ 
-        IStr "λ" <> binds <> " -> " <> pretty e
-        where
-            binds = fmap IStr ns & intersperse " " & mconcat
-    prettyPrec (Case e as)   = withPrec 0 $
-            "case " <> IIndent (pretty e <> " of" <> IBreak <> alts)
-        where
-            -- TODO: don't break on last alt
-            alts = mconcat $ fmap palt as
-            palt x = IIndent $ pretty x <> IBreak
-    prettyPrec (App f x) = \p -> bracketPrec 0 p $
-        case f of
-            -- application is left-associative; don't increase prec if the
-            -- expression being applied is itself an application
-            (_:$_) -> precPretty       p  f <> " " <> precPretty (succ p) x
-            _      -> precPretty (succ p) f <> " " <> precPretty (succ p) x
-
-instance Pretty Alter where
-    prettyPrec (Alter t bs e) = withPrec 0 $
-            "<" <> IStr (show t) <> "> " <> binds <> " -> " <> pretty e
-        where
-            binds = mconcat $ intersperse " " (fmap IStr bs)
-
-instance Pretty Binding where
-    prettyPrec (k := v) = withPrec 0 $ IStr k <> " = " <> precPretty 0 v
-
-----------------------------------------------------------------------------------
-
-instance Semigroup Program where
-    (<>) = coerce $ (<>) @[ScDef] 
-
-instance Monoid Program where
+instance Monoid (Program b) where
     mempty = Program []
 
 ----------------------------------------------------------------------------------
@@ -141,16 +107,17 @@ bindersOf = fmap fst
 rhssOf :: [(Name, b)] -> [b]
 rhssOf = fmap snd
 
-isAtomic :: Expr -> Bool
-isAtomic (Var _) = True
-isAtomic _       = False
+isAtomic :: Expr b -> Bool
+isAtomic (Var _)  = True
+isAtomic (LitE _) = True
+isAtomic _        = False
 
 ----------------------------------------------------------------------------------
 
 -- TODO: export list awareness
-insertModule :: Module -> Program -> Program
+insertModule :: (Module b) -> (Program b) -> (Program b)
 insertModule (Module _ m) p = p <> m
 
-extractProgram :: Module -> Program
+extractProgram :: (Module b) -> (Program b)
 extractProgram (Module _ p) = p
 

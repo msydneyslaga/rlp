@@ -12,7 +12,6 @@ import Core.TH
 
 -- TODO: my shitty lexer isn't inserting semicolons
 
-letrecExample :: Program
 letrecExample = [coreProg|
     pair x y f = f x y;
 
@@ -28,7 +27,6 @@ letrecExample = [coreProg|
     main = f 3 4;
 |]
 
-idExample :: Program
 idExample = [coreProg|
     main = id 3;
 |]
@@ -138,7 +136,7 @@ factorialGM = [coreProg|
     main = fac 3;
 |]
 
-corePrelude :: Module
+corePrelude :: Module Name
 corePrelude = Module (Just ("Prelude", [])) $
     -- non-primitive defs
     [coreProg|
