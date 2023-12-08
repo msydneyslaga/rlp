@@ -124,7 +124,7 @@ Alter           : litint ParList '->' Expr      { Alter (AltData $1) $2 $4 }
 
 Expr1           :: { Expr Name }
 Expr1           : litint                        { LitE $ IntL $1 }
-                | Id                            { Var (Name $1) }
+                | Id                            { Var $1 }
                 | PackCon                       { $1 }
                 | ExprPragma                    { $1 }
                 | '(' Expr ')'                  { $2 }

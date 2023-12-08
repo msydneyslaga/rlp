@@ -47,6 +47,7 @@ library
                     , unordered-containers
                     , hashable
                     , pretty
+                    , recursion-schemes
 
     hs-source-dirs:   src
     default-language: GHC2021

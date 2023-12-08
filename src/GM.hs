@@ -30,6 +30,8 @@ import Debug.Trace
 import Core
 ----------------------------------------------------------------------------------
 
+{-}
+
 hdbgProg = undefined
 evalProg = undefined
 
@@ -41,7 +43,7 @@ data Node = NNum Int
           | NMarked Node
           deriving (Show, Eq)
 
-{-
+--}
 
 data GmState = GmState
     { _gmCode   :: Code
@@ -116,7 +118,7 @@ pure []
 
 ----------------------------------------------------------------------------------
 
-evalProg :: Program -> Maybe (Node, Stats)
+evalProg :: CoreProgram -> Maybe (Node, Stats)
 evalProg p = res <&> (,sts)
     where
         final = eval (compile p) & last
@@ -125,7 +127,7 @@ evalProg p = res <&> (,sts)
         resAddr = final ^. gmStack ^? _head
         res = resAddr >>= flip hLookup h
 
-hdbgProg :: Program -> Handle -> IO (Node, Stats)
+hdbgProg :: CoreProgram -> Handle -> IO (Node, Stats)
 hdbgProg p hio = do
     (renderOut . showState) `traverse_` states
     -- TODO: i'd like the statistics to be at the top of the file, but `sts`
@@ -546,7 +548,7 @@ pop []     = []
 
 ----------------------------------------------------------------------------------
 
-compile :: Program -> GmState
+compile :: CoreProgram -> GmState
 compile p = GmState c [] [] h g sts
     where
         -- find the entry point and evaluate it
@@ -573,7 +575,7 @@ compiledPrims =
 
         binop k i = (k, 2, [Push 1, Eval, Push 1, Eval, i, Update 2, Pop 2, Unwind])
 
-buildInitialHeap :: Program -> (GmHeap, Env)
+buildInitialHeap :: CoreProgram -> (GmHeap, Env)
 buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
     where
         compiledScs = fmap compileSc ss <> compiledPrims
@@ -586,20 +588,20 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
         -- >> [ref/compileSc]
         -- type CompiledSC = (Name, Int, Code)
 
-        compileSc :: ScDef -> CompiledSC
+        compileSc :: CoreScDef -> CompiledSC
         compileSc (ScDef n as b) = (n, d, compileR env b)
             where
                 env = (NameKey <$> as) `zip` [0..]
                 d = length as
         -- << [ref/compileSc]
 
-        compileR :: Env -> Expr -> Code
+        compileR :: Env -> CoreExpr -> Code
         compileR g e = compileE g e <> [Update d, Pop d, Unwind]
             where
                 d = length g
 
         -- compile an expression in a lazy context
-        compileC :: Env -> Expr -> Code
+        compileC :: Env -> CoreExpr -> Code
         compileC g (Var k)
             | k `elem` domain  = [Push n]
             | otherwise        = [PushGlobal k]
@@ -625,7 +627,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 -- kinda gross. revisit this
                 addressed = bs `zip` reverse [0 .. d-1]
 
-                compileBinder :: Env -> (Binding, Int) -> (Env, Code)
+                compileBinder :: Env -> (CoreBinding, Int) -> (Env, Code)
                 compileBinder m (k := v, a) = (m',c)
                     where
                         m' = (NameKey k, a) : m
@@ -643,7 +645,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 initialisers = mconcat $ compileBinder <$> addressed
                 body = compileC g' e
 
-                compileBinder :: (Binding, Int) -> Code
+                compileBinder :: (CoreBinding, Int) -> Code
                 compileBinder (_ := v, a) = compileC g' v <> [Update a]
 
         compileC _ (Con t n) = [PushConstr t n]
@@ -661,7 +663,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
 
         -- compile an expression in a strict context such that a pointer to the
         -- expression is left on top of the stack in WHNF
-        compileE :: Env -> Expr -> Code
+        compileE :: Env -> CoreExpr -> Code
         compileE _ (LitE l) = compileEL l
         compileE g (Let NonRec bs e) =
                 -- we use compileE instead of compileC
@@ -672,7 +674,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 -- kinda gross. revisit this
                 addressed = bs `zip` reverse [0 .. d-1]
 
-                compileBinder :: Env -> (Binding, Int) -> (Env, Code)
+                compileBinder :: Env -> (CoreBinding, Int) -> (Env, Code)
                 compileBinder m (k := v, a) = (m',c)
                     where
                         m' = (NameKey k, a) : m
@@ -693,7 +695,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 body = compileE g' e
 
                 -- we use compileE instead of compileC
-                compileBinder :: (Binding, Int) -> Code
+                compileBinder :: (CoreBinding, Int) -> Code
                 compileBinder (_ := v, a) = compileC g' v <> [Update a]
 
         -- special cases for prim functions; essentially inlining
@@ -708,11 +710,11 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
 
         compileE g e = compileC g e ++ [Eval]
 
-        compileD :: Env -> [Alter] -> [(Tag, Code)]
+        compileD :: Env -> [CoreAlter] -> [(Tag, Code)]
         compileD g as = fmap (compileA g) as
 
-        compileA :: Env -> Alter -> (Tag, Code)
-        compileA g (Alter t as e) = (t, [Split n] <> c <> [Slide n])
+        compileA :: Env -> CoreAlter -> (Tag, Code)
+        compileA g (Alter (AltData t) as e) = (t, [Split n] <> c <> [Slide n])
             where
                 n = length as
                 binds = (NameKey <$> as) `zip` [0..]

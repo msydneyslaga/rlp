@@ -3,9 +3,13 @@ Module      : Core.Syntax
 Description : Core ASTs and the like
 -}
 {-# LANGUAGE PatternSynonyms, OverloadedStrings #-}
+-- for recursion schemes
+{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+-- for recursion schemes
+{-# LANGUAGE TemplateHaskell, TypeFamilies #-}
+
 module Core.Syntax
     ( Expr(..)
-    , Id(..)
     , Literal(..)
     , pattern (:$)
     , Binding(..)
@@ -19,6 +23,10 @@ module Core.Syntax
     , Module(..)
     , Program(..)
     , CoreProgram
+    , CoreExpr
+    , CoreScDef
+    , CoreAlter
+    , CoreBinding
     , bindersOf
     , rhssOf
     , isAtomic
@@ -32,10 +40,12 @@ import Data.Pretty
 import Data.List                    (intersperse)
 import Data.Function                ((&))
 import Data.String
+-- Lift instances for the Core quasiquoters
 import Language.Haskell.TH.Syntax   (Lift)
+import Data.Functor.Foldable.TH     (makeBaseFunctor)
 ----------------------------------------------------------------------------------
 
-data Expr b = Var Id
+data Expr b = Var Name
             | Con Tag Int -- Con Tag Arity
             | Case (Expr b) [Alter b]
             | Lam [b] (Expr b)
@@ -44,8 +54,7 @@ data Expr b = Var Id
             | LitE Literal
             deriving (Show, Read, Lift)
 
-data Id = Name Name
-    deriving (Show, Read, Lift)
+deriving instance (Eq b) => Eq (Expr b)
 
 infixl 2 :$
 pattern (:$) :: Expr b  -> Expr b  -> Expr b 
@@ -56,11 +65,16 @@ pattern f :$ x = App f x
 data Binding b = Binding b (Expr b)
     deriving (Show, Read, Lift)
 
+deriving instance (Eq b) => Eq (Binding b)
+
 infixl 1 :=
 pattern (:=) :: b -> (Expr b) -> (Binding b)
 pattern k := v = Binding k v
+
 data Alter b = Alter AltCon [b] (Expr b)
     deriving (Show, Read, Lift)
+
+deriving instance (Eq b) => Eq (Alter b)
 
 data Rec = Rec
          | NonRec
@@ -69,10 +83,10 @@ data Rec = Rec
 data AltCon = AltData Tag
             | AltLiteral Literal
             | Default
-            deriving (Show, Read, Lift)
+            deriving (Show, Read, Eq, Lift)
 
 data Literal = IntL Int
-    deriving (Show, Read, Lift)
+    deriving (Show, Read, Eq, Lift)
 
 type Name = String
 type Tag = Int
@@ -87,9 +101,13 @@ newtype Program b = Program [ScDef b]
     deriving (Show, Lift)
 
 type CoreProgram = Program Name
+type CoreExpr = Expr Name
+type CoreScDef = ScDef Name
+type CoreAlter = Alter Name
+type CoreBinding = Binding Name
 
 instance IsString (Expr b) where
-    fromString = Var . Name
+    fromString = Var
 
 ----------------------------------------------------------------------------------
 
@@ -120,4 +138,8 @@ insertModule (Module _ m) p = p <> m
 
 extractProgram :: (Module b) -> (Program b)
 extractProgram (Module _ p) = p
+
+----------------------------------------------------------------------------------
+
+makeBaseFunctor ''Expr
 
