@@ -49,11 +49,11 @@ Listed in order of importance.
         - [x] Conditionals
         - [x] Structured data
         - [x] Garbage collection
-    - [ ] Low-level execution model (GM)
+    - [x] Low-level execution model (GM)
         - [x] Arithmetic
         - [x] Conditionals
         - [x] Structured data
-        - [ ] Garbage Collection
+        - [x] Garbage Collection
     - [ ] Emitter
         - [ ] Code-gen (target yet to be decided)
         - [ ] Core language emitter
