@@ -58,7 +58,9 @@ Listed in order of importance.
         - [ ] Code-gen (target yet to be decided)
         - [ ] Core language emitter
     - [ ] Core linter (Type-checker)
-    - [ ] Optimisation pass
+    - [ ] Core2Core pass
+        - [ ] GM prep
+            - [ ] Non-strict case-floating
         - [ ] Let-floating
         - [ ] TCO
         - [ ] DCE
