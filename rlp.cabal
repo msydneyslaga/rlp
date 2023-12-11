@@ -23,6 +23,7 @@ library
                     , GM
                     , Compiler.RLPC
                     , Core.Syntax
+                    , Core.Utils
 
     other-modules:    Data.Heap
                     , Data.Pretty
@@ -31,6 +32,7 @@ library
                     , Core.Examples
                     , Core.Lex
                     , Control.Monad.Errorful
+                    , Core2Core
 
     build-tool-depends: happy:happy, alex:alex
 

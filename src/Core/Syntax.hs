@@ -3,11 +3,7 @@ Module      : Core.Syntax
 Description : Core ASTs and the like
 -}
 {-# LANGUAGE PatternSynonyms, OverloadedStrings #-}
--- for recursion schemes
-{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
--- for recursion schemes
-{-# LANGUAGE TemplateHaskell, TypeFamilies #-}
-
+{-# LANGUAGE FunctionalDependencies #-}
 module Core.Syntax
     ( Expr(..)
     , Literal(..)
@@ -22,27 +18,24 @@ module Core.Syntax
     , ScDef(..)
     , Module(..)
     , Program(..)
-    , CoreProgram
-    , CoreExpr
-    , CoreScDef
-    , CoreAlter
-    , CoreBinding
-    , bindersOf
-    , rhssOf
-    , isAtomic
-    , insertModule
-    , extractProgram
+    , Program'
+    , Expr'
+    , ScDef'
+    , Alter'
+    , Binding'
+    , HasRHS(_rhs)
     )
     where
 ----------------------------------------------------------------------------------
 import Data.Coerce
 import Data.Pretty
+import GHC.Generics
 import Data.List                    (intersperse)
 import Data.Function                ((&))
 import Data.String
 -- Lift instances for the Core quasiquoters
+import Lens.Micro
 import Language.Haskell.TH.Syntax   (Lift)
-import Data.Functor.Foldable.TH     (makeBaseFunctor)
 ----------------------------------------------------------------------------------
 
 data Expr b = Var Name
@@ -100,16 +93,14 @@ data Module b = Module (Maybe (Name, [Name])) (Program b)
 newtype Program b = Program [ScDef b]
     deriving (Show, Lift)
 
-type CoreProgram = Program Name
-type CoreExpr = Expr Name
-type CoreScDef = ScDef Name
-type CoreAlter = Alter Name
-type CoreBinding = Binding Name
+type Program' = Program Name
+type Expr' = Expr Name
+type ScDef' = ScDef Name
+type Alter' = Alter Name
+type Binding' = Binding Name
 
 instance IsString (Expr b) where
     fromString = Var
-
-----------------------------------------------------------------------------------
 
 instance Semigroup (Program b) where
     (<>) = coerce $ (<>) @[ScDef b] 
@@ -119,27 +110,21 @@ instance Monoid (Program b) where
 
 ----------------------------------------------------------------------------------
 
-bindersOf :: [(Name, b)] -> [Name]
-bindersOf = fmap fst
+class HasRHS s z | s -> z where
+    _rhs :: Lens' s (Expr z)
 
-rhssOf :: [(Name, b)] -> [b]
-rhssOf = fmap snd
+instance HasRHS (Alter b) b where
+    _rhs = lens
+        (\ (Alter _ _ e) -> e)
+        (\ (Alter t as _) e' -> Alter t as e')
 
-isAtomic :: Expr b -> Bool
-isAtomic (Var _)  = True
-isAtomic (LitE _) = True
-isAtomic _        = False
+instance HasRHS (ScDef b) b where
+    _rhs = lens
+        (\ (ScDef _ _ e) -> e)
+        (\ (ScDef n as _) e' -> ScDef n as e')
 
-----------------------------------------------------------------------------------
-
--- TODO: export list awareness
-insertModule :: (Module b) -> (Program b) -> (Program b)
-insertModule (Module _ m) p = p <> m
-
-extractProgram :: (Module b) -> (Program b)
-extractProgram (Module _ p) = p
-
-----------------------------------------------------------------------------------
-
-makeBaseFunctor ''Expr
+instance HasRHS (Binding b) b where
+    _rhs = lens
+        (\ (_ := e) -> e)
+        (\ (k := _) e' -> k := e')
 
