@@ -14,7 +14,7 @@ extra-doc-files:    README.md
 -- extra-source-files:
 
 common warnings
-    ghc-options: -Wall -Wno-incomplete-uni-patterns -Wno-unused-top-binds
+--    ghc-options: -Wall -Wno-incomplete-uni-patterns -Wno-unused-top-binds
 
 library
     import:           warnings
@@ -23,6 +23,7 @@ library
                     , GM
                     , Compiler.RLPC
                     , Core.Syntax
+                    , Core.Utils
 
     other-modules:    Data.Heap
                     , Data.Pretty
@@ -31,6 +32,7 @@ library
                     , Core.Examples
                     , Core.Lex
                     , Control.Monad.Errorful
+                    , Core2Core
 
     build-tool-depends: happy:happy, alex:alex
 
@@ -47,6 +49,7 @@ library
                     , unordered-containers
                     , hashable
                     , pretty
+                    , recursion-schemes
 
     hs-source-dirs:   src
     default-language: GHC2021

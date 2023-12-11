@@ -3,10 +3,13 @@ Module      : Core.Syntax
 Description : Core ASTs and the like
 -}
 {-# LANGUAGE PatternSynonyms, OverloadedStrings #-}
+{-# LANGUAGE FunctionalDependencies #-}
 module Core.Syntax
     ( Expr(..)
+    , Literal(..)
     , pattern (:$)
     , Binding(..)
+    , AltCon(..)
     , pattern (:=)
     , Rec(..)
     , Alter(..)
@@ -15,142 +18,113 @@ module Core.Syntax
     , ScDef(..)
     , Module(..)
     , Program(..)
-    , bindersOf
-    , rhssOf
-    , isAtomic
-    , insertModule
-    , extractProgram
+    , Program'
+    , Expr'
+    , ScDef'
+    , Alter'
+    , Binding'
+    , HasRHS(_rhs)
     )
     where
 ----------------------------------------------------------------------------------
 import Data.Coerce
 import Data.Pretty
+import GHC.Generics
 import Data.List                    (intersperse)
 import Data.Function                ((&))
 import Data.String
+-- Lift instances for the Core quasiquoters
+import Lens.Micro
 import Language.Haskell.TH.Syntax   (Lift)
 ----------------------------------------------------------------------------------
 
-data Expr = Var Name
-          | Con Tag Int -- Con Tag Arity
-          | Let Rec [Binding] Expr
-          | Case Expr [Alter]
-          | Lam [Name] Expr
-          | App Expr Expr
-          | IntE Int
-          deriving (Show, Read, Lift, Eq)
+data Expr b = Var Name
+            | Con Tag Int -- Con Tag Arity
+            | Case (Expr b) [Alter b]
+            | Lam [b] (Expr b)
+            | Let Rec [Binding b] (Expr b)
+            | App (Expr b) (Expr b)
+            | LitE Literal
+            deriving (Show, Read, Lift)
+
+deriving instance (Eq b) => Eq (Expr b)
 
 infixl 2 :$
-pattern (:$) :: Expr -> Expr -> Expr
+pattern (:$) :: Expr b  -> Expr b  -> Expr b 
 pattern f :$ x = App f x
 
 {-# COMPLETE Binding :: Binding #-}
 {-# COMPLETE (:=) :: Binding #-}
-data Binding = Binding Name Expr
-    deriving (Show, Read, Lift, Eq)
+data Binding b = Binding b (Expr b)
+    deriving (Show, Read, Lift)
+
+deriving instance (Eq b) => Eq (Binding b)
 
 infixl 1 :=
-pattern (:=) :: Name -> Expr -> Binding
+pattern (:=) :: b -> (Expr b) -> (Binding b)
 pattern k := v = Binding k v
+
+data Alter b = Alter AltCon [b] (Expr b)
+    deriving (Show, Read, Lift)
+
+deriving instance (Eq b) => Eq (Alter b)
 
 data Rec = Rec
          | NonRec
          deriving (Show, Read, Eq, Lift)
 
-data Alter = Alter Tag [Name] Expr
-    deriving (Show, Read, Lift, Eq)
+data AltCon = AltData Tag
+            | AltLiteral Literal
+            | Default
+            deriving (Show, Read, Eq, Lift)
+
+data Literal = IntL Int
+    deriving (Show, Read, Eq, Lift)
 
 type Name = String
 type Tag = Int
 
-data ScDef = ScDef Name [Name] Expr
-    deriving (Show, Lift, Eq)
-
-data Module = Module (Maybe (Name, [Name])) Program
+data ScDef b = ScDef b [b] (Expr b)
     deriving (Show, Lift)
 
-newtype Program = Program [ScDef]
+data Module b = Module (Maybe (Name, [Name])) (Program b)
     deriving (Show, Lift)
 
-instance IsString Expr where
+newtype Program b = Program [ScDef b]
+    deriving (Show, Lift)
+
+type Program' = Program Name
+type Expr' = Expr Name
+type ScDef' = ScDef Name
+type Alter' = Alter Name
+type Binding' = Binding Name
+
+instance IsString (Expr b) where
     fromString = Var
 
-----------------------------------------------------------------------------------
+instance Semigroup (Program b) where
+    (<>) = coerce $ (<>) @[ScDef b] 
 
-instance Pretty Program where
-    -- TODO: module header
-    prettyPrec (Program ss) _ = mconcat $ intersperse "\n\n" $ fmap pretty ss
-
-instance Pretty ScDef where
-    prettyPrec (ScDef n as e) _ =
-        mconcat (intersperse " " $ fmap IStr (n:as))
-        <> " = " <> pretty e <> IBreak
-
-instance Pretty Expr where
-    prettyPrec (Var k)      = withPrec maxBound $ IStr k
-    prettyPrec (IntE n)     = withPrec maxBound $ iShow n
-    prettyPrec (Con t a)    = withPrec maxBound $
-        "Pack{" <> iShow t <> " " <> iShow a <> "}"
-    prettyPrec (Let r bs e) = withPrec 0 $
-        IStr (if r == Rec then "letrec " else "let ")
-        <> binds <> IBreak
-        <> "in " <> pretty e
-        where
-            binds = mconcat (f <$> init bs)
-                 <> IIndent (pretty $ last bs)
-            f b = IIndent $ pretty b <> IBreak
-    prettyPrec (Lam ns e)   = withPrec 0 $ 
-        IStr "λ" <> binds <> " -> " <> pretty e
-        where
-            binds = fmap IStr ns & intersperse " " & mconcat
-    prettyPrec (Case e as)   = withPrec 0 $
-            "case " <> IIndent (pretty e <> " of" <> IBreak <> alts)
-        where
-            -- TODO: don't break on last alt
-            alts = mconcat $ fmap palt as
-            palt x = IIndent $ pretty x <> IBreak
-    prettyPrec (App f x) = \p -> bracketPrec 0 p $
-        case f of
-            -- application is left-associative; don't increase prec if the
-            -- expression being applied is itself an application
-            (_:$_) -> precPretty       p  f <> " " <> precPretty (succ p) x
-            _      -> precPretty (succ p) f <> " " <> precPretty (succ p) x
-
-instance Pretty Alter where
-    prettyPrec (Alter t bs e) = withPrec 0 $
-            "<" <> IStr (show t) <> "> " <> binds <> " -> " <> pretty e
-        where
-            binds = mconcat $ intersperse " " (fmap IStr bs)
-
-instance Pretty Binding where
-    prettyPrec (k := v) = withPrec 0 $ IStr k <> " = " <> precPretty 0 v
-
-----------------------------------------------------------------------------------
-
-instance Semigroup Program where
-    (<>) = coerce $ (<>) @[ScDef] 
-
-instance Monoid Program where
+instance Monoid (Program b) where
     mempty = Program []
 
 ----------------------------------------------------------------------------------
 
-bindersOf :: [(Name, b)] -> [Name]
-bindersOf = fmap fst
+class HasRHS s z | s -> z where
+    _rhs :: Lens' s (Expr z)
 
-rhssOf :: [(Name, b)] -> [b]
-rhssOf = fmap snd
+instance HasRHS (Alter b) b where
+    _rhs = lens
+        (\ (Alter _ _ e) -> e)
+        (\ (Alter t as _) e' -> Alter t as e')
 
-isAtomic :: Expr -> Bool
-isAtomic (Var _) = True
-isAtomic _       = False
+instance HasRHS (ScDef b) b where
+    _rhs = lens
+        (\ (ScDef _ _ e) -> e)
+        (\ (ScDef n as _) e' -> ScDef n as e')
 
-----------------------------------------------------------------------------------
-
--- TODO: export list awareness
-insertModule :: Module -> Program -> Program
-insertModule (Module _ m) p = p <> m
-
-extractProgram :: Module -> Program
-extractProgram (Module _ p) = p
+instance HasRHS (Binding b) b where
+    _rhs = lens
+        (\ (_ := e) -> e)
+        (\ (k := _) e' -> k := e')
 
