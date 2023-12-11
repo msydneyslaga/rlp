@@ -60,7 +60,7 @@ Listed in order of importance.
     - [ ] Core linter (Type-checker)
     - [ ] Core2Core pass
         - [ ] GM prep
-            - [ ] Non-strict case-floating
+            - [x] Non-strict case-floating
         - [ ] Let-floating
         - [ ] TCO
         - [ ] DCE
