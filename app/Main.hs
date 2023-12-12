@@ -29,7 +29,7 @@ options = RLPCOptions
         (  long "log"
         <> short 'l'
         <> metavar "FILE"
-        <> help "output dumps to FILE. stderr is used by default"
+        <> help "output dumps to FILE. stderr is used if unset"
         )
     {- -d -}
     <*> fmap S.fromList # many # option debugFlagReader
