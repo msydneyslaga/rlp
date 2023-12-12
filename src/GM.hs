@@ -27,6 +27,7 @@ import System.IO                    (Handle, hPutStrLn)
 import Data.String                  (IsString)
 import Data.Heap
 import Debug.Trace
+import Core2Core
 import Core
 ----------------------------------------------------------------------------------
 
@@ -551,9 +552,10 @@ pop []     = []
 compile :: Program' -> GmState
 compile p = GmState c [] [] h g sts
     where
+        p' = gmPrep p
         -- find the entry point and evaluate it
         c = [PushGlobal "main", Eval]
-        (h,g) = buildInitialHeap p
+        (h,g) = buildInitialHeap p'
         sts = def
 
 type CompiledSC = (Name, Int, Code)

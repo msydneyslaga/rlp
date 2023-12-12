@@ -25,6 +25,7 @@ module Core.Syntax
     , Alter'
     , Binding'
     , HasRHS(_rhs)
+    , HasLHS(_lhs)
     )
     where
 ----------------------------------------------------------------------------------
@@ -131,4 +132,17 @@ instance HasRHS (Binding b) b where
     _rhs = lens
         (\ (_ := e) -> e)
         (\ (k := _) e' -> k := e')
+
+class HasLHS s a | s -> a where
+    _lhs :: Lens' s a
+
+instance HasLHS (Alter b) (AltCon, [b]) where
+    _lhs = lens
+        (\ (Alter a bs _) -> (a,bs))
+        (\ (Alter _ _ e) (a',bs') -> Alter a' bs' e)
+
+instance HasLHS (ScDef b) (b, [b]) where
+    _lhs = lens
+        (\ (ScDef n as _) -> (n,as))
+        (\ (ScDef _ _ e) (n',as') -> (ScDef n' as' e))
 
