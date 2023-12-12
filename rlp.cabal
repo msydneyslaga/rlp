@@ -33,6 +33,7 @@ library
                     , Core.Lex
                     , Control.Monad.Errorful
                     , Core2Core
+                    , RLP.Syntax
 
     build-tool-depends: happy:happy, alex:alex
 
@@ -50,6 +51,8 @@ library
                     , hashable
                     , pretty
                     , recursion-schemes
+                    , megaparsec
+                    , text
 
     hs-source-dirs:   src
     default-language: GHC2021

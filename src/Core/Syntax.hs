@@ -115,33 +115,33 @@ instance Monoid (Program b) where
 
 ----------------------------------------------------------------------------------
 
-class HasRHS s z | s -> z where
-    _rhs :: Lens' s (Expr z)
+class HasRHS s t a b | s -> a, t -> b, s b -> t, t a -> s where
+    _rhs :: Lens s t a b
 
-instance HasRHS (Alter b) b where
+instance HasRHS (Alter b) (Alter b) (Expr b) (Expr b) where
     _rhs = lens
         (\ (Alter _ _ e) -> e)
         (\ (Alter t as _) e' -> Alter t as e')
 
-instance HasRHS (ScDef b) b where
+instance HasRHS (ScDef b) (ScDef b) (Expr b) (Expr b) where
     _rhs = lens
         (\ (ScDef _ _ e) -> e)
         (\ (ScDef n as _) e' -> ScDef n as e')
 
-instance HasRHS (Binding b) b where
+instance HasRHS (Binding b) (Binding b) (Expr b) (Expr b) where
     _rhs = lens
         (\ (_ := e) -> e)
         (\ (k := _) e' -> k := e')
 
-class HasLHS s a | s -> a where
-    _lhs :: Lens' s a
+class HasLHS s t a b | s -> a, t -> b, s b -> t, t a -> s where
+    _lhs :: Lens s t a b
 
-instance HasLHS (Alter b) (AltCon, [b]) where
+instance HasLHS (Alter b) (Alter b) (AltCon, [b]) (AltCon, [b]) where
     _lhs = lens
         (\ (Alter a bs _) -> (a,bs))
         (\ (Alter _ _ e) (a',bs') -> Alter a' bs' e)
 
-instance HasLHS (ScDef b) (b, [b]) where
+instance HasLHS (ScDef b) (ScDef b) (b, [b]) (b, [b]) where
     _lhs = lens
         (\ (ScDef n as _) -> (n,as))
         (\ (ScDef _ _ e) (n',as') -> (ScDef n' as' e))
