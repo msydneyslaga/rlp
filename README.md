@@ -59,7 +59,7 @@ Listed in order of importance.
         - [ ] Core language emitter
     - [ ] Core linter (Type-checker)
     - [ ] Core2Core pass
-        - [ ] GM prep
+        - [x] GM prep
             - [x] Non-strict case-floating
         - [ ] Let-floating
         - [ ] TCO
@@ -72,8 +72,7 @@ Listed in order of importance.
     - [ ] Translation to the core language
         - [ ] Constraint solver
         - [ ] `do`-notation
-        - [ ] Renamer
-    - [ ] CLI
+    - [x] CLI
 - [ ] Documentation
     - [ ] State transition rules
     - [ ] How does the evaluation model work?
