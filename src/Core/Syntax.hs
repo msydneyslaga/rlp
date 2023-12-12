@@ -19,6 +19,7 @@ module Core.Syntax
     , Module(..)
     , Program(..)
     , Program'
+    , programScDefs
     , Expr'
     , ScDef'
     , Alter'
@@ -92,6 +93,9 @@ data Module b = Module (Maybe (Name, [Name])) (Program b)
 
 newtype Program b = Program [ScDef b]
     deriving (Show, Lift)
+
+programScDefs :: Lens' (Program b) [ScDef b]
+programScDefs = lens coerce (const coerce)
 
 type Program' = Program Name
 type Expr' = Expr Name
