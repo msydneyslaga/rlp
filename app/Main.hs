@@ -133,7 +133,7 @@ ddumpEval = whenFlag flagDDumpEval do
 
 parseProg :: RLPCOptions
           -> String
-          -> Either SrcError (CoreProgram, [SrcError])
+          -> Either SrcError (Program', [SrcError])
 parseProg o = evalRLPC o . (lexCore >=> parseCoreProg)
 
 forFiles_ :: (Monad m)
