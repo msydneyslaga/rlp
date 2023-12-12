@@ -50,6 +50,7 @@ options = RLPCOptions
         <> metavar "INT"
         <> help "the number of nodes allowed on the heap before\
                 \triggering the garbage collector"
+        <> value 50
         )
     <*> some (argument str $ metavar "FILES...")
     where
