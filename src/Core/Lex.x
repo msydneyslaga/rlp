@@ -68,6 +68,7 @@ rlp :-
     "{"                     { constTok TokenLBrace }
     "}"                     { constTok TokenRBrace }
     ";"                     { constTok TokenSemicolon }
+    "@"                     { constTok TokenTypeApp }
     "{-#"                   { constTok TokenLPragma `andBegin` pragma }
 
     "let"                   { constTok TokenLet }
@@ -133,6 +134,7 @@ data CoreToken = TokenLet
                | TokenLBrace
                | TokenRBrace
                | TokenSemicolon
+               | TokenTypeApp
                | TokenLPragma
                | TokenRPragma
                | TokenWord String

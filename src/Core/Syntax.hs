@@ -6,6 +6,7 @@ Description : Core ASTs and the like
 {-# LANGUAGE FunctionalDependencies #-}
 module Core.Syntax
     ( Expr(..)
+    , Type(..)
     , Literal(..)
     , pattern (:$)
     , Binding(..)
@@ -36,8 +37,8 @@ import Data.List                    (intersperse)
 import Data.Function                ((&))
 import Data.String
 -- Lift instances for the Core quasiquoters
-import Lens.Micro
 import Language.Haskell.TH.Syntax   (Lift)
+import Lens.Micro
 ----------------------------------------------------------------------------------
 
 data Expr b = Var Name
@@ -47,9 +48,19 @@ data Expr b = Var Name
             | Let Rec [Binding b] (Expr b)
             | App (Expr b) (Expr b)
             | LitE Literal
+            | Type Type
             deriving (Show, Read, Lift)
 
 deriving instance (Eq b) => Eq (Expr b)
+
+data Type = TyInt
+          | TyFun
+          | TyVar Name
+          | TyApp Type Type
+          | TyConApp TyCon [Type]
+          deriving (Show, Read, Lift, Eq)
+
+type TyCon = Name
 
 infixl 2 :$
 pattern (:$) :: Expr b  -> Expr b  -> Expr b 
