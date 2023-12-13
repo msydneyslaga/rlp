@@ -16,9 +16,15 @@ data ArithExpr = IntA Int
                | NegateA ArithExpr
                -- to test Evals
                | IdA ArithExpr
+               -- strict arith; these get inlined
                | ArithExpr :+ ArithExpr
                | ArithExpr :* ArithExpr
                | ArithExpr :- ArithExpr
+               -- non-strict ops; these get wrapped in an `id` call to test
+               -- non-inlined arith
+               | ArithExpr ::+ ArithExpr
+               | ArithExpr ::* ArithExpr
+               | ArithExpr ::- ArithExpr
                deriving Show
 
 evalA :: ArithExpr -> Int
@@ -28,6 +34,9 @@ evalA (NegateA a) = negate (evalA a)
 evalA (a :+ b)    = evalA a + evalA b
 evalA (a :* b)    = evalA a * evalA b
 evalA (a :- b)    = evalA a - evalA b
+evalA (a ::+ b)   = evalA a + evalA b
+evalA (a ::* b)   = evalA a * evalA b
+evalA (a ::- b)   = evalA a - evalA b
 
 instance Arbitrary ArithExpr where
     arbitrary = gen 4
@@ -38,10 +47,13 @@ instance Arbitrary ArithExpr where
                     -- i don't feel like dealing with division at the moment
                     [ IntA <$> int
                     , NegateA <$> arbitrary
-                    -- , IdA <$> arbitrary
+                    , IdA <$> arbitrary
                     , b (:+)
                     , b (:-)
                     , b (:*)
+                    , b (::+)
+                    , b (::-)
+                    , b (::*)
                     ]
                 | otherwise = IntA <$> int
                 where
@@ -69,6 +81,9 @@ toCore expr = Program
         go (a :+ b)    = f "+#" a b
         go (a :- b)    = f "-#" a b
         go (a :* b)    = f "*#" a b
+        go (a ::+ b)   = f ("id" :$ "+#") a b
+        go (a ::- b)   = f ("id" :$ "-#") a b
+        go (a ::* b)   = f ("id" :$ "*#") a b
 
         f n a b = n :$ go a :$ go b
 
