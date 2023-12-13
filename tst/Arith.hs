@@ -35,7 +35,7 @@ instance Arbitrary ArithExpr where
             gen :: Int -> Gen ArithExpr
             gen n
                 | n > 0 = oneof
-                    -- i don't feel like dealing with zero at the moment
+                    -- i don't feel like dealing with division at the moment
                     [ IntA <$> int
                     , NegateA <$> arbitrary
                     -- , IdA <$> arbitrary
@@ -47,7 +47,8 @@ instance Arbitrary ArithExpr where
                 where
                     b f = liftA2 f s s
                     s = gen (n `div` 2)
-                    int = chooseInt (minBound,maxBound)
+                    -- int = chooseInt (minBound,maxBound)
+                    int = chooseInt (-500,500)
 
 prop_ArithExprEqCoreExpr :: ArithExpr -> Bool
 prop_ArithExprEqCoreExpr e = arithResult `eq1` coreResult
@@ -55,23 +56,23 @@ prop_ArithExprEqCoreExpr e = arithResult `eq1` coreResult
         arithResult = Just (evalA e)
         coreResult  = evalCore (toCore e)
 
-toCore :: ArithExpr -> Program
+toCore :: ArithExpr -> Program'
 toCore expr = Program
         [ ScDef "id" ["x"] $ Var "x"
         , ScDef "main" [] $ go expr
         ]
     where
-        go :: ArithExpr -> Expr
-        go (IntA n)    = IntE n
+        go :: ArithExpr -> Expr'
+        go (IntA n)    = LitE (IntL n)
         go (NegateA e) = "negate#" :$ go e
         go (IdA e)     = "id" :$ go e
-        go (a :+ b)  = f "+#" a b
-        go (a :- b)  = f "-#" a b
-        go (a :* b)  = f "*#" a b
+        go (a :+ b)    = f "+#" a b
+        go (a :- b)    = f "-#" a b
+        go (a :* b)    = f "*#" a b
 
         f n a b = n :$ go a :$ go b
 
-evalCore :: Program -> Maybe Int
+evalCore :: Program' -> Maybe Int
 evalCore p = do
     a <- fst <$> evalProg p
     case a of

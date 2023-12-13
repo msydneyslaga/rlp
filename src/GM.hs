@@ -701,12 +701,12 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 compileBinder (_ := v, a) = compileC g' v <> [Update a]
 
         -- special cases for prim functions; essentially inlining
-        compileE g ("negate#" :$ a) = compileE g a <>                 [Neg]
-        compileE g ("+#" :$ a :$ b) = compileE g a <> compileE g b <> [Add]
-        compileE g ("-#" :$ a :$ b) = compileE g a <> compileE g b <> [Sub]
-        compileE g ("*#" :$ a :$ b) = compileE g a <> compileE g b <> [Mul]
-        compileE g ("/#" :$ a :$ b) = compileE g a <> compileE g b <> [Div]
-        compileE g ("==#" :$ a :$ b) = compileE g a <> compileE g b <> [Equals]
+        compileE g ("negate#" :$ a)  = compileE g a <>                 [Neg]
+        compileE g ("+#" :$ a :$ b)  = compileE g b <> compileE g a <> [Add]
+        compileE g ("-#" :$ a :$ b)  = compileE g b <> compileE g a <> [Sub]
+        compileE g ("*#" :$ a :$ b)  = compileE g b <> compileE g a <> [Mul]
+        compileE g ("/#" :$ a :$ b)  = compileE g b <> compileE g a <> [Div]
+        compileE g ("==#" :$ a :$ b) = compileE g b <> compileE g a <> [Equals]
 
         compileE g (Case e as) = compileE g e <> [CaseJump (compileD g as)]
 
