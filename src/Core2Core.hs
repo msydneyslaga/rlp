@@ -57,6 +57,7 @@ floatNonStrictCases g = goE
         goE :: Expr' -> Floater Expr'
         goE (Var k)             = pure (Var k)
         goE (LitE l)            = pure (LitE l)
+        goE (Case e as)         = pure (Case e as)
         goE (Let Rec bs e)      = Let Rec <$> bs' <*> goE e
             where bs' = travBs goE bs
         goE e                   = goC e

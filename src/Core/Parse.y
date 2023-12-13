@@ -47,6 +47,7 @@ import Data.Default.Class   (def)
       'λ'             { Located _ _ _ TokenLambda }
       '->'            { Located _ _ _ TokenArrow }
       '='             { Located _ _ _ TokenEquals }
+      '@'             { Located _ _ _ TokenTypeApp }
       '('             { Located _ _ _ TokenLParen }
       ')'             { Located _ _ _ TokenRParen }
       '{'             { Located _ _ _ TokenLBrace }
@@ -104,9 +105,8 @@ Binders         : Var Binders                  { $1 : $2 }
                 | Var                          { [$1] }
 
 Application     :: { Expr Name }
-Application     : Expr1 AppArgs                 { foldl' App $1 $2 }
+Application     : Expr1 AppArgs                { foldl' App $1 $2 }
 
--- TODO: Application can probably be written as a single rule, without AppArgs
 AppArgs         :: { [Expr Name] }
 AppArgs         : Expr1 AppArgs                 { $1 : $2 }
                 | Expr1                         { [$1] }
