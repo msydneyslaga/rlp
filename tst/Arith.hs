@@ -48,7 +48,7 @@ instance Arbitrary ArithExpr where
                     -- i don't feel like dealing with division at the moment
                     [ IntA <$> int
                     , NegateA <$> arbitrary
-                    -- , IdA <$> arbitrary
+                    , IdA <$> arbitrary
                     , b (:+)
                     , b (:-)
                     , b (:*)
