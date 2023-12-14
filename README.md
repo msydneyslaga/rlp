@@ -12,6 +12,9 @@ $ cabal build       # Build the rlpc compiler
 $ cabal install     # Install rlpc to $PATH
 $ cabal haddock     # Build the API docs w/ Haddock
 $ make -C doc html  # Build the primary docs w/ Sphinx
+
+# run the test suite
+$ cabal test --test-show-details=direct
 ```
 
 ### Use
@@ -80,7 +83,7 @@ Listed in order of importance.
     - [ ] Tail call optimisation
     - [x] Parsing rlp
 - [ ] Tests
-    - [ ] Generic example programs
+    - [x] Generic example programs
     - [ ] Parser
 
 ### December Release Plan
