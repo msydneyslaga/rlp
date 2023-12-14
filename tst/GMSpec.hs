@@ -33,3 +33,6 @@ spec = do
         it "sum [1,2,3]" $ do
             resultOf Ex.sumList `shouldBe` Just (NNum 6)
 
+        it "k 3 ((/#) 1 0)" $ do
+            resultOf Ex.constDivZero `shouldBe` Just (NNum 3)
+

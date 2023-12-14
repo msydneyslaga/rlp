@@ -7,6 +7,7 @@ Description : Core examples (may eventually be unit tests)
 module Core.Examples
     ( fac3
     , sumList
+    , constDivZero
     ) where
 ----------------------------------------------------------------------------------
 import Core.Syntax
@@ -172,6 +173,12 @@ sumList = [coreProg|
             ; 1 x xs -> (+#) x (sum xs)
             };
         main = sum list;
+    |]
+
+constDivZero :: Program'
+constDivZero = [coreProg|
+        k x y = x;
+        main = k 3 ((/#) 1 0);
     |]
 
 corePrelude :: Module Name
