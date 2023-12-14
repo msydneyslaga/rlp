@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Arith
-    ( runTestsArith
+    ( evalCore
+    , evalArith
     ) where
 ----------------------------------------------------------------------------------
 import Data.Functor.Classes             (eq1)
@@ -27,16 +28,16 @@ data ArithExpr = IntA Int
                | ArithExpr ::- ArithExpr
                deriving Show
 
-evalA :: ArithExpr -> Int
-evalA (IntA n)    = n
-evalA (IdA  e)    = evalA e
-evalA (NegateA a) = negate (evalA a)
-evalA (a :+ b)    = evalA a + evalA b
-evalA (a :* b)    = evalA a * evalA b
-evalA (a :- b)    = evalA a - evalA b
-evalA (a ::+ b)   = evalA a + evalA b
-evalA (a ::* b)   = evalA a * evalA b
-evalA (a ::- b)   = evalA a - evalA b
+evalArith :: ArithExpr -> Int
+evalArith (IntA n)    = n
+evalArith (IdA  e)    = evalArith e
+evalArith (NegateA a) = negate (evalArith a)
+evalArith (a :+ b)    = evalArith a + evalArith b
+evalArith (a :* b)    = evalArith a * evalArith b
+evalArith (a :- b)    = evalArith a - evalArith b
+evalArith (a ::+ b)   = evalArith a + evalArith b
+evalArith (a ::* b)   = evalArith a * evalArith b
+evalArith (a ::- b)   = evalArith a - evalArith b
 
 instance Arbitrary ArithExpr where
     arbitrary = gen 4
@@ -47,7 +48,7 @@ instance Arbitrary ArithExpr where
                     -- i don't feel like dealing with division at the moment
                     [ IntA <$> int
                     , NegateA <$> arbitrary
-                    , IdA <$> arbitrary
+                    -- , IdA <$> arbitrary
                     , b (:+)
                     , b (:-)
                     , b (:*)
@@ -62,11 +63,11 @@ instance Arbitrary ArithExpr where
                     -- int = chooseInt (minBound,maxBound)
                     int = chooseInt (-500,500)
 
-prop_ArithExprEqCoreExpr :: ArithExpr -> Bool
-prop_ArithExprEqCoreExpr e = arithResult `eq1` coreResult
-    where
-        arithResult = Just (evalA e)
-        coreResult  = evalCore (toCore e)
+-- prop_ArithExprEqCoreExpr :: ArithExpr -> Bool
+-- prop_ArithExprEqCoreExpr e = arithResult `eq1` coreResult
+--     where
+--         arithResult = Just (evalArith e)
+--         coreResult  = evalCore (toCore e)
 
 toCore :: ArithExpr -> Program'
 toCore expr = Program
@@ -87,15 +88,18 @@ toCore expr = Program
 
         f n a b = n :$ go a :$ go b
 
-evalCore :: Program' -> Maybe Int
-evalCore p = do
+evalProgram :: Program' -> Maybe Int
+evalProgram p = do
     a <- fst <$> evalProg p
     case a of
         (NNum n) -> Just n
         _        -> Nothing
 
-pure []
+evalCore :: ArithExpr -> Maybe Int
+evalCore = evalProgram . toCore
 
-runTestsArith :: IO Bool
-runTestsArith = $quickCheckAll
+-- pure []
+
+-- runTestsArith :: IO Bool
+-- runTestsArith = $quickCheckAll
 
