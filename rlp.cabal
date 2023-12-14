@@ -23,13 +23,13 @@ library
                     , GM
                     , Compiler.RLPC
                     , Core.Syntax
+                    , Core.Examples
                     , Core.Utils
+                    , Core.TH
 
     other-modules:    Data.Heap
                     , Data.Pretty
                     , Core.Parse
-                    , Core.TH
-                    , Core.Examples
                     , Core.Lex
                     , Control.Monad.Errorful
                     , Core2Core
@@ -83,5 +83,8 @@ test-suite rlp-test
     build-depends: base ^>=4.18.0.0
                  , rlp
                  , QuickCheck
+                 , hspec            ==2.*
     other-modules: Arith
+                 , GMSpec
+    build-tool-depends: hspec-discover:hspec-discover
 

@@ -9,6 +9,10 @@ module GM
     ( hdbgProg
     , evalProg
     , Node(..)
+    , gmEvalProg
+    , finalStateOf
+    , resultOf
+    , resultOfExpr
     )
     where
 ----------------------------------------------------------------------------------
@@ -701,12 +705,12 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 compileBinder (_ := v, a) = compileC g' v <> [Update a]
 
         -- special cases for prim functions; essentially inlining
-        compileE g ("negate#" :$ a)  = compileE g a <>                 [Neg]
-        compileE g ("+#" :$ a :$ b)  = compileE g b <> compileE g a <> [Add]
-        compileE g ("-#" :$ a :$ b)  = compileE g b <> compileE g a <> [Sub]
-        compileE g ("*#" :$ a :$ b)  = compileE g b <> compileE g a <> [Mul]
-        compileE g ("/#" :$ a :$ b)  = compileE g b <> compileE g a <> [Div]
-        compileE g ("==#" :$ a :$ b) = compileE g b <> compileE g a <> [Equals]
+        compileE g ("negate#" :$ a)  = inlineOp1 g Neg    a
+        compileE g ("+#" :$ a :$ b)  = inlineOp2 g Add    a b
+        compileE g ("-#" :$ a :$ b)  = inlineOp2 g Sub    a b
+        compileE g ("*#" :$ a :$ b)  = inlineOp2 g Mul    a b
+        compileE g ("/#" :$ a :$ b)  = inlineOp2 g Div    a b
+        compileE g ("==#" :$ a :$ b) = inlineOp2 g Equals a b
 
         compileE g (Case e as) = compileE g e <> [CaseJump (compileD g as)]
 
@@ -722,6 +726,13 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 binds = (NameKey <$> as) `zip` [0..]
                 g' = binds ++ argOffset n g
                 c = compileE g' e
+
+        inlineOp1 :: Env -> Instr -> Expr' -> Code
+        inlineOp1 g i a = compileE g a <> [i]
+
+        inlineOp2 :: Env -> Instr -> Expr' -> Expr' -> Code
+        inlineOp2 g i a b = compileE g b <> compileE g' a <> [i]
+            where g' = argOffset 1 g
 
         -- | offset each address in the environment by n
         argOffset :: Int -> Env -> Env
@@ -850,7 +861,7 @@ showNodeAtP p st a = case hLookup a h of
             name = case lookup a (swap <$> g) of
                 Just (NameKey n)     -> n
                 Just (ConstrKey t n) -> idPack t n
-                _                     -> errTxtInvalidAddress
+                _                    -> errTxtInvalidAddress
     -- TODO: left-associativity
     Just (NAp f x)       -> pprec $ showNodeAtP (p+1) st f
                                 <+> showNodeAtP (p+1) st x
@@ -945,4 +956,26 @@ sweepNodes st = st & gmHeap %~ thread (f <$> addresses h)
 thread :: [a -> a] -> (a -> a)
 thread = appEndo . foldMap Endo
 
---}
+----------------------------------------------------------------------------------
+
+gmEvalProg :: Program' -> GmState
+gmEvalProg p = compile p & eval & last
+
+finalStateOf :: (GmState -> r) -> Program' -> r
+finalStateOf f = f . gmEvalProg
+
+resultOf :: Program' -> Maybe Node
+resultOf p = do
+    a <- res
+    n <- hLookup a h
+    pure n
+    where
+        res = st ^? gmStack . _head
+        st = gmEvalProg p
+        h = st ^. gmHeap
+
+resultOfExpr :: Expr' -> Maybe Node
+resultOfExpr e = resultOf $ Program
+    [ ScDef "main" [] e
+    ]
+
