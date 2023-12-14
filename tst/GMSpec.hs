@@ -36,3 +36,6 @@ spec = do
         it "k 3 ((/#) 1 0)" $ do
             resultOf Ex.constDivZero `shouldBe` Just (NNum 3)
 
+        it "id (case ... of { ... })" $ do
+            resultOf Ex.idCase `shouldBe` Just (NNum 5)
+

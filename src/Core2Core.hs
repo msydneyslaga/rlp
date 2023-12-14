@@ -46,8 +46,7 @@ type Floater = StateT [Name] (Writer [ScDef'])
 runFloater :: Floater a -> (a, [ScDef'])
 runFloater = flip evalStateT ns >>> runWriter
     where
-        -- TODO: safer, uncapturable names
-        ns = [ "nonstrict_case_" ++ showHex n "" | n <- [0..] ]
+        ns = [ "$nonstrict_case_" ++ showHex n "" | n <- [0..] ]
 
 -- TODO: formally define a "strict context" and reference that here
 -- the returned ScDefs are guaranteed to be free of non-strict cases.
