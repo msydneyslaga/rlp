@@ -1,16 +1,24 @@
 The *G-Machine*
 ===============
 
+The G-Machine (graph machine) is the current heart of rlpc, until we potentially
+move onto a STG (spineless tagless graph machine) or a TIM (three-instruction
+machine). rl' source code is desugared into Core; a dumbed-down subset of rl',
+and then compiled to G-Machine code, which is then finally translated to the
+desired target.
+
 **********
 Motivation
 **********
 
-Our initial model, the *Template Instantiator* (TI) was a very
-straightforward solution to compilation, but its core design has a major
-Achilles' heel, being that Compilation is interleaved with evaluation -- The
-heap nodes for supercombinators hold uninstantiated expressions, i.e. raw ASTs
-straight from the parser. When a supercombinator is found on the stack during
-evaluation, the template expression is instantiated (compiled) on the spot.
+Our initial model, the *Template Instantiator* (TI) was a very straightforward
+solution to compilation, but its core design has a major Achilles' heel, being
+that compilation is interleaved with evaluation -- The heap nodes for
+supercombinators hold uninstantiated expressions, i.e. raw ASTs straight from
+the parser. When a supercombinator is found on the stack during evaluation, the
+template expression is instantiated (compiled) on the spot. This makes
+translation to an assembly difficult, undermining the point of an intermediate
+language.
 
 .. math::
    \transrule
@@ -31,7 +39,7 @@ evaluation, the template expression is instantiated (compiled) on the spot.
    \text{where } h' = \mathtt{instantiateU} \; e \; a_n \; h \; g
    }
 
-The process of instantiating a supercombinator goes something like this
+The process of instantiating a supercombinator goes something like this:
 
 1. Augment the environment with bindings to the arguments.
 
@@ -52,13 +60,17 @@ The process of instantiating a supercombinator goes something like this
 Instantiating the supercombinator's body in this way is the root of our
 Achilles' heel. Traversing a tree structure is a very non-linear task unfit for
 an assembly target. The goal of our new G-Machine is to compile a *linear
-sequence of instructions* which instantiate the expression at execution.
+sequence of instructions* which, **when executed**, build up a graph
+representing the code.
 
 **************************
 Trees and Vines, in Theory
 **************************
 
-WIP.
+Rather than instantiating an expression at runtime -- traversing the AST and
+building a graph -- we want to compile all expressions at compile-time,
+generating a linear sequence of instructions which may be executed to build the
+graph.
 
 **************************
 Evaluation: Slurping Vines
