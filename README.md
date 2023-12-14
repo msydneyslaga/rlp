@@ -19,10 +19,8 @@ $ cabal test --test-show-details=direct
 
 ### Use
 ```sh
-# Compile and evaluate t.hs
-$ rlpc t.hs
-# Compile and evaluate t.hs, with evaluation info dumped to stderr
-$ rlpc -ddump-eval t.hs
+# Compile and evaluate examples/factorial.hs, with evaluation info dumped to stderr
+$ rlpc -ddump-eval examples/factorial.hs
 # Compile and evaluate t.hs, with evaluation info dumped to t.log
 $ rlpc -ddump-eval -l t.log t.hs
 # Print the raw structure describing the compiler options and die
