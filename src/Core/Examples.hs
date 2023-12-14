@@ -8,6 +8,7 @@ module Core.Examples
     ( fac3
     , sumList
     , constDivZero
+    , idCase
     ) where
 ----------------------------------------------------------------------------------
 import Core.Syntax
@@ -179,6 +180,15 @@ constDivZero :: Program'
 constDivZero = [coreProg|
         k x y = x;
         main = k 3 ((/#) 1 0);
+    |]
+
+idCase :: Program'
+idCase = [coreProg|
+        id x = x;
+
+        main = id (case Pack{1 0} of
+            { 1 -> (+#) 2 3
+            })
     |]
 
 corePrelude :: Module Name
