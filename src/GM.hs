@@ -701,11 +701,16 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 compileBinder (_ := v, a) = compileC g' v <> [Update a]
 
         -- special cases for prim functions; essentially inlining
-        compileE g ("negate#" :$ a) = compileE g a <>                 [Neg]
-        compileE g ("+#" :$ a :$ b) = compileE g a <> compileE g b <> [Add]
-        compileE g ("-#" :$ a :$ b) = compileE g a <> compileE g b <> [Sub]
-        compileE g ("*#" :$ a :$ b) = compileE g a <> compileE g b <> [Mul]
-        compileE g ("/#" :$ a :$ b) = compileE g a <> compileE g b <> [Div]
+        compileE g ("negate#" :$ a) = compileE g a <>                  [Neg]
+        compileE g ("+#" :$ a :$ b) = compileE g a <> compileE g b  <> [Add]
+        -- note that we only bother offsetting the environment and evaluationg
+        -- in the "correct" order with non-commutative operations. if we
+        -- implemented Sub the same way as Add, (-#) 3 2 would evaluate to -1.
+        compileE g ("-#" :$ a :$ b) = compileE g b <> compileE g' a <> [Sub]
+            where g' = argOffset 1 g
+        compileE g ("*#" :$ a :$ b) = compileE g a <> compileE g b  <> [Mul]
+        compileE g ("/#" :$ a :$ b) = compileE g a <> compileE g' b <> [Div]
+            where g' = argOffset 1 g
         compileE g ("==#" :$ a :$ b) = compileE g a <> compileE g b <> [Equals]
 
         compileE g (Case e as) = compileE g e <> [CaseJump (compileD g as)]
