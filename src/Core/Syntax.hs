@@ -9,6 +9,8 @@ module Core.Syntax
     , Type(..)
     , Lit(..)
     , pattern (:$)
+    , pattern (:@)
+    , pattern (:->)
     , Binding(..)
     , AltCon(..)
     , pattern (:=)
@@ -57,14 +59,22 @@ data Type = TyInt
           | TyFun
           | TyVar Name
           | TyApp Type Type
-          | TyConApp TyCon [Type]
+          -- | TyConApp TyCon [Type]
           deriving (Show, Read, Lift, Eq)
 
 type TyCon = Name
 
 infixl 2 :$
-pattern (:$) :: Expr b  -> Expr b  -> Expr b 
+pattern (:$) :: Expr b -> Expr b -> Expr b 
 pattern f :$ x = App f x
+
+infixl 2 :@
+pattern (:@) :: Type -> Type -> Type
+pattern f :@ x = TyApp f x
+
+infixr 1 :->
+pattern (:->) :: Type -> Type -> Type
+pattern a :-> b = TyApp (TyApp TyFun a) b
 
 {-# COMPLETE Binding :: Binding #-}
 {-# COMPLETE (:=) :: Binding #-}

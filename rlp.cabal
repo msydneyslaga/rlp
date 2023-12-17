@@ -26,13 +26,14 @@ library
                     , Core.Examples
                     , Core.Utils
                     , Core.TH
+                    , Core.HindleyMilner
 
     other-modules:    Data.Heap
                     , Data.Pretty
                     , Core.Parse
                     , Core.Lex
-                    , Control.Monad.Errorful
                     , Core2Core
+                    , Control.Monad.Errorful
                     , RLP.Syntax
 
     build-tool-depends: happy:happy, alex:alex
@@ -41,6 +42,7 @@ library
     build-depends:    base ^>=4.18.0.0
                     , containers
                     , microlens
+                    , microlens-mtl
                     , microlens-th
                     , mtl
                     , template-haskell
@@ -50,6 +52,8 @@ library
                     , unordered-containers
                     , hashable
                     , pretty
+                    -- TODO: either learn recursion-schemes, or stop depending
+                    -- on it.
                     , recursion-schemes
                     , megaparsec
                     , text
@@ -86,5 +90,6 @@ test-suite rlp-test
                  , hspec            ==2.*
     other-modules: Arith
                  , GMSpec
+                 , Core.HindleyMilnerSpec
     build-tool-depends: hspec-discover:hspec-discover
 
