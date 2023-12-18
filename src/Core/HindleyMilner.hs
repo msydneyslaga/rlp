@@ -2,6 +2,7 @@
 module Core.HindleyMilner
     ( infer
     , Context'
+    , TypeError(..)
     )
     where
 ----------------------------------------------------------------------------------
@@ -18,7 +19,12 @@ type Context b = [(b, Type)]
 
 type Context' = Context Name
 
-infer :: Context' -> Expr' -> Maybe Type
+-- TODO: Errorful monad?
+data TypeError = TyErrCouldNotUnify Type Type
+               | TyErrRecursiveType Name Type
+               deriving Show
+
+infer :: Context' -> Expr' -> Either TypeError Type
 infer g e = foldr (uncurry subst) t <$> unify cs where
     (t,cs) = gather g e
 
@@ -47,12 +53,12 @@ uniqueVar = do
 addConstraint :: Type -> Type -> State ([Constraint], Int) ()
 addConstraint t u = _1 %= ((t, u):)
 
-unify :: [Constraint] -> Maybe Context'
+unify :: [Constraint] -> Either TypeError Context'
 unify = go mempty where
-    go :: Context' -> [Constraint] -> Maybe Context'
+    go :: Context' -> [Constraint] -> Either TypeError Context'
 
-    -- nothing left! return accumulator
-    go g [] = Just g
+    -- nothing left! return accumulated context
+    go g [] = Right g
 
     go g (c:cs) = case c of
         -- primitives may of course unify with themselves
@@ -69,10 +75,11 @@ unify = go mempty where
         -- two functions may be unified if their domain and codomain unify
         (a :-> b, x :-> y)          -> go g $ (a,x) : (b,y) : cs
 
-        _                           -> Nothing
+        -- anything else is a failure :(
+        (t,u)                       -> Left $ TyErrCouldNotUnify t u
 
-    unifyTV :: Context' -> Name -> Type -> [Constraint] -> Maybe Context'
-    unifyTV g x t cs | occurs t   = Nothing
+    unifyTV :: Context' -> Name -> Type -> [Constraint] -> Either TypeError Context'
+    unifyTV g x t cs | occurs t   = Left $ TyErrRecursiveType x t
                      | otherwise  = go g' substed
         where
             g' = (x,t) : g

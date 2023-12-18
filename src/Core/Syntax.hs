@@ -50,7 +50,6 @@ data Expr b = Var Name
             | Let Rec [Binding b] (Expr b)
             | App (Expr b) (Expr b)
             | Lit Lit
-            | Type Type
             deriving (Show, Read, Lift)
 
 deriving instance (Eq b) => Eq (Expr b)
@@ -59,7 +58,6 @@ data Type = TyInt
           | TyFun
           | TyVar Name
           | TyApp Type Type
-          -- | TyConApp TyCon [Type]
           deriving (Show, Read, Lift, Eq)
 
 type TyCon = Name
