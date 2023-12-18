@@ -58,6 +58,7 @@ data Type = TyInt
           | TyFun
           | TyVar Name
           | TyApp Type Type
+          | TyCon Name
           deriving (Show, Read, Lift, Eq)
 
 type TyCon = Name

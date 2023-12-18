@@ -108,7 +108,7 @@ addConstraint t u = _1 %= ((t, u):)
 
 -- | Unify a list of constraints, meaning that pairs between types are turned
 -- into pairs of type variables and types. A useful thought model is to think of
--- it like solving an equation such that the unknown variable is the left-hand
+-- it as solving an equation such that the unknown variable is the left-hand
 -- side.
 
 unify :: [Constraint] -> HMError Context'
