@@ -76,7 +76,7 @@ gather :: Context' -> Expr' -> HMError (Type, [Constraint])
 gather = \g e -> runStateT (go g e) ([],0) <&> \ (t,(cs,_)) -> (t,cs) where
     go :: Context' -> Expr' -> StateT ([Constraint], Int) HMError Type
     go g = \case
-        LitE (IntL _) -> pure TyInt
+        Lit (IntL _)  -> pure TyInt
         Var k         -> lift $ maybe e Right $ lookup k g
             where e = Left (TyErrUntypedVariable k)
         App f x       -> do
