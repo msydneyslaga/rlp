@@ -44,7 +44,7 @@ import Lens.Micro
 ----------------------------------------------------------------------------------
 
 data Expr b = Var Name
-            | Con Tag Int -- Con Tag Arity
+            | Con Tag Int -- ^ Con Tag Arity
             | Case (Expr b) [Alter b]
             | Lam [b] (Expr b)
             | Let Rec [Binding b] (Expr b)

@@ -15,5 +15,5 @@ spec :: Spec
 spec = do
     it "should infer `id 3` :: Int" $
         let g = [ ("id", TyVar "a" :-> TyVar "a") ]
-        in infer g [coreExpr|id 3|] `shouldBe` Just TyInt
+        in infer g [coreExpr|id 3|] `shouldBe` Right TyInt
 
