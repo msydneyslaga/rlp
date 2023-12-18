@@ -7,7 +7,7 @@ Description : Core ASTs and the like
 module Core.Syntax
     ( Expr(..)
     , Type(..)
-    , Literal(..)
+    , Lit(..)
     , pattern (:$)
     , Binding(..)
     , AltCon(..)
@@ -47,7 +47,7 @@ data Expr b = Var Name
             | Lam [b] (Expr b)
             | Let Rec [Binding b] (Expr b)
             | App (Expr b) (Expr b)
-            | LitE Literal
+            | Lit Lit
             | Type Type
             deriving (Show, Read, Lift)
 
@@ -87,11 +87,11 @@ data Rec = Rec
          deriving (Show, Read, Eq, Lift)
 
 data AltCon = AltData Tag
-            | AltLiteral Literal
+            | AltLit Lit
             | Default
             deriving (Show, Read, Eq, Lift)
 
-data Literal = IntL Int
+data Lit = IntL Int
     deriving (Show, Read, Eq, Lift)
 
 type Name = String

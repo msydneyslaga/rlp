@@ -617,7 +617,7 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
                 f (NameKey n, _) = Just n
                 f _              = Nothing
 
-        compileC _ (LitE l)  = compileCL l
+        compileC _ (Lit l)   = compileCL l
 
         -- >> [ref/compileC]
         compileC g (App f x) = compileC g x
@@ -661,16 +661,16 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
 
         compileC _ _ = error "yet to be implemented!"
 
-        compileCL :: Literal -> Code
+        compileCL :: Lit -> Code
         compileCL (IntL n) = [PushInt n]
 
-        compileEL :: Literal -> Code
+        compileEL :: Lit -> Code
         compileEL (IntL n) = [PushInt n]
 
         -- compile an expression in a strict context such that a pointer to the
         -- expression is left on top of the stack in WHNF
         compileE :: Env -> Expr' -> Code
-        compileE _ (LitE l) = compileEL l
+        compileE _ (Lit l) = compileEL l
         compileE g (Let NonRec bs e) =
                 -- we use compileE instead of compileC
                 mconcat binders <> compileE g' e <> [Slide d]

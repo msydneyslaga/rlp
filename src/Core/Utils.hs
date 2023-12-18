@@ -32,7 +32,7 @@ rhssOf = fromList . fmap f
 
 isAtomic :: Expr b -> Bool
 isAtomic (Var _)  = True
-isAtomic (LitE _) = True
+isAtomic (Lit _)  = True
 isAtomic _        = False
 
 ----------------------------------------------------------------------------------
