@@ -76,7 +76,7 @@ toCore expr = Program
         ]
     where
         go :: ArithExpr -> Expr'
-        go (IntA n)    = LitE (IntL n)
+        go (IntA n)    = Lit (IntL n)
         go (NegateA e) = "negate#" :$ go e
         go (IdA e)     = "id" :$ go e
         go (a :+ b)    = f "+#" a b
