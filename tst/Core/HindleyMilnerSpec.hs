@@ -21,6 +21,17 @@ spec = do
         let g = [ ("id", ("a" :-> "a") :-> "a" :-> "a") ]
         in infer g [coreExpr|id 3|] `shouldSatisfy` isUntypedVariableErr
 
+    -- TODO: property-based tests for let
+    it "should infer `let x = 3 in id x` :: Int" $
+        let g = [ ("id", "a" :-> "a") ]
+            e = [coreExpr|let {x = 3} in id x|]
+        in infer g e `shouldBe` Right TyInt
+
+    it "should infer `let x = 3; y = 2 in (+#) x y` :: Int" $
+        let g = [ ("+#", TyInt :-> TyInt :-> TyInt) ]
+            e = [coreExpr|let {x=3;y=2} in (+#) x y|]
+        in infer g e `shouldBe` Right TyInt
+
 isUntypedVariableErr :: HMError a -> Bool
 isUntypedVariableErr (Left (TyErrCouldNotUnify _ _)) = True
 isUntypedVariableErr _                               = False

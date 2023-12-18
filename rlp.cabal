@@ -34,6 +34,7 @@ library
                     , Core.Lex
                     , Core2Core
                     , Control.Monad.Errorful
+                    , Control.Monad.Utils
                     , RLP.Syntax
 
     build-tool-depends: happy:happy, alex:alex

@@ -13,10 +13,10 @@ module Core.HindleyMilner
 ----------------------------------------------------------------------------------
 import Lens.Micro
 import Lens.Micro.Mtl
-import Data.Set                 qualified as S
-import Data.Set                 (Set)
 import Data.Maybe               (fromMaybe)
+import Control.Monad            (foldM)
 import Control.Monad.State
+import Control.Monad.Utils      (mapAccumLM)
 import Core.Syntax
 ----------------------------------------------------------------------------------
 
@@ -85,6 +85,17 @@ gather = \g e -> runStateT (go g e) ([],0) <&> \ (t,(cs,_)) -> (t,cs) where
             tfx <- uniqueVar
             addConstraint tf (tx :-> tfx)
             pure tfx
+        Let NonRec bs e -> do
+            g' <- buildLetContext g bs
+            go g' e
+
+    buildLetContext :: Context' -> [Binding']
+                    -> StateT ([Constraint], Int) HMError Context'
+    buildLetContext = foldM k where
+        k :: Context' -> Binding' -> StateT ([Constraint], Int) HMError Context'
+        k g (x := y) = do
+            ty <- go g y
+            pure ((x,ty) : g)
 
 uniqueVar :: StateT ([Constraint], Int) HMError Type
 uniqueVar = do
