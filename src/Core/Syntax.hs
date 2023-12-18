@@ -126,6 +126,9 @@ type Binding' = Binding Name
 instance IsString (Expr b) where
     fromString = Var
 
+instance IsString Type where
+    fromString = TyVar
+
 instance Semigroup (Program b) where
     (<>) = coerce $ (<>) @[ScDef b] 
 

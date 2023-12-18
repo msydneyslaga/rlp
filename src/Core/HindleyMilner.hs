@@ -7,6 +7,7 @@ module Core.HindleyMilner
     ( infer
     , Context'
     , TypeError(..)
+    , HMError
     )
     where
 ----------------------------------------------------------------------------------
@@ -50,7 +51,7 @@ type HMError = Either TypeError
 -- >>> infer g2 [coreExpr|id 3|]
 -- Left (TyErrCouldNotUnify (TyVar "a" :-> TyVar "a") TyInt)
 
-infer :: Context' -> Expr' -> Either TypeError Type
+infer :: Context' -> Expr' -> HMError Type
 infer g e = do
     (t,cs) <- gather g e
     foldr (uncurry subst) t <$> unify cs
