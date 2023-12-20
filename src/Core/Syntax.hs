@@ -4,6 +4,7 @@ Description : Core ASTs and the like
 -}
 {-# LANGUAGE PatternSynonyms, OverloadedStrings #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Core.Syntax
     ( Expr(..)
     , Type(..)
@@ -24,6 +25,7 @@ module Core.Syntax
     , Program(..)
     , Program'
     , programScDefs
+    , programTypeSigs
     , Expr'
     , ScDef'
     , Alter'
@@ -39,8 +41,11 @@ import GHC.Generics
 import Data.List                    (intersperse)
 import Data.Function                ((&))
 import Data.String
+import Data.HashMap.Strict          qualified as H
+import Data.Hashable
 -- Lift instances for the Core quasiquoters
 import Language.Haskell.TH.Syntax   (Lift)
+import Lens.Micro.TH                (makeLenses)
 import Lens.Micro
 ----------------------------------------------------------------------------------
 
@@ -113,11 +118,14 @@ data ScDef b = ScDef b [b] (Expr b)
 data Module b = Module (Maybe (Name, [Name])) (Program b)
     deriving (Show, Lift)
 
-newtype Program b = Program [ScDef b]
+data Program b = Program
+    { _programScDefs   :: [ScDef b]
+    , _programTypeSigs :: H.HashMap b Type
+    }
     deriving (Show, Lift)
 
-programScDefs :: Lens' (Program b) [ScDef b]
-programScDefs = lens coerce (const coerce)
+makeLenses ''Program
+pure []
 
 type Program' = Program Name
 type Expr' = Expr Name
@@ -134,8 +142,11 @@ instance IsString Type where
 instance Semigroup (Program b) where
     (<>) = coerce $ (<>) @[ScDef b] 
 
-instance Monoid (Program b) where
-    mempty = Program []
+instance (Hashable b) => Semigroup (Program b) where
+    (<>) = undefined
+
+instance (Hashable b) => Monoid (Program b) where
+    mempty = Program mempty mempty
 
 ----------------------------------------------------------------------------------
 

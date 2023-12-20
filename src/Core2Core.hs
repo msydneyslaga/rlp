@@ -27,7 +27,7 @@ core2core :: Program' -> Program'
 core2core p = undefined
 
 gmPrep :: Program' -> Program'
-gmPrep p = p' <> Program caseScs
+gmPrep p = p' & programScDefs %~ (<>caseScs)
     where
         rhss :: Applicative f => (Expr z -> f (Expr z)) -> Program z -> f (Program z)
         rhss = programScDefs . each . _rhs

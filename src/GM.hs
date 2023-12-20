@@ -22,6 +22,7 @@ import Data.Maybe                   (fromMaybe, mapMaybe)
 import Data.Monoid                  (Endo(..))
 import Data.Tuple                   (swap)
 import Lens.Micro
+import Lens.Micro.Extras            (view)
 import Lens.Micro.TH
 import Text.Printf
 import Text.PrettyPrint             hiding ((<>))
@@ -582,7 +583,7 @@ compiledPrims =
         binop k i = (k, 2, [Push 1, Eval, Push 1, Eval, i, Update 2, Pop 2, Unwind])
 
 buildInitialHeap :: Program' -> (GmHeap, Env)
-buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
+buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compiledScs
     where
         compiledScs = fmap compileSc ss <> compiledPrims
 
@@ -975,7 +976,8 @@ resultOf p = do
         h = st ^. gmHeap
 
 resultOfExpr :: Expr' -> Maybe Node
-resultOfExpr e = resultOf $ Program
-    [ ScDef "main" [] e
-    ]
+resultOfExpr e = resultOf $
+    mempty & programScDefs .~
+                [ ScDef "main" [] e
+                ]
 

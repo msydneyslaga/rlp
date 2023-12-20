@@ -15,7 +15,14 @@ import Core.Syntax
 import Core.TH
 ----------------------------------------------------------------------------------
 
--- TODO: my shitty lexer isn't inserting semicolons
+--
+fac3 = undefined
+sumList = undefined
+constDivZero = undefined
+idCase = undefined
+--}
+
+{--
 
 letrecExample :: Program'
 letrecExample = [coreProg|
@@ -191,30 +198,32 @@ idCase = [coreProg|
             })
     |]
 
-corePrelude :: Module Name
-corePrelude = Module (Just ("Prelude", [])) $
-    -- non-primitive defs
-    [coreProg|
-        id x = x;
-        k x y = x;
-        k1 x y = y;
-        s f g x = f x (g x);
-        compose f g x = f (g x);
-        twice f x = f (f x);
-        fst p = casePair# p k;
-        snd p = casePair# p k1;
-        head l = caseList# l abort# k;
-        tail l = caseList# l abort# k1;
-        _length_cc x xs = (+#) 1 (length xs);
-        length l = caseList# l 0 length_cc;
-    |]
-    <>
-    -- primitive constructors need some specialised wiring:
-    Program
-        [ ScDef "False" [] $ Con 0 0
-        , ScDef "True" [] $ Con 1 0
-        , ScDef "MkPair" [] $ Con 0 2
-        , ScDef "Nil" [] $ Con 1 0
-        , ScDef "Cons" [] $ Con 2 2
-        ]
+-- corePrelude :: Module Name
+-- corePrelude = Module (Just ("Prelude", [])) $
+--     -- non-primitive defs
+--     [coreProg|
+--         id x = x;
+--         k x y = x;
+--         k1 x y = y;
+--         s f g x = f x (g x);
+--         compose f g x = f (g x);
+--         twice f x = f (f x);
+--         fst p = casePair# p k;
+--         snd p = casePair# p k1;
+--         head l = caseList# l abort# k;
+--         tail l = caseList# l abort# k1;
+--         _length_cc x xs = (+#) 1 (length xs);
+--         length l = caseList# l 0 length_cc;
+--     |]
+--     <>
+--     -- primitive constructors need some specialised wiring:
+--     Program
+--         [ ScDef "False" [] $ Con 0 0
+--         , ScDef "True" [] $ Con 1 0
+--         , ScDef "MkPair" [] $ Con 0 2
+--         , ScDef "Nil" [] $ Con 1 0
+--         , ScDef "Cons" [] $ Con 2 2
+--         ]
+
+--}
 

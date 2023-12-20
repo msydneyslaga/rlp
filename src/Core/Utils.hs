@@ -7,7 +7,7 @@ module Core.Utils
     ( bindersOf
     , rhssOf
     , isAtomic
-    , insertModule
+    -- , insertModule
     , extractProgram
     , freeVariables
     , ExprF(..)
@@ -19,6 +19,7 @@ import Data.Functor.Foldable
 import Data.Set                     (Set)
 import Data.Set                     qualified as S
 import Core.Syntax
+import Lens.Micro
 import GHC.Exts                     (IsList(..))
 ----------------------------------------------------------------------------------
 
@@ -38,8 +39,8 @@ isAtomic _        = False
 ----------------------------------------------------------------------------------
 
 -- TODO: export list awareness
-insertModule :: Module b -> Program b -> Program b
-insertModule (Module _ m) p = p <> m
+-- insertModule :: Module b -> Program b -> Program b
+-- insertModule (Module _ p) = programScDefs %~ (<>m)
 
 extractProgram :: Module b -> Program b
 extractProgram (Module _ p) = p

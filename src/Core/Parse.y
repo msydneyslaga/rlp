@@ -19,7 +19,10 @@ import Data.Foldable        (foldl')
 import Core.Syntax
 import Core.Lex
 import Compiler.RLPC
+import Lens.Micro
 import Data.Default.Class   (def)
+import Data.Hashable        (Hashable)
+import Data.HashMap.Strict  qualified as H
 }
 
 %name parseCore Module
@@ -55,6 +58,7 @@ import Data.Default.Class   (def)
       '{-#'           { Located _ _ _ TokenLPragma }
       '#-}'           { Located _ _ _ TokenRPragma }
       ';'             { Located _ _ _ TokenSemicolon }
+      '::'            { Located _ _ _ TokenHasType }
       eof             { Located _ _ _ TokenEOF }
 
 %%
@@ -71,7 +75,15 @@ StandaloneProgram :: { Program Name }
 StandaloneProgram : Program eof                 { $1 }
 
 Program         :: { Program Name }
-Program         : ScDefs                        { Program $1 }
+Program         : ScTypeSig ';' Program         { insTypeSig $1 $3 }
+                | ScTypeSig OptSemi             { singletonTypeSig $1 }
+
+OptSemi         :: { () }
+OptSemi         : ';'                           { () }
+                | {- epsilon -}                 { () }
+
+ScTypeSig       :: { (Name, Type) }
+ScTypeSig       : Var '::' Type                 { ($1,$3) }
 
 ScDefs          :: { [ScDef Name] }
 ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
@@ -81,6 +93,9 @@ ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
 
 ScDef           :: { ScDef Name }
 ScDef           : Var ParList '=' Expr          { ScDef $1 $2 $4 }
+
+Type            :: { Type }
+Type            : Var                           { TyInt }
 
 ParList         :: { [Name] }
 ParList         : Var ParList                   { $1 : $2 }
@@ -189,6 +204,13 @@ exprPragma _           = addFatal err
 
 astPragma :: [String] -> RLPC SrcError (Expr Name)
 astPragma = pure . read . unwords
+
+insTypeSig :: (Hashable b) => (b, Type) -> Program b -> Program b
+insTypeSig ts = programTypeSigs %~ uncurry H.insert ts
+
+singletonTypeSig :: (Hashable b) => (b, Type) -> Program b
+singletonTypeSig ts = mempty
+                    & programTypeSigs .~ uncurry H.singleton ts
 
 }
 
