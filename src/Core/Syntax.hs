@@ -7,6 +7,7 @@ Description : Core ASTs and the like
 module Core.Syntax
     ( Expr(..)
     , Type(..)
+    , pattern TyInt
     , Lit(..)
     , pattern (:$)
     , pattern (:@)
@@ -54,14 +55,14 @@ data Expr b = Var Name
 
 deriving instance (Eq b) => Eq (Expr b)
 
-data Type = TyInt
-          | TyFun
+data Type = TyFun
           | TyVar Name
           | TyApp Type Type
           | TyCon Name
           deriving (Show, Read, Lift, Eq)
 
-type TyCon = Name
+pattern TyInt :: Type
+pattern TyInt = TyCon "Int#"
 
 infixl 2 :$
 pattern (:$) :: Expr b -> Expr b -> Expr b 
