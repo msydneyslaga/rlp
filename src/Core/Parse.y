@@ -95,7 +95,14 @@ ScDef           :: { ScDef Name }
 ScDef           : Var ParList '=' Expr          { ScDef $1 $2 $4 }
 
 Type            :: { Type }
-Type            : Var                           { TyInt }
+Type            : Type1                         { $1 }
+
+Type1           :: { Type }
+Type1           : '(' Type ')'                  { $2 }
+                | Type1 '->' Type               { $1 :-> $3 }
+                -- do we want to use Var instead, permitting symbolic type vars?
+                | varname                       { TyVar $1 }
+                | conname                       { TyCon $1 }
 
 ParList         :: { [Name] }
 ParList         : Var ParList                   { $1 : $2 }

@@ -139,9 +139,6 @@ instance IsString (Expr b) where
 instance IsString Type where
     fromString = TyVar
 
-instance Semigroup (Program b) where
-    (<>) = coerce $ (<>) @[ScDef b] 
-
 instance (Hashable b) => Semigroup (Program b) where
     (<>) = undefined
 
