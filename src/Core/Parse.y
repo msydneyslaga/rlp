@@ -3,6 +3,7 @@
 Module : Core.Parse
 Description : Parser for the Core language
 -}
+{-# LANGUAGE OverloadedStrings #-}
 module Core.Parse
     ( parseCore
     , parseCoreExpr
@@ -22,6 +23,8 @@ import Compiler.RLPC
 import Lens.Micro
 import Data.Default.Class   (def)
 import Data.Hashable        (Hashable)
+import Data.Text.IO         qualified as TIO
+import Data.Text            qualified as T
 import Data.HashMap.Strict  qualified as H
 }
 
@@ -157,8 +160,8 @@ ExprPragma      :: { Expr Name }
 ExprPragma      : '{-#' Words '#-}'      {% exprPragma $2 }
 
 Words           :: { [String] }
-Words           : word Words                    { $1 : $2 }
-                | word                          { [$1] }
+Words           : word Words                    { T.unpack $1 : $2 }
+                | word                          { [T.unpack $1] }
 
 PackCon         :: { Expr Name }
 PackCon         : pack '{' litint litint '}'    { Con $3 $4 }
@@ -195,7 +198,7 @@ parseError (Located y x l _ : _) = addFatal err
 
 parseTmp :: IO (Module Name)
 parseTmp = do
-    s <- readFile "/tmp/t.hs"
+    s <- TIO.readFile "/tmp/t.hs"
     case parse s of
         Left e -> error (show e)
         Right (ts,_) -> pure ts

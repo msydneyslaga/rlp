@@ -3,6 +3,7 @@
 Module      : Core.Lex
 Description : Lexical analysis for the core language
 -}
+{-# LANGUAGE OverloadedStrings #-}
 module Core.Lex
     ( lexCore
     , lexCore'
@@ -15,13 +16,16 @@ module Core.Lex
     where
 import Data.Char (chr)
 import Debug.Trace
+import Data.Text            (Text)
+import Data.Text            qualified as T
+import Data.String          (IsString(..))
 import Core.Syntax
 import Compiler.RLPC
 import Lens.Micro
 import Lens.Micro.TH
 }
 
-%wrapper "monad"
+%wrapper "monad-strict-text"
 
 $whitechar = [ \t\n\r\f\v]
 $special   = [\(\)\,\;\[\]\{\}]
@@ -91,7 +95,7 @@ rlp :-
     @varsym                 { lexWith TokenVarSym }
     @consym                 { lexWith TokenConSym }
 
-    @decimal                { lexWith (TokenLitInt . read @Int) }
+    @decimal                { lexWith (TokenLitInt . read @Int . T.unpack) }
 
     $white                  { skip }
     \n                      { skip }
@@ -139,7 +143,7 @@ data CoreToken = TokenLet
                | TokenTypeApp
                | TokenLPragma
                | TokenRPragma
-               | TokenWord String
+               | TokenWord Text
                | TokenEOF
                deriving Show
 
@@ -157,11 +161,11 @@ data SrcErrorType = SrcErrLexical String
 
 type Lexer = AlexInput -> Int -> Alex (Located CoreToken)
 
-lexWith :: (String -> CoreToken) -> Lexer
-lexWith f (AlexPn _ y x,_,_,s) l = pure $ Located y x l (f $ take l s)
+lexWith :: (Text -> CoreToken) -> Lexer
+lexWith f (AlexPn _ y x,_,_,s) l = pure $ Located y x l (f $ T.take l s)
 
 -- | The main lexer driver.
-lexCore :: String -> RLPC SrcError [Located CoreToken]
+lexCore :: Text -> RLPC SrcError [Located CoreToken]
 lexCore s = case m of
     Left e   -> addFatal err
         where err = SrcError
@@ -175,7 +179,7 @@ lexCore s = case m of
 
 -- | @lexCore@, but the tokens are stripped of location info. Useful for
 -- debugging
-lexCore' :: String -> RLPC SrcError [CoreToken]
+lexCore' :: Text -> RLPC SrcError [CoreToken]
 lexCore' s = fmap f <$> lexCore s
     where f (Located _ _ _ t) = t
 

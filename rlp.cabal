@@ -45,6 +45,7 @@ library
                     , microlens
                     , microlens-mtl
                     , microlens-th
+                    , microlens-platform
                     , mtl
                     , template-haskell
                     -- required for happy
@@ -74,6 +75,7 @@ executable rlpc
                  , microlens-mtl
                  , mtl
                  , unordered-containers
+                 , text
 
     hs-source-dirs:   app
     default-language: GHC2021

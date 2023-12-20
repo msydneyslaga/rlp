@@ -14,6 +14,7 @@ module Core.HindleyMilner
 import Lens.Micro
 import Lens.Micro.Mtl
 import Data.Maybe               (fromMaybe)
+import Data.Text                qualified as T
 import Control.Monad            (foldM)
 import Control.Monad.State
 import Control.Monad.Utils      (mapAccumLM)
@@ -101,7 +102,7 @@ uniqueVar :: StateT ([Constraint], Int) HMError Type
 uniqueVar = do
     n <- use _2
     _2 %= succ
-    pure (TyVar $ '$' : 'a' : show n)
+    pure (TyVar . T.pack $ '$' : 'a' : show n)
 
 addConstraint :: Type -> Type -> StateT ([Constraint], Int) HMError ()
 addConstraint t u = _1 %= ((t, u):)

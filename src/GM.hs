@@ -24,6 +24,8 @@ import Data.Tuple                   (swap)
 import Lens.Micro
 import Lens.Micro.Extras            (view)
 import Lens.Micro.TH
+import Lens.Micro.Platform          (packed, unpacked)
+import Lens.Micro.Platform.Internal (IsText(..))
 import Text.Printf
 import Text.PrettyPrint             hiding ((<>))
 import Text.PrettyPrint.HughesPJ    (maybeParens)
@@ -282,7 +284,7 @@ step st = case head (st ^. gmCode) of
                 m = st ^. gmEnv
                 s = st ^. gmStack
                 h = st ^. gmHeap
-                n' = show n
+                n' = show n ^. packed
 
         -- Core Rule 2. (no sharing)
         -- pushIntI :: Int -> GmState
@@ -613,7 +615,8 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
             | k `elem` domain  = [Push n]
             | otherwise        = [PushGlobal k]
             where
-                n = fromMaybe (error $ "undeclared var: " <> k) $ lookupN k g
+                n = fromMaybe err $ lookupN k g
+                err = error $ "undeclared var: " <> (k ^. unpacked)
                 domain = f `mapMaybe` g
                 f (NameKey n, _) = Just n
                 f _              = Nothing
@@ -739,8 +742,8 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
         argOffset :: Int -> Env -> Env
         argOffset n = each . _2 %~ (+n)
 
-idPack :: Tag -> Int -> String
-idPack t n = printf "Pack{%d %d}" t n
+showCon :: (IsText a) => Tag -> Int -> a
+showCon t n = printf "Pack{%d %d}" t n ^. packed
 
 ----------------------------------------------------------------------------------
 
@@ -856,12 +859,12 @@ showNodeAt = showNodeAtP 0
 showNodeAtP :: Int -> GmState -> Addr -> Doc
 showNodeAtP p st a = case hLookup a h of
     Just (NNum n)        -> int n <> "#"
-    Just (NGlobal _ _)   -> text name
+    Just (NGlobal _ _)   -> textt name
         where
             g = st ^. gmEnv
             name = case lookup a (swap <$> g) of
                 Just (NameKey n)     -> n
-                Just (ConstrKey t n) -> idPack t n
+                Just (ConstrKey t n) -> showCon t n
                 _                    -> errTxtInvalidAddress
     -- TODO: left-associativity
     Just (NAp f x)       -> pprec $ showNodeAtP (p+1) st f
@@ -878,7 +881,7 @@ showNodeAtP p st a = case hLookup a h of
         pprec = maybeParens (p > 0)
 
 showSc :: GmState -> (Name, Addr) -> Doc
-showSc st (k,a) = "Supercomb " <> qquotes (text k) <> colon
+showSc st (k,a) = "Supercomb " <> qquotes (textt k) <> colon
                $$ code
     where
         code = case hLookup a (st ^. gmHeap) of
@@ -900,6 +903,9 @@ showInstr (CaseJump alts) = "CaseJump" $$ nest pprTabstop alternatives
         showAlt (t,c) = "<" <> int t <> ">" <> showCodeShort c
         alternatives = foldr (\a acc -> showAlt a $$ acc) mempty alts
 showInstr i = text $ show i
+
+textt :: (IsText a) => a -> Doc
+textt t = t ^. unpacked & text
 
 ----------------------------------------------------------------------------------
 

@@ -7,6 +7,9 @@ import Options.Applicative      hiding (ParseError)
 import Control.Monad
 import Control.Monad.Reader
 import Data.HashSet             qualified as S
+import Data.Text                (Text)
+import Data.Text                qualified as T
+import Data.Text.IO             qualified as TIO
 import System.IO
 import System.Exit              (exitSuccess)
 import Core
@@ -102,7 +105,7 @@ dshowFlags = whenFlag flagDDumpOpts do
 ddumpAST :: RLPCIO CompilerError ()
 ddumpAST = whenFlag flagDDumpAST $ forFiles_ \o f -> do
     liftIO $ withFile f ReadMode $ \h -> do
-        s <- hGetContents h
+        s <- TIO.hGetContents h
         case parseProg o s of
             Right (a,_) -> hPutStrLn stderr $ show a
             Left e -> error "todo errors lol"
@@ -110,10 +113,10 @@ ddumpAST = whenFlag flagDDumpAST $ forFiles_ \o f -> do
 ddumpEval :: RLPCIO CompilerError ()
 ddumpEval = whenFlag flagDDumpEval do
     fs <- view rlpcInputFiles
-    forM_ fs $ \f -> liftIO (readFile f) >>= doProg
+    forM_ fs $ \f -> liftIO (TIO.readFile f) >>= doProg
 
     where
-        doProg :: String -> RLPCIO CompilerError ()
+        doProg :: Text -> RLPCIO CompilerError ()
         doProg s = ask >>= \o -> case parseProg o s of
             -- TODO: error handling
             Left e -> addFatal . CompilerError $ show e
@@ -133,7 +136,7 @@ ddumpEval = whenFlag flagDDumpEval do
             where v f p h = f p h *> pure ()
 
 parseProg :: RLPCOptions
-          -> String
+          -> Text
           -> Either SrcError (Program', [SrcError])
 parseProg o = evalRLPC o . (lexCore >=> parseCoreProg)
 

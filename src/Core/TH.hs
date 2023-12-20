@@ -10,11 +10,12 @@ module Core.TH
     where
 ----------------------------------------------------------------------------------
 import Language.Haskell.TH
-import Language.Haskell.TH.Syntax hiding (Module)
+import Language.Haskell.TH.Syntax   hiding (Module)
 import Language.Haskell.TH.Quote
 import Control.Monad                ((>=>))
 import Compiler.RLPC
 import Data.Default.Class           (def)
+import Data.Text                    qualified as T
 import Core.Parse
 import Core.Lex
 ----------------------------------------------------------------------------------
@@ -44,21 +45,21 @@ coreExpr = QuasiQuoter
     }
 
 qCore :: String -> Q Exp
-qCore s = case parse s of
+qCore s = case parse (T.pack s) of
     Left e       -> error (show e)
     Right (m,ts) -> lift m
     where
         parse = evalRLPC def . (lexCore >=> parseCore)
 
 qCoreExpr :: String -> Q Exp
-qCoreExpr s = case parseExpr s of
+qCoreExpr s = case parseExpr (T.pack s) of
     Left e       -> error (show e)
     Right (m,ts) -> lift m
     where
         parseExpr = evalRLPC def . (lexCore >=> parseCoreExpr)
 
 qCoreProg :: String -> Q Exp
-qCoreProg s = case parseProg s of
+qCoreProg s = case parseProg (T.pack s) of
     Left e       -> error (show e)
     Right (m,ts) -> lift m
     where

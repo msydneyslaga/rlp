@@ -17,6 +17,7 @@ import Data.List
 import Control.Monad.Writer
 import Control.Monad.State
 import Control.Arrow            ((>>>))
+import Data.Text                qualified as T
 import Numeric                  (showHex)
 import Lens.Micro
 import Core.Syntax
@@ -46,7 +47,7 @@ type Floater = StateT [Name] (Writer [ScDef'])
 runFloater :: Floater a -> (a, [ScDef'])
 runFloater = flip evalStateT ns >>> runWriter
     where
-        ns = [ "$nonstrict_case_" ++ showHex n "" | n <- [0..] ]
+        ns = [ T.pack $ "$nonstrict_case_" ++ showHex n "" | n <- [0..] ]
 
 -- TODO: formally define a "strict context" and reference that here
 -- the returned ScDefs are guaranteed to be free of non-strict cases.

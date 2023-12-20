@@ -43,6 +43,7 @@ import Data.Function                ((&))
 import Data.String
 import Data.HashMap.Strict          qualified as H
 import Data.Hashable
+import Data.Text                    qualified as T
 -- Lift instances for the Core quasiquoters
 import Language.Haskell.TH.Syntax   (Lift)
 import Lens.Micro.TH                (makeLenses)
@@ -109,7 +110,7 @@ data AltCon = AltData Tag
 data Lit = IntL Int
     deriving (Show, Read, Eq, Lift)
 
-type Name = String
+type Name = T.Text
 type Tag = Int
 
 data ScDef b = ScDef b [b] (Expr b)
@@ -134,10 +135,10 @@ type Alter' = Alter Name
 type Binding' = Binding Name
 
 instance IsString (Expr b) where
-    fromString = Var
+    fromString = Var . fromString
 
 instance IsString Type where
-    fromString = TyVar
+    fromString = TyVar . fromString
 
 instance (Hashable b) => Semigroup (Program b) where
     (<>) = undefined
