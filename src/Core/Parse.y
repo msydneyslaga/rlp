@@ -102,7 +102,7 @@ Type            : Type1                         { $1 }
 Type1           :: { Type }
 Type1           : '(' Type ')'                  { $2 }
                 | Type1 '->' Type               { $1 :-> $3 }
-                -- do we want to use Var instead, permitting symbolic type vars?
+                -- do we want to allow symbolic names for tyvars and tycons?
                 | varname                       { TyVar $1 }
                 | conname                       { TyCon $1 }
 
