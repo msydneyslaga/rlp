@@ -77,6 +77,8 @@ StandaloneProgram : Program eof                 { $1 }
 Program         :: { Program Name }
 Program         : ScTypeSig ';' Program         { insTypeSig $1 $3 }
                 | ScTypeSig OptSemi             { singletonTypeSig $1 }
+                | ScDef     ';' Program         { insScDef $1 $3 }
+                | ScDef     OptSemi             { singletonScDef $1 }
 
 OptSemi         :: { () }
 OptSemi         : ';'                           { () }
@@ -216,8 +218,13 @@ insTypeSig :: (Hashable b) => (b, Type) -> Program b -> Program b
 insTypeSig ts = programTypeSigs %~ uncurry H.insert ts
 
 singletonTypeSig :: (Hashable b) => (b, Type) -> Program b
-singletonTypeSig ts = mempty
-                    & programTypeSigs .~ uncurry H.singleton ts
+singletonTypeSig ts = insTypeSig ts mempty
+
+insScDef :: (Hashable b) => ScDef b -> Program b -> Program b
+insScDef sc = programScDefs %~ (sc:)
+
+singletonScDef :: (Hashable b) => ScDef b -> Program b
+singletonScDef sc = insScDef sc mempty
 
 }
 
