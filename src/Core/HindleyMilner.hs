@@ -4,8 +4,9 @@ Description : Hindley-Milner inference
 -}
 {-# LANGUAGE LambdaCase #-}
 module Core.HindleyMilner
-    ( infer
-    , Context'
+    ( Context'
+    , infer
+    , check
     , TypeError(..)
     , HMError
     )
@@ -15,7 +16,8 @@ import Lens.Micro
 import Lens.Micro.Mtl
 import Data.Maybe               (fromMaybe)
 import Data.Text                qualified as T
-import Control.Monad            (foldM)
+import Data.HashMap.Strict      qualified as H
+import Control.Monad            (foldM, void)
 import Control.Monad.State
 import Control.Monad.Utils      (mapAccumLM)
 import Core.Syntax
@@ -43,6 +45,26 @@ data TypeError
 -- | Synonym for @Either TypeError@
 type HMError = Either TypeError
 
+-- | Assert that an expression unifies with a given type
+--
+-- >>> let e = [coreProg|3|]
+-- >>> check [] (TyCon "Bool") e
+-- Left (TyErrCouldNotUnify (TyCon "Bool") (TyCon "Int#"))
+-- >>> check [] (TyCon "Int#") e
+-- Right ()
+
+check :: Context' -> Type -> Expr' -> HMError ()
+check g t1 e = do
+    t2 <- infer g e
+    unify [(t1,t2)]
+    pure ()
+
+checkProg :: Program' -> HMError ()
+checkProg p = p ^. programScDefs
+            & traversalOf k
+    where
+        k sc = undefined
+
 -- | Infer the type of an expression under some context.
 --
 -- >>> let g1 = [("id", TyVar "a" :-> TyVar "a")]
@@ -55,6 +77,7 @@ type HMError = Either TypeError
 infer :: Context' -> Expr' -> HMError Type
 infer g e = do
     (t,cs) <- gather g e
+    -- apply all unified constraints
     foldr (uncurry subst) t <$> unify cs
 
 -- | A @Constraint@ between two types describes the requirement that the pair
@@ -89,6 +112,7 @@ gather = \g e -> runStateT (go g e) ([],0) <&> \ (t,(cs,_)) -> (t,cs) where
         Let NonRec bs e -> do
             g' <- buildLetContext g bs
             go g' e
+        -- TODO letrec, lambda, case
 
     buildLetContext :: Context' -> [Binding']
                     -> StateT ([Constraint], Int) HMError Context'
@@ -149,8 +173,17 @@ unify = go mempty where
                 | x == y     = True
             occurs _         = False
 
+buildInitialContext :: Program b -> Context b
+buildInitialContext p = p ^. programTypeSigs
+                      & H.toList
+
 -- | The expression @subst x t e@ substitutes all occurences of @x@ in @e@ with
 -- @t@
+--
+-- >>> subst "a" (TyCon "Int") (TyVar "a")
+-- TyCon "Int"
+-- >>> subst "a" (TyCon "Int") (TyVar "a" :-> TyVar "a")
+-- TyCon "Int" :-> TyCon "Int"
 
 subst :: Name -> Type -> Type -> Type
 subst x t (TyVar y) | x == y  = t

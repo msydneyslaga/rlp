@@ -6,6 +6,7 @@ module Arith
     ) where
 ----------------------------------------------------------------------------------
 import Data.Functor.Classes             (eq1)
+import Lens.Micro
 import Core.Syntax
 import GM
 import Test.QuickCheck
@@ -70,7 +71,7 @@ instance Arbitrary ArithExpr where
 --         coreResult  = evalCore (toCore e)
 
 toCore :: ArithExpr -> Program'
-toCore expr = Program
+toCore expr = mempty & programScDefs .~
         [ ScDef "id" ["x"] $ Var "x"
         , ScDef "main" [] $ go expr
         ]

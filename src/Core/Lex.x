@@ -87,6 +87,7 @@ rlp :-
     "where"                 { constTok TokenWhere }
     "Pack"                  { constTok TokenPack } -- temp
 
+    -- TODO: this should be "\"
     "\\"                    { constTok TokenLambda }
     "λ"                     { constTok TokenLambda }
     "="                     { constTok TokenEquals }

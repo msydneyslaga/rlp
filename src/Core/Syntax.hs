@@ -24,6 +24,7 @@ module Core.Syntax
     , Module(..)
     , Program(..)
     , Program'
+    , unliftScDef
     , programScDefs
     , programTypeSigs
     , Expr'
@@ -37,13 +38,13 @@ module Core.Syntax
 ----------------------------------------------------------------------------------
 import Data.Coerce
 import Data.Pretty
-import GHC.Generics
 import Data.List                    (intersperse)
 import Data.Function                ((&))
 import Data.String
 import Data.HashMap.Strict          qualified as H
 import Data.Hashable
 import Data.Text                    qualified as T
+import Data.Char
 -- Lift instances for the Core quasiquoters
 import Language.Haskell.TH.Syntax   (Lift)
 import Lens.Micro.TH                (makeLenses)
@@ -116,6 +117,9 @@ type Tag = Int
 data ScDef b = ScDef b [b] (Expr b)
     deriving (Show, Lift)
 
+unliftScDef :: ScDef b -> Expr b
+unliftScDef (ScDef _ as e) = Lam as e
+
 data Module b = Module (Maybe (Name, [Name])) (Program b)
     deriving (Show, Lift)
 
@@ -138,7 +142,11 @@ instance IsString (Expr b) where
     fromString = Var . fromString
 
 instance IsString Type where
-    fromString = TyVar . fromString
+    fromString "" = error "IsString Type string may not be empty"
+    fromString s
+        | isUpper c     = TyCon . fromString $ s
+        | otherwise     = TyVar . fromString $ s
+        where (c:_) = s
 
 instance (Hashable b) => Semigroup (Program b) where
     (<>) = undefined

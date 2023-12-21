@@ -92,6 +92,7 @@ test-suite rlp-test
                  , rlp
                  , QuickCheck
                  , hspec            ==2.*
+                 , microlens
     other-modules: Arith
                  , GMSpec
                  , Core.HindleyMilnerSpec

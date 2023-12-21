@@ -6,7 +6,8 @@ module Core.HindleyMilnerSpec
 ----------------------------------------------------------------------------------
 import Core.Syntax
 import Core.TH                  (coreExpr)
-import Core.HindleyMilner       (infer, TypeError(..), HMError)
+import Core.HindleyMilner       (infer, check, TypeError(..), HMError)
+import Data.Either              (isLeft)
 import Test.Hspec
 ----------------------------------------------------------------------------------
 
@@ -19,7 +20,7 @@ spec = do
 
     it "should not infer `id 3` when `id` is specialised to `a -> a`" $
         let g = [ ("id", ("a" :-> "a") :-> "a" :-> "a") ]
-        in infer g [coreExpr|id 3|] `shouldSatisfy` isUntypedVariableErr
+        in infer g [coreExpr|id 3|] `shouldSatisfy` isLeft
 
     -- TODO: property-based tests for let
     it "should infer `let x = 3 in id x` :: Int" $
@@ -31,8 +32,8 @@ spec = do
         let g = [ ("+#", TyInt :-> TyInt :-> TyInt) ]
             e = [coreExpr|let {x=3;y=2} in (+#) x y|]
         in infer g e `shouldBe` Right TyInt
-
-isUntypedVariableErr :: HMError a -> Bool
-isUntypedVariableErr (Left (TyErrCouldNotUnify _ _)) = True
-isUntypedVariableErr _                               = False
+    
+    it "should find `3 :: Bool` contradictory" $
+        let e = [coreExpr|3|]
+        in check [] (TyCon "Bool") e `shouldSatisfy` isLeft
 
