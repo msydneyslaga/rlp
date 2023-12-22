@@ -17,6 +17,7 @@ import Lens.Micro.Mtl
 import Data.Maybe               (fromMaybe)
 import Data.Text                qualified as T
 import Data.HashMap.Strict      qualified as H
+import Data.Foldable            (traverse_)
 import Control.Monad            (foldM, void)
 import Control.Monad.State
 import Control.Monad.Utils      (mapAccumLM)
@@ -56,14 +57,20 @@ type HMError = Either TypeError
 check :: Context' -> Type -> Expr' -> HMError ()
 check g t1 e = do
     t2 <- infer g e
-    unify [(t1,t2)]
-    pure ()
+    void $ unify [(t1,t2)]
 
+-- | Typecheck program. I plan to allow for *some* inference in the future, but
+-- in the mean time all top-level binders must have a type annotation.
 checkProg :: Program' -> HMError ()
-checkProg p = p ^. programScDefs
-            & traversalOf k
+checkProg p = scDefs
+            & traverse_ k
     where
-        k sc = undefined
+        scDefs = p ^. programScDefs
+        g = gatherTypeSigs p
+
+        k :: ScDef' -> HMError ()
+        k sc | Just t <- lookup (sc ^. _lhs._1) g
+             = check g t (sc ^. _rhs)
 
 -- | Infer the type of an expression under some context.
 --
@@ -173,9 +180,9 @@ unify = go mempty where
                 | x == y     = True
             occurs _         = False
 
-buildInitialContext :: Program b -> Context b
-buildInitialContext p = p ^. programTypeSigs
-                      & H.toList
+gatherTypeSigs :: Program b -> Context b
+gatherTypeSigs p = p ^. programTypeSigs
+                 & H.toList
 
 -- | The expression @subst x t e@ substitutes all occurences of @x@ in @e@ with
 -- @t@
