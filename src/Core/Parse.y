@@ -8,6 +8,7 @@ module Core.Parse
     ( parseCore
     , parseCoreExpr
     , parseCoreProg
+    , parseCoreProgR
     , module Core.Lex -- temp convenience
     , parseTmp
     , SrcError
@@ -228,6 +229,9 @@ insScDef sc = programScDefs %~ (sc:)
 
 singletonScDef :: (Hashable b) => ScDef b -> Program b
 singletonScDef sc = insScDef sc mempty
+
+parseCoreProgR :: [Located CoreToken] -> RLPC RlpcError Program'
+parseCoreProgR = liftRlpcErrs . parseCoreProg
 
 }
 

@@ -6,6 +6,7 @@ Description : Lexical analysis for the core language
 {-# LANGUAGE OverloadedStrings #-}
 module Core.Lex
     ( lexCore
+    , lexCoreR
     , lexCore'
     , CoreToken(..)
     , SrcError(..)
@@ -21,6 +22,7 @@ import Data.Text            qualified as T
 import Data.String          (IsString(..))
 import Core.Syntax
 import Compiler.RLPC
+import Compiler.RlpcError
 import Lens.Micro
 import Lens.Micro.TH
 }
@@ -177,6 +179,9 @@ lexCore s = case m of
     where
         m = runAlex s lexStream
 
+lexCoreR :: Text -> RLPC RlpcError [Located CoreToken]
+lexCoreR = liftRlpcErrs . lexCore
+
 -- | @lexCore@, but the tokens are stripped of location info. Useful for
 -- debugging
 lexCore' :: Text -> RLPC SrcError [CoreToken]
@@ -193,6 +198,14 @@ lexStream = do
 data ParseError = ParErrLexical String
                 | ParErrParse
                 deriving Show
+
+-- TODO:
+instance IsRlpcError SrcError where
+    liftRlpcErr = RlpcErr . show
+
+-- TODO:
+instance IsRlpcError ParseError where
+    liftRlpcErr = RlpcErr . show
 
 alexEOF :: Alex (Located CoreToken)
 alexEOF = Alex $ \ st@(AlexState { alex_pos = AlexPn _ y x }) ->

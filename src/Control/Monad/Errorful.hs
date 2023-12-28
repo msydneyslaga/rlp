@@ -6,6 +6,7 @@ module Control.Monad.Errorful
     , runErrorfulT
     , Errorful
     , runErrorful
+    , mapErrors
     , MonadErrorful(..)
     )
     where
@@ -62,4 +63,11 @@ instance (Monad m) => Monad (ErrorfulT e m) where
         case m' of
             Right (a,es) -> runErrorfulT (k a)
             Left e       -> pure (Left e)
+
+mapErrors :: (Monad m) => (e -> e') -> ErrorfulT e m a -> ErrorfulT e' m a
+mapErrors f m = ErrorfulT $ do
+    x <- runErrorfulT m
+    case x of
+        Left  e      -> pure . Left  $ f e
+        Right (a,es) -> pure . Right $ (a, f <$> es)
 

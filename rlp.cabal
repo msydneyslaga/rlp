@@ -22,6 +22,7 @@ library
                     , TI
                     , GM
                     , Compiler.RLPC
+                    , Compiler.RlpcError
                     , Core.Syntax
                     , Core.Examples
                     , Core.Utils

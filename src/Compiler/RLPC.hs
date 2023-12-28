@@ -16,6 +16,7 @@ module Compiler.RLPC
     , RLPCT
     , RLPCIO
     , RLPCOptions(RLPCOptions)
+    , RlpcError(..)
     , addFatal
     , addWound
     , MonadErrorful
@@ -24,6 +25,9 @@ module Compiler.RLPC
     , evalRLPCT
     , evalRLPCIO
     , evalRLPC
+    , addRlpcWound
+    , addRlpcFatal
+    , liftRlpcErrs
     , rlpcLogFile
     , rlpcDebugOpts
     , rlpcEvaluator
@@ -42,6 +46,7 @@ import Control.Exception
 import Control.Monad.Reader
 import Control.Monad.State      (MonadState(state))
 import Control.Monad.Errorful
+import Compiler.RlpcError
 import Data.Functor.Identity
 import Data.Default.Class
 import GHC.Generics             (Generic)
@@ -115,12 +120,20 @@ data Severity = Error
 -- temporary until we have a new doc building system
 type ErrorDoc = String
 
-class Diagnostic e where
-    errorDoc :: e -> ErrorDoc
-
 instance (Monad m) => MonadErrorful e (RLPCT e m) where
     addWound = RLPCT . lift . addWound
     addFatal = RLPCT . lift . addFatal
+
+liftRlpcErrs :: (IsRlpcError e, Monad m)
+             => RLPCT e m a -> RLPCT RlpcError m a
+liftRlpcErrs m = RLPCT . ReaderT $ \r ->
+    mapErrors liftRlpcErr $ runRLPCT >>> (`runReaderT` r) $ m
+
+addRlpcWound :: (IsRlpcError e, Monad m) => e -> RLPCT RlpcError m ()
+addRlpcWound = addWound . liftRlpcErr
+
+addRlpcFatal :: (IsRlpcError e, Monad m) => e -> RLPCT RlpcError m ()
+addRlpcFatal = addWound . liftRlpcErr
 
 ----------------------------------------------------------------------------------
 

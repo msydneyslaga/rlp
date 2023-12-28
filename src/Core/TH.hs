@@ -63,5 +63,5 @@ qCoreProg s = case parseProg (T.pack s) of
     Left e       -> error (show e)
     Right (m,ts) -> lift m
     where
-        parseProg = evalRLPC def . (lexCore >=> parseCoreProg)
+        parseProg = evalRLPC def . (lexCoreR >=> parseCoreProgR)
 
