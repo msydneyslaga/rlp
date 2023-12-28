@@ -7,6 +7,7 @@ module Core.HindleyMilner
     ( Context'
     , infer
     , check
+    , checkProg
     , TypeError(..)
     , HMError
     )
@@ -20,6 +21,7 @@ import Data.HashMap.Strict      qualified as H
 import Data.Foldable            (traverse_)
 import Compiler.RLPC
 import Control.Monad            (foldM, void)
+import Control.Monad.Errorful   (Errorful, addFatal)
 import Control.Monad.State
 import Control.Monad.Utils      (mapAccumLM)
 import Core.Syntax
@@ -45,8 +47,9 @@ data TypeError
     | TyErrMissingTypeSig Name
     deriving (Show, Eq)
 
--- | Synonym for @Either TypeError@
-type HMError = Either TypeError
+-- | Synonym for @Errorful [TypeError]@. This means an @HMError@ action may
+-- throw any number of fatal or nonfatal errors. Run with @runErrorful@.
+type HMError = Errorful TypeError
 
 -- TODO: better errors. Errorful-esque, with cummulative errors instead of
 -- instantly dying.
@@ -76,7 +79,7 @@ checkProg p = scDefs
         k :: ScDef' -> HMError ()
         k sc = case lookup scname g of
              Just t  -> check g t (sc ^. _rhs)
-             Nothing -> Left (TyErrMissingTypeSig $ scname)
+             Nothing -> addFatal $ TyErrMissingTypeSig scname
              where scname = sc ^. _lhs._1
 
 checkRlpcProg :: Program' -> RLPC TypeError ()
@@ -118,8 +121,8 @@ gather = \g e -> runStateT (go g e) ([],0) <&> \ (t,(cs,_)) -> (t,cs) where
     go :: Context' -> Expr' -> StateT ([Constraint], Int) HMError Type
     go g = \case
         Lit (IntL _)  -> pure TyInt
-        Var k         -> lift $ maybe e Right $ lookup k g
-            where e = Left (TyErrUntypedVariable k)
+        Var k         -> lift $ maybe e pure $ lookup k g
+            where e = addFatal $ TyErrUntypedVariable k
         App f x       -> do
             tf <- go g f
             tx <- go g x
@@ -158,7 +161,7 @@ unify = go mempty where
     go :: Context' -> [Constraint] -> HMError Context'
 
     -- nothing left! return accumulated context
-    go g [] = Right g
+    go g [] = pure g
 
     go g (c:cs) = case c of
         -- primitives may of course unify with themselves
@@ -176,10 +179,10 @@ unify = go mempty where
         (a :-> b, x :-> y)          -> go g $ (a,x) : (b,y) : cs
 
         -- anything else is a failure :(
-        (t,u)                       -> Left $ TyErrCouldNotUnify t u
+        (t,u)                       -> addFatal $ TyErrCouldNotUnify t u
 
-    unifyTV :: Context' -> Name -> Type -> [Constraint] -> Either TypeError Context'
-    unifyTV g x t cs | occurs t   = Left $ TyErrRecursiveType x t
+    unifyTV :: Context' -> Name -> Type -> [Constraint] -> HMError Context'
+    unifyTV g x t cs | occurs t   = addFatal $ TyErrRecursiveType x t
                      | otherwise  = go g' substed
         where
             g' = (x,t) : g
