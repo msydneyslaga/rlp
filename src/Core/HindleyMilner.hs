@@ -1,6 +1,6 @@
 {-|
 Module      : Core.HindleyMilner
-Description : Hindley-Milner inference
+Description : Hindley-Milner type system
 -}
 {-# LANGUAGE LambdaCase #-}
 module Core.HindleyMilner
@@ -18,6 +18,7 @@ import Data.Maybe               (fromMaybe)
 import Data.Text                qualified as T
 import Data.HashMap.Strict      qualified as H
 import Data.Foldable            (traverse_)
+import Compiler.RLPC
 import Control.Monad            (foldM, void)
 import Control.Monad.State
 import Control.Monad.Utils      (mapAccumLM)
@@ -41,10 +42,14 @@ data TypeError
     | TyErrRecursiveType Name Type
     -- | Untyped, potentially undefined variable
     | TyErrUntypedVariable Name
+    | TyErrMissingTypeSig Name
     deriving (Show, Eq)
 
 -- | Synonym for @Either TypeError@
 type HMError = Either TypeError
+
+-- TODO: better errors. Errorful-esque, with cummulative errors instead of
+-- instantly dying.
 
 -- | Assert that an expression unifies with a given type
 --
@@ -69,8 +74,13 @@ checkProg p = scDefs
         g = gatherTypeSigs p
 
         k :: ScDef' -> HMError ()
-        k sc | Just t <- lookup (sc ^. _lhs._1) g
-             = check g t (sc ^. _rhs)
+        k sc = case lookup scname g of
+             Just t  -> check g t (sc ^. _rhs)
+             Nothing -> Left (TyErrMissingTypeSig $ scname)
+             where scname = sc ^. _lhs._1
+
+checkRlpcProg :: Program' -> RLPC TypeError ()
+checkRlpcProg = undefined
 
 -- | Infer the type of an expression under some context.
 --
