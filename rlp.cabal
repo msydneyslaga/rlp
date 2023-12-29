@@ -23,6 +23,7 @@ library
                     , GM
                     , Compiler.RLPC
                     , Compiler.RlpcError
+                    , Compiler.JustRun
                     , Core.Syntax
                     , Core.Examples
                     , Core.Utils

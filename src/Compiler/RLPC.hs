@@ -100,7 +100,6 @@ evalRLPCIO o m = do
         -- TODO: errors
         Left e -> throwIO e
         Right a -> pure a
-    
 
 data RLPCOptions = RLPCOptions
     { _rlpcLogFile     :: Maybe FilePath
