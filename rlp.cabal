@@ -28,13 +28,13 @@ library
                     , Core.Utils
                     , Core.TH
                     , Core.HindleyMilner
+                    , Control.Monad.Errorful
 
     other-modules:    Data.Heap
                     , Data.Pretty
                     , Core.Parse
                     , Core.Lex
                     , Core2Core
-                    , Control.Monad.Errorful
                     , Control.Monad.Utils
                     , RLP.Syntax
 
