@@ -13,10 +13,12 @@ errors and the family of RLPC monads.
 {-# LANGUAGE DeriveGeneric, DerivingStrategies, DerivingVia #-}
 module Compiler.RLPC
     ( RLPC
-    , RLPCT
+    , RLPCT(..)
     , RLPCIO
     , RLPCOptions(RLPCOptions)
     , RlpcError(..)
+    , IsRlpcError(..)
+    , rlpc
     , addFatal
     , addWound
     , MonadErrorful
@@ -134,6 +136,9 @@ addRlpcWound = addWound . liftRlpcErr
 
 addRlpcFatal :: (IsRlpcError e, Monad m) => e -> RLPCT RlpcError m ()
 addRlpcFatal = addWound . liftRlpcErr
+
+rlpc :: (Monad m) => ErrorfulT e m a -> RLPCT e m a
+rlpc = RLPCT . ReaderT . const
 
 ----------------------------------------------------------------------------------
 

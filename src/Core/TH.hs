@@ -5,6 +5,7 @@ Description : Core quasiquoters
 module Core.TH
     ( coreExpr
     , coreProg
+    , coreProgT
     , core
     )
     where
@@ -18,7 +19,10 @@ import Data.Default.Class           (def)
 import Data.Text                    qualified as T
 import Core.Parse
 import Core.Lex
+import Core.HindleyMilner           (checkCoreProgR)
 ----------------------------------------------------------------------------------
+
+-- TODO: write in terms of a String -> QuasiQuoter
 
 core :: QuasiQuoter
 core = QuasiQuoter
@@ -44,6 +48,15 @@ coreExpr = QuasiQuoter
     , quoteDec = error "core quasiquotes may only be used in expressions"
     }
 
+-- | Type-checked @coreProg@
+coreProgT :: QuasiQuoter
+coreProgT = QuasiQuoter
+    { quoteExp = qCoreProgT
+    , quotePat = error "core quasiquotes may only be used in expressions"
+    , quoteType = error "core quasiquotes may only be used in expressions"
+    , quoteDec = error "core quasiquotes may only be used in expressions"
+    }
+
 qCore :: String -> Q Exp
 qCore s = case parse (T.pack s) of
     Left e       -> error (show e)
@@ -59,9 +72,16 @@ qCoreExpr s = case parseExpr (T.pack s) of
         parseExpr = evalRLPC def . (lexCore >=> parseCoreExpr)
 
 qCoreProg :: String -> Q Exp
-qCoreProg s = case parseProg (T.pack s) of
+qCoreProg s = case parse (T.pack s) of
     Left e       -> error (show e)
     Right (m,ts) -> lift m
     where
-        parseProg = evalRLPC def . (lexCoreR >=> parseCoreProgR)
+        parse = evalRLPC def . (lexCoreR >=> parseCoreProgR)
+
+qCoreProgT :: String -> Q Exp
+qCoreProgT s = case parse (T.pack s) of
+    Left e      -> error (show e)
+    Right (m,_) -> lift m
+    where
+        parse = evalRLPC def . (lexCoreR >=> parseCoreProgR >=> checkCoreProgR)
 

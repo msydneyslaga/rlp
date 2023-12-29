@@ -7,7 +7,8 @@ module Core.HindleyMilner
     ( Context'
     , infer
     , check
-    , checkProg
+    , checkCoreProg
+    , checkCoreProgR
     , TypeError(..)
     , HMError
     )
@@ -47,6 +48,10 @@ data TypeError
     | TyErrMissingTypeSig Name
     deriving (Show, Eq)
 
+-- TODO:
+instance IsRlpcError TypeError where
+    liftRlpcErr = RlpcErr . show
+
 -- | Synonym for @Errorful [TypeError]@. This means an @HMError@ action may
 -- throw any number of fatal or nonfatal errors. Run with @runErrorful@.
 type HMError = Errorful TypeError
@@ -69,8 +74,8 @@ check g t1 e = do
 
 -- | Typecheck program. I plan to allow for *some* inference in the future, but
 -- in the mean time all top-level binders must have a type annotation.
-checkProg :: Program' -> HMError ()
-checkProg p = scDefs
+checkCoreProg :: Program' -> HMError ()
+checkCoreProg p = scDefs
             & traverse_ k
     where
         scDefs = p ^. programScDefs
@@ -82,8 +87,11 @@ checkProg p = scDefs
              Nothing -> addFatal $ TyErrMissingTypeSig scname
              where scname = sc ^. _lhs._1
 
-checkRlpcProg :: Program' -> RLPC TypeError ()
-checkRlpcProg = undefined
+-- | @checkCoreProgR p@ returns @p@ if @p@ successfully typechecks.
+checkCoreProgR :: Program' -> RLPC RlpcError Program'
+checkCoreProgR p = do
+    liftRlpcErrs . rlpc . checkCoreProg $ p
+    pure p
 
 -- | Infer the type of an expression under some context.
 --
