@@ -1,13 +1,17 @@
 {-# LANGUAGE OverloadedStrings, LambdaCase #-}
 module CoreSyntax
-    (
+    ( ProgramSrc(..)
+    , (~==)
+    , congruentSrc
     )
     where
 ----------------------------------------------------------------------------------
 import Core.Syntax
+import Compiler.JustRun             (justParseSrc)
 import Control.Arrow                ((>>>), (&&&))
 import Control.Monad
 import Data.List                    (intersperse)
+import Data.Coerce                  (coerce)
 import Data.Text                    (Text)
 import Data.Text                    qualified as T
 import Test.QuickCheck
@@ -191,4 +195,15 @@ ws = elements [""," ", "  "]
 
 ws1 :: (IsString a) => Gen a
 ws1 = elements [" ", "  "]
+
+----------------------------------------------------------------------------------
+
+-- | Two bodies of source code are considered congruent iff the parser produces
+-- identical ASTs for both.
+(~==) :: ProgramSrc -> ProgramSrc -> Bool
+(~==) = (==) `on` (justParseSrc . T.unpack . coerce)
+
+-- | Prefix synonym for @(~==)@
+congruentSrc :: ProgramSrc -> ProgramSrc -> Bool
+congruentSrc = (~==)
 

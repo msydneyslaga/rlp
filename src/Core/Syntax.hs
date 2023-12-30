@@ -58,9 +58,9 @@ data Expr b = Var Name
             | Let Rec [Binding b] (Expr b)
             | App (Expr b) (Expr b)
             | Lit Lit
-            deriving (Show, Read, Lift)
+            deriving (Show, Eq, Read, Lift)
 
-deriving instance (Eq b) => Eq (Expr b)
+-- deriving instance (Eq b) => Eq (Expr b)
 
 data Type = TyFun
           | TyVar Name
@@ -86,18 +86,14 @@ pattern a :-> b = TyApp (TyApp TyFun a) b
 {-# COMPLETE Binding :: Binding #-}
 {-# COMPLETE (:=) :: Binding #-}
 data Binding b = Binding b (Expr b)
-    deriving (Show, Read, Lift)
-
-deriving instance (Eq b) => Eq (Binding b)
+    deriving (Show, Read, Eq, Lift)
 
 infixl 1 :=
 pattern (:=) :: b -> (Expr b) -> (Binding b)
 pattern k := v = Binding k v
 
 data Alter b = Alter AltCon [b] (Expr b)
-    deriving (Show, Read, Lift)
-
-deriving instance (Eq b) => Eq (Alter b)
+    deriving (Show, Read, Eq, Lift)
 
 data Rec = Rec
          | NonRec
@@ -115,7 +111,7 @@ type Name = T.Text
 type Tag = Int
 
 data ScDef b = ScDef b [b] (Expr b)
-    deriving (Show, Lift)
+    deriving (Show, Eq, Lift)
 
 unliftScDef :: ScDef b -> Expr b
 unliftScDef (ScDef _ as e) = Lam as e
@@ -127,7 +123,7 @@ data Program b = Program
     { _programScDefs   :: [ScDef b]
     , _programTypeSigs :: H.HashMap b Type
     }
-    deriving (Show, Lift)
+    deriving (Show, Eq, Lift)
 
 makeLenses ''Program
 pure []

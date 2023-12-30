@@ -8,7 +8,7 @@ import Control.Monad.Errorful
 ----------------------------------------------------------------------------------
 
 data RlpcError = RlpcErr String -- temp
-    deriving Show
+    deriving (Show, Eq)
 
 class IsRlpcError a where
     liftRlpcErr :: a -> RlpcError
