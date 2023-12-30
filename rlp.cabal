@@ -94,8 +94,12 @@ test-suite rlp-test
                  , QuickCheck
                  , hspec            ==2.*
                  , microlens
+                 , text
+                 , pretty
+                 , microlens-platform
     other-modules: Arith
                  , GMSpec
+                 , CoreSyntax
                  , Core.HindleyMilnerSpec
     build-tool-depends: hspec-discover:hspec-discover
 

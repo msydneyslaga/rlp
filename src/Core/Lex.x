@@ -103,6 +103,8 @@ rlp :-
     \n                      { skip }
 }
 
+-- TODO: negative literals
+
 <pragma>
 {
     "#-}"                   { constTok TokenRPragma `andBegin` 0 }
