@@ -11,6 +11,8 @@ module Compiler.JustRun
     ( justLexSrc
     , justParseSrc
     , justTypeCheckSrc
+    , RlpcError
+    , Program'
     )
     where
 ----------------------------------------------------------------------------------

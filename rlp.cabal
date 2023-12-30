@@ -30,7 +30,6 @@ library
                     , Core.TH
                     , Core.HindleyMilner
                     , Control.Monad.Errorful
-                    , Data.Monoid.Utils
 
     other-modules:    Data.Heap
                     , Data.Pretty
@@ -99,9 +98,12 @@ test-suite rlp-test
                  , text
                  , pretty
                  , microlens-platform
+
     other-modules: Arith
                  , GMSpec
                  , CoreSyntax
                  , Core.HindleyMilnerSpec
+                 , Core.ParseSpec
+
     build-tool-depends: hspec-discover:hspec-discover
 
