@@ -30,6 +30,7 @@ library
                     , Core.TH
                     , Core.HindleyMilner
                     , Control.Monad.Errorful
+                    , Data.Monoid.Utils
 
     other-modules:    Data.Heap
                     , Data.Pretty
@@ -90,6 +91,7 @@ test-suite rlp-test
     hs-source-dirs: tst
     main-is: Main.hs
     build-depends: base ^>=4.18.0.0
+                 , unordered-containers
                  , rlp
                  , QuickCheck
                  , hspec            ==2.*

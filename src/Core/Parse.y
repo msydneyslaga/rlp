@@ -147,6 +147,7 @@ Alters          : Alter ';' Alters              { $1 : $3 }
                 | Alter ';'                     { [$1] }
                 | Alter                         { [$1] }
 
+-- TODO: tags should be wrapped in <n> to allow matching against literals
 Alter           :: { Alter Name }
 Alter           : litint ParList '->' Expr      { Alter (AltData $1) $2 $4 }
 

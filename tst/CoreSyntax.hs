@@ -1,8 +1,9 @@
-{-# LANGUAGE OverloadedStrings, LambdaCase #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase, GeneralisedNewtypeDeriving #-}
 module CoreSyntax
     ( ProgramSrc(..)
     , (~==)
     , congruentSrc
+    , unparseCoreProg
     )
     where
 ----------------------------------------------------------------------------------
@@ -14,6 +15,7 @@ import Data.List                    (intersperse)
 import Data.Coerce                  (coerce)
 import Data.Text                    (Text)
 import Data.Text                    qualified as T
+import Data.HashMap.Strict          qualified as H
 import Test.QuickCheck
 import Text.PrettyPrint             hiding ((<>))
 import Data.Functor                 ((<&>))
@@ -24,7 +26,7 @@ import Lens.Micro.Platform.Internal (IsText(..))
 ----------------------------------------------------------------------------------
 
 newtype ProgramSrc = ProgramSrc Text
-    deriving Show
+    deriving (Show, Eq, Semigroup, Monoid, IsString)
 
 instance Arbitrary ProgramSrc where
     arbitrary = sized genProg where
@@ -116,7 +118,8 @@ instance Arbitrary ProgramSrc where
             genLam n p = conseq [l, ws, bs, pure "->", ws, gen n' 0]
                      <&> pprec 0 p
                 where
-                    l = elements ["\\", "λ"]
+                    -- whitespace because reserved op shenanigans :3
+                    l = elements [" \\ ", "λ"]
                     n' = next n
                     bs = chooseSize (0,6) (listOf1 genName)
                      <&> mconcat
@@ -206,4 +209,92 @@ ws1 = elements [" ", "  "]
 -- | Prefix synonym for @(~==)@
 congruentSrc :: ProgramSrc -> ProgramSrc -> Bool
 congruentSrc = (~==)
+
+----------------------------------------------------------------------------------
+
+-- | @unparseCoreProg@ should be inverse to @parseCoreProg@ up to source code
+-- congruency, newtype coercion and errors handling.
+unparseCoreProg :: Program' -> ProgramSrc
+unparseCoreProg p = unparseTypeSigs (p ^. programTypeSigs)
+                 <> unparseScDefs (p ^. programScDefs)
+
+unparseTypeSigs :: H.HashMap Name Type -> ProgramSrc
+unparseTypeSigs = H.foldrWithKey f mempty
+    where f k v a = unparseTypeSig k v <> ";\n\n" <> a
+
+unparseTypeSig :: Name -> Type -> ProgramSrc
+unparseTypeSig n t = unparseName n <> " :: " <> unparseType t
+
+unparseName :: Name -> ProgramSrc
+unparseName = coerce
+
+unparseType :: Type -> ProgramSrc
+unparseType = go 0 where
+    go :: Int -> Type -> ProgramSrc
+    -- (:->) is a special case of TyApp, but we want the infix syntax
+    go p (a :-> b)          = a : assocFun b
+                            <&> go 1
+                            & coerce (T.intercalate " -> ")
+                            & pprec 0 p
+    go p a@(TyApp f x)      = assocApp a
+                            <&> go 1
+                            & coerce (T.intercalate " ")
+                            & pprec 1 p
+    go _ TyFun              = "(->)"
+    go _ (TyCon a)          = unparseName a
+    go _ (TyVar a)          = unparseName a
+
+    assocFun :: Type -> [Type]
+    assocFun (a :-> b) = a : assocFun b
+    assocFun x         = [x]
+
+    assocApp :: Type -> [Type]
+    assocApp (TyApp f x) = assocApp f ++ [x]
+    assocApp x           = [x]
+
+unparseScDefs :: [ScDef'] -> ProgramSrc
+unparseScDefs = foldr f mempty where
+    f sc a = unparseScDef sc <> ";\n\n" <> a
+
+unparseScDef :: ScDef' -> ProgramSrc
+unparseScDef (ScDef n as e) = (unparseName <$> (n:as)) <> ["=", unparseExpr e]
+                            & coerce (T.intercalate " ")
+
+unparseExpr :: Expr' -> ProgramSrc
+unparseExpr = go 0 where
+    go :: Int -> Expr' -> ProgramSrc
+    go _ (Var n)        = unparseName n
+    go _ (Con t a)      = mconcat ["Pack{",srcShow t," ",srcShow a,"}"]
+    go _ (Lit l)        = unparseLit l
+    go p a@(App _ _)    = srci " " (go 1 <$> assocApp a)
+                        & pprec 0 p
+    go p (Lam bs e)     = "λ" <> srci " " (unparseName <$> bs)
+                              <> " -> " <> go 0 e
+                        & pprec 0 p
+    go p (Let r bs e)   = mconcat [lw," { ",bs'," } in ",go 0 e]
+        where
+            lw = case r of { NonRec -> "let"; Rec -> "letrec" }
+            bs' = srci "; " $ unparseBinding <$> bs
+    go p (Case e as)    = mconcat ["case ",go 0 e," of {",as',"}"]
+                        & pprec 0 p
+        where as' = srci "; " (unparseAlter <$> as)
+
+    assocApp (App f x) = assocApp f ++ [x]
+    assocApp f         = [f]
+
+    srci :: ProgramSrc -> [ProgramSrc] -> ProgramSrc
+    srci = coerce T.intercalate
+
+unparseBinding :: Binding' -> ProgramSrc
+unparseBinding (k := v) = mconcat [unparseName k, " = ", unparseExpr v]
+
+unparseLit :: Lit -> ProgramSrc
+unparseLit (IntL n) = srcShow n
+
+srcShow :: (Show a) => a -> ProgramSrc
+srcShow = coerce . T.pack . show
+
+unparseAlter :: Alter' -> ProgramSrc
+unparseAlter (Alter (AltData t) as e)   = srcShow t <> " " <> coerce (T.unwords as)
+                                       <> " -> " <> unparseExpr e
 
