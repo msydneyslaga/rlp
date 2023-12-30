@@ -77,6 +77,7 @@ Eof             : eof           { () }
 
 StandaloneProgram :: { Program Name }
 StandaloneProgram : Program eof                 { $1 }
+                  | eof                         { mempty }
 
 Program         :: { Program Name }
 Program         : ScTypeSig ';' Program         { insTypeSig $1 $3 }

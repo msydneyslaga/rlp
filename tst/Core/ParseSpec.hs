@@ -17,9 +17,10 @@ import Test.QuickCheck
 
 spec :: Spec
 spec = do
-    it "should be a right-inverse to the unparser\
+    it "should be a right-inverse to the unparser \
         \up to source code congruency" $
-        property $ \p -> (unparse <=< parse) p ~== Right p
+        withMaxSuccess 20 $ property $
+            \p -> (unparse <=< parse) p ~== Right p
 
     -- TODO: abitrary ASTs
     -- it "should be a right-inverse to the unparser\

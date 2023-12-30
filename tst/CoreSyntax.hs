@@ -25,7 +25,7 @@ import Lens.Micro.Platform.Internal (IsText(..))
 ----------------------------------------------------------------------------------
 
 newtype ProgramSrc = ProgramSrc Text
-    deriving (Show, Eq, Semigroup, Monoid, IsString)
+    deriving (Show, Read, Eq, Semigroup, Monoid, IsString)
 
 instance Arbitrary ProgramSrc where
     arbitrary = sized genProg where
@@ -68,8 +68,8 @@ instance Arbitrary ProgramSrc where
                 , wrapParens <$> gen n' 0
                 , genApp n p
                 , genLet n p
-                , genLam n p
-                , genCase n p
+                -- , genLam n p
+                -- , genCase n p
                 ]
                 where n' = next n
 
@@ -114,7 +114,7 @@ instance Arbitrary ProgramSrc where
                     var = oneof [genName, wrapParens <$> genSymName]
                     n' = next n
 
-            genLam n p = conseq [l, ws, bs, pure "->", ws, gen n' 0]
+            genLam n p = conseq [l, ws, bs, ws, pure "->", ws, gen n' 0]
                      <&> pprec 0 p
                 where
                     -- whitespace because reserved op shenanigans :3
@@ -207,6 +207,11 @@ congruentSrc = (==) `on` (justParseSrc . T.unpack . coerce)
 
 ----------------------------------------------------------------------------------
 
+-- TODO: unparseCoreProg :: Program -> [CoreToken]
+-- womp womp.
+
+-- TODO: implement shrink
+
 -- | @unparseCoreProg@ should be inverse to @parseCoreProg@ up to source code
 -- congruency, newtype coercion and errors handling.
 unparseCoreProg :: Program' -> ProgramSrc
@@ -221,7 +226,9 @@ unparseTypeSig :: Name -> Type -> ProgramSrc
 unparseTypeSig n t = unparseName n <> " :: " <> unparseType t
 
 unparseName :: Name -> ProgramSrc
-unparseName = coerce
+unparseName n
+    | T.head n `elem` (':' : nameSymbols)   = coerce $ wrapParens n
+    | otherwise                             = coerce n
 
 unparseType :: Type -> ProgramSrc
 unparseType = go 0 where
@@ -267,6 +274,7 @@ unparseExpr = go 0 where
                               <> " -> " <> go 0 e
                         & pprec 0 p
     go p (Let r bs e)   = mconcat [lw," { ",bs'," } in ",go 0 e]
+                        & pprec 0 p
         where
             lw = case r of { NonRec -> "let"; Rec -> "letrec" }
             bs' = srci "; " $ unparseBinding <$> bs

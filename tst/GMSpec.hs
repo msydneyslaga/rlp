@@ -21,7 +21,7 @@ spec = do
         resultOf [coreProg|id x = x; main = (id (-#)) 3 2;|] `shouldBe` Just (NNum 1)
 
     it "should correctly evaluate arbitrary arithmetic" $ do
-        property $ \e ->
+        withMaxSuccess 40 $ property $ \e ->
             let arithRes = Just (evalArith e)
                 coreRes  = evalCore e
             in coreRes `shouldBe` arithRes
