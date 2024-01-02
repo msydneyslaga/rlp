@@ -13,12 +13,12 @@ import Text.Megaparsec.Char.Lexer   qualified as L
 import Data.Functor.Const
 import Data.Text                    (Text)
 import Data.Text                    qualified as T
+import Data.List                    (foldl1')
 import Data.Void
 import Data.Char
 import Data.Functor
 import Data.HashMap.Strict          qualified as H
 import Control.Monad
-import Core.Syntax
 import Control.Monad.State
 ----------------------------------------------------------------------------------
 
@@ -71,11 +71,25 @@ funD = FunD <$> varid <*> many pat1 <*> (symbol "=" *> fmap Const partialExpr)
 
 partialExpr :: Parser PartialExpr'
 partialExpr = choice
-    [ try $ fmap Y $ U <$> varid' <*> lexeme infixOp <*> fmap unY partialExpr
-    , fmap Y $ varid'
+    [ try $ fmap Y $ U <$> partialExpr1' <*> lexeme infixOp <*> partialExpr'
+    , foldl1' papp <$> some partialExpr1
     ]
-    where varid' = E . VarEF <$> varid
+    where
+        partialExpr1' = unY <$> partialExpr1
+        partialExpr' = unY <$> partialExpr
 
+        papp :: PartialExpr' -> PartialExpr' -> PartialExpr'
+        papp f x = Y . E $ f `AppEF` x
+
+partialExpr1 :: Parser PartialExpr'
+partialExpr1 = choice
+    [ try $ char '(' *> partialExpr <* char ')'
+    , fmap Y $ varid'
+    , fmap Y $ lit'
+    ]
+    where
+        varid' = E . VarEF <$> varid
+        lit' = E . LitEF <$> lit
 
 infixOp :: Parser Name
 infixOp = symvar <|> symcon
@@ -87,13 +101,6 @@ symvar = T.pack <$>
 symcon :: Parser Name
 symcon = T.pack <$>
     liftA2 (:) (char ':') (many $ satisfy isSym)
-
--- partialExpr :: Parser (Const Text a)
--- partialExpr = fmap Const $ L.lineFold w $ \w' ->
---     try w' <> w
---     where
---         w = L.space eat (void lineComment) (void blockComment)
---         eat = void . some $ satisfy (not . isSpace)
 
 pat1 :: Parser Pat'
 pat1 = VarP <$> varid
@@ -121,6 +128,11 @@ infixD = undefined
 tySigD = undefined
 dataD = undefined
 
+lit :: Parser Lit'
+lit = int
+    where
+        int = IntL <$> L.decimal
+
 ----------------------------------------------------------------------------------
 
 -- absolute psycho shit
@@ -131,6 +143,9 @@ newtype Y f = Y (f (Y f))
 
 unY :: Y f -> f (Y f)
 unY (Y f) = f
+
+ymap :: (Functor f) => (forall a. f a -> g a) -> Y f -> Y g
+ymap m (Y f) = Y $ m (ymap m <$> f)
 
 instance (Show (f (Y f))) => Show (Y f) where
     showsPrec p (Y f) = showsPrec p f
