@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Rlp.Syntax
     ( RlpExpr(..)
+    , RlpExpr'
     , RlpExprF(..)
     , RlpExprF'
     , Decl(..)
@@ -60,6 +61,8 @@ data RlpExpr b = LetE  [Bind b] (RlpExpr b)
                | AppE  (RlpExpr b) (RlpExpr b)
                | LitE  (Lit b)
                deriving Show
+
+type RlpExpr' = RlpExpr Name
 
 -- do we want guards?
 data Alt b = AltA (Pat b) (RlpExpr b)
