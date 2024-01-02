@@ -71,7 +71,8 @@ funD = FunD <$> varid <*> many pat1 <*> (symbol "=" *> fmap Const partialExpr)
 
 partialExpr :: Parser PartialExpr'
 partialExpr = choice
-    [ fmap Y $ U <$> varid' <*> lexeme infixOp <*> varid'
+    [ try $ fmap Y $ U <$> varid' <*> lexeme infixOp <*> fmap unY partialExpr
+    , fmap Y $ varid'
     ]
     where varid' = E . VarEF <$> varid
 
@@ -127,6 +128,9 @@ dataD = undefined
 type PartialDecl' = Decl (Const PartialExpr') Name
 
 newtype Y f = Y (f (Y f))
+
+unY :: Y f -> f (Y f)
+unY (Y f) = f
 
 instance (Show (f (Y f))) => Show (Y f) where
     showsPrec p (Y f) = showsPrec p f
