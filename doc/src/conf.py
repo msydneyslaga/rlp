@@ -32,6 +32,7 @@ html_theme = 'alabaster'
 imgmath_latex_preamble = r'''
 \usepackage{amsmath}
 \usepackage{tabularray}
+\usepackage{syntax}
 
 \newcommand{\transrule}[2]
     {\begin{tblr}{|rrrlc|}
