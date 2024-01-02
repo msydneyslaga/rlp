@@ -30,6 +30,8 @@ library
                     , Core.TH
                     , Core.HindleyMilner
                     , Control.Monad.Errorful
+                    , Rlp.Syntax
+                    , Rlp.ParseDecls
 
     other-modules:    Data.Heap
                     , Data.Pretty
@@ -37,7 +39,6 @@ library
                     , Core.Lex
                     , Core2Core
                     , Control.Monad.Utils
-                    , RLP.Syntax
 
     build-tool-depends: happy:happy, alex:alex
 
