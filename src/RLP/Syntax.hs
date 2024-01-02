@@ -12,6 +12,9 @@ module Rlp.Syntax
     , VarId(..)
     , Pat(..)
     , Pat'
+    , Lit(..)
+    , Lit'
+    , Name
     )
     where
 ----------------------------------------------------------------------------------
@@ -89,6 +92,8 @@ data Lit b = IntL Int
            | CharL Char
            | ListL [RlpExpr b]
            deriving Show
+
+type Lit' = Lit Name
 
 -- instance HasLHS Alt Alt Pat Pat where
 --     _lhs = lens
