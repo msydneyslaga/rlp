@@ -1,5 +1,6 @@
 -- Show Y
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Rlp.ParseDecls
     (
@@ -17,6 +18,7 @@ import Data.List                    (foldl1')
 import Data.Void
 import Data.Char
 import Data.Functor
+import Data.Functor.Foldable
 import Data.HashMap.Strict          qualified as H
 import Control.Monad
 import Control.Monad.State
@@ -83,7 +85,7 @@ partialExpr = choice
 
 partialExpr1 :: Parser PartialExpr'
 partialExpr1 = choice
-    [ try $ char '(' *> partialExpr <* char ')'
+    [ try $ char '(' *> (hoistY P <$> partialExpr) <* char ')'
     , fmap Y $ varid'
     , fmap Y $ lit'
     ]
@@ -144,19 +146,21 @@ newtype Y f = Y (f (Y f))
 unY :: Y f -> f (Y f)
 unY (Y f) = f
 
-ymap :: (Functor f) => (forall a. f a -> g a) -> Y f -> Y g
-ymap m (Y f) = Y $ m (ymap m <$> f)
+hoistY :: (Functor f) => (forall a. f a -> g a) -> Y f -> Y g
+hoistY m (Y f) = Y $ m (hoistY m <$> f)
 
 instance (Show (f (Y f))) => Show (Y f) where
     showsPrec p (Y f) = showsPrec p f
 
 data Partial a = E (RlpExprF Name a)
                | U (Partial a) Name (Partial a)
-               deriving Show
+               | P (Partial a)
+               deriving (Show, Functor)
 
 type PartialExpr' = Y Partial
 
 ----------------------------------------------------------------------------------
 
-
+mkOp :: RlpExpr b -> RlpExpr b -> RlpExpr b -> RlpExpr b
+mkOp f a b = (f `AppE` a) `AppE` b
 
