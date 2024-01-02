@@ -47,7 +47,7 @@ symbol :: Text -> Parser Text
 symbol = L.symbol sc
 
 sc :: Parser ()
-sc = L.space space1 (void lineComment) (void blockComment)
+sc = L.space hspace1 (void lineComment) (void blockComment)
 
 -- TODO: return comment text
 -- TODO: '---' should not start a comment
@@ -155,4 +155,8 @@ data Partial a = E (RlpExprF Name a)
                deriving Show
 
 type PartialExpr' = Y Partial
+
+----------------------------------------------------------------------------------
+
+
 
