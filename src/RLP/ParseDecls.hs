@@ -1,7 +1,8 @@
--- Show Y
+-- Show Fix
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Rlp.ParseDecls
     (
     )
@@ -12,6 +13,7 @@ import Text.Megaparsec              hiding (State)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer   qualified as L
 import Data.Functor.Const
+import Data.Functor.Classes
 import Data.Text                    (Text)
 import Data.Text                    qualified as T
 import Data.List                    (foldl1')
@@ -19,6 +21,7 @@ import Data.Void
 import Data.Char
 import Data.Functor
 import Data.Functor.Foldable
+import Data.Fix
 import Data.HashMap.Strict          qualified as H
 import Control.Monad
 import Control.Monad.State
@@ -73,21 +76,21 @@ funD = FunD <$> varid <*> many pat1 <*> (symbol "=" *> fmap Const partialExpr)
 
 partialExpr :: Parser PartialExpr'
 partialExpr = choice
-    [ try $ fmap Y $ U <$> partialExpr1' <*> lexeme infixOp <*> partialExpr'
+    [ try $ fmap Fix $ U <$> partialExpr1' <*> lexeme infixOp <*> partialExpr'
     , foldl1' papp <$> some partialExpr1
     ]
     where
-        partialExpr1' = unY <$> partialExpr1
-        partialExpr' = unY <$> partialExpr
+        partialExpr1' = unFix <$> partialExpr1
+        partialExpr' = unFix <$> partialExpr
 
         papp :: PartialExpr' -> PartialExpr' -> PartialExpr'
-        papp f x = Y . E $ f `AppEF` x
+        papp f x = Fix . E $ f `AppEF` x
 
 partialExpr1 :: Parser PartialExpr'
 partialExpr1 = choice
-    [ try $ char '(' *> (hoistY P <$> partialExpr) <* char ')'
-    , fmap Y $ varid'
-    , fmap Y $ lit'
+    [ try $ char '(' *> (hoistFix P <$> partialExpr) <* char ')'
+    , fmap Fix $ varid'
+    , fmap Fix $ lit'
     ]
     where
         varid' = E . VarEF <$> varid
@@ -141,23 +144,25 @@ lit = int
 
 type PartialDecl' = Decl (Const PartialExpr') Name
 
-newtype Y f = Y (f (Y f))
-
-unY :: Y f -> f (Y f)
-unY (Y f) = f
-
-hoistY :: (Functor f) => (forall a. f a -> g a) -> Y f -> Y g
-hoistY m (Y f) = Y $ m (hoistY m <$> f)
-
-instance (Show (f (Y f))) => Show (Y f) where
-    showsPrec p (Y f) = showsPrec p f
-
 data Partial a = E (RlpExprF Name a)
                | U (Partial a) Name (Partial a)
                | P (Partial a)
                deriving (Show, Functor)
 
-type PartialExpr' = Y Partial
+instance Show1 Partial where
+    liftShowsPrec :: forall a. (Int -> a -> ShowS)
+                  -> ([a] -> ShowS)
+                  -> Int -> Partial a -> ShowS
+
+    liftShowsPrec sp sl p m = case m of
+        (E e)       -> showsUnaryWith lshow "E" p e
+        (U a f b)   -> showsTernaryWith lshow showsPrec lshow "U" p a f b
+        (P e)       -> showsUnaryWith lshow "P" p e
+        where
+            lshow :: forall f. (Show1 f) => Int -> f a -> ShowS
+            lshow = liftShowsPrec sp sl
+
+type PartialExpr' = Fix Partial
 
 ----------------------------------------------------------------------------------
 
