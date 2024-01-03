@@ -16,6 +16,9 @@ module Rlp.Syntax
     , Lit(..)
     , Lit'
     , Name
+
+    -- TODO: ugh move this somewhere else later
+    , showsTernaryWith
     )
     where
 ----------------------------------------------------------------------------------
@@ -24,11 +27,12 @@ import Data.Text                    (Text)
 import Data.Text                    qualified as T
 import Data.String                  (IsString(..))
 import Data.Functor.Foldable.TH     (makeBaseFunctor)
+import Data.Functor.Classes
 import Lens.Micro
 import Core.Syntax                  hiding (Lit)
 import Core                         (HasRHS(..), HasLHS(..))
 ----------------------------------------------------------------------------------
-
+ 
 newtype RlpProgram b = RlpProgram [Decl RlpExpr b]
 
 -- | The @e@ parameter is used for partial results. When parsing an input, we
@@ -113,4 +117,28 @@ makeBaseFunctor ''RlpExpr
 deriving instance (Show b, Show a) => Show (RlpExprF b a)
 
 type RlpExprF' = RlpExprF Name
+
+-- society if derivable Show1
+instance (Show b) => Show1 (RlpExprF b) where
+    liftShowsPrec sp _ p m = case m of
+        (LetEF bs e)            -> showsBinaryWith showsPrec sp "LetEF" p bs e
+        (VarEF n)               -> showsUnaryWith showsPrec "VarEF" p n
+        (ConEF n)               -> showsUnaryWith showsPrec "ConEF" p n
+        (LamEF bs e)            -> showsBinaryWith showsPrec sp "LamEF" p bs e
+        (CaseEF e as)           -> showsBinaryWith sp showsPrec "CaseEF" p e as
+        (IfEF a b c)            -> showsTernaryWith sp sp sp "IfEF" p a b c
+        (AppEF f x)             -> showsBinaryWith sp sp "AppEF" p f x
+        (LitEF l)               -> showsUnaryWith showsPrec "LitEF" p l
+
+showsTernaryWith :: (Int -> x -> ShowS)
+                 -> (Int -> y -> ShowS)
+                 -> (Int -> z -> ShowS)
+                 -> String -> Int
+                 -> x -> y -> z
+                 -> ShowS
+showsTernaryWith sa sb sc name p a b c = showParen (p > 10)
+    $ showString name
+    . showChar ' ' . sa 11 a 
+    . showChar ' ' . sb 11 b
+    . showChar ' ' . sc 11 c
 
