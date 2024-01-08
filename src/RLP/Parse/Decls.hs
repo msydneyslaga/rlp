@@ -1,41 +1,30 @@
--- Show Fix
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE LambdaCase, BlockArguments #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Rlp.ParseDecls
+module Rlp.Parse.Decls
     (
     )
     where
 ----------------------------------------------------------------------------------
-import Rlp.Syntax
+import Control.Monad
+import Control.Monad.State
 import Text.Megaparsec              hiding (State)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer   qualified as L
-import Data.Functor.Const
 import Data.Functor.Classes
+import Data.Functor.Foldable
 import Data.Text                    (Text)
 import Data.Text                    qualified as T
 import Data.List                    (foldl1')
-import Data.Void
 import Data.Char
 import Data.Functor
-import Data.Functor.Foldable
-import Data.Fix
-import Data.HashMap.Strict          qualified as H
-import Control.Monad
-import Control.Monad.State
-----------------------------------------------------------------------------------
-
-type Parser = ParsecT Void Text (State ParserState)
-
-data ParserState = ParserState
-    { _psPrecTable :: PrecTable
-    }
-    deriving Show
-
-type PrecTable = H.HashMap Name (Assoc, Int)
-
+import Data.Functor.Const
+import Data.Fix                     hiding (cata)
+import Lens.Micro
+import Rlp.Parse.Types
+import Rlp.Syntax
 ----------------------------------------------------------------------------------
 
 parseTest' :: (Show a) => Parser a -> Text -> IO ()
@@ -76,10 +65,11 @@ funD = FunD <$> varid <*> many pat1 <*> (symbol "=" *> fmap Const partialExpr)
 
 partialExpr :: Parser PartialExpr'
 partialExpr = choice
-    [ try $ fmap Fix $ U <$> partialExpr1' <*> lexeme infixOp <*> partialExpr'
+    [ try $ fmap Fix $ mkB <$> partialExpr1' <*> lexeme infixOp <*> partialExpr'
     , foldl1' papp <$> some partialExpr1
     ]
     where
+        mkB a f b = B f a b
         partialExpr1' = unFix <$> partialExpr1
         partialExpr' = unFix <$> partialExpr
 
@@ -140,32 +130,42 @@ lit = int
 
 ----------------------------------------------------------------------------------
 
--- absolute psycho shit
+type PartialE = Partial RlpExpr'
 
-type PartialDecl' = Decl (Const PartialExpr') Name
+-- complete :: OpTable -> Fix Partial -> RlpExpr'
+complete :: OpTable -> PartialExpr' -> RlpExpr'
+complete pt = let ?pt = pt in cata completePartial
 
-data Partial a = E (RlpExprF Name a)
-               | U (Partial a) Name (Partial a)
-               | P (Partial a)
-               deriving (Show, Functor)
+completePartial :: PartialE -> RlpExpr'
+completePartial (E e)        = completeRlpExpr e
+completePartial p@(B o l r)  = completeB (build p)
+completePartial (P e)        = completePartial e
 
-instance Show1 Partial where
-    liftShowsPrec :: forall a. (Int -> a -> ShowS)
-                  -> ([a] -> ShowS)
-                  -> Int -> Partial a -> ShowS
+completeRlpExpr :: RlpExprF' RlpExpr' -> RlpExpr'
+completeRlpExpr = embed
 
-    liftShowsPrec sp sl p m = case m of
-        (E e)       -> showsUnaryWith lshow "E" p e
-        (U a f b)   -> showsTernaryWith lshow showsPrec lshow "U" p a f b
-        (P e)       -> showsUnaryWith lshow "P" p e
-        where
-            lshow :: forall f. (Show1 f) => Int -> f a -> ShowS
-            lshow = liftShowsPrec sp sl
+completeB :: PartialE -> RlpExpr'
+completeB = build
 
-type PartialExpr' = Fix Partial
+build :: PartialE -> PartialE
+build e = go id e (rightmost e) where
+    rightmost :: Partial -> Partial
+    rightmost (B _ _ _) = rightmost r
+    rightmost (E n)     = undefined
 
-----------------------------------------------------------------------------------
+    go :: (?pt :: OpTable)
+       => (PartialE -> PartialE)
+       -> PartialE -> PartialE -> PartialE
+    go f p@(WithPrec o _ r) = case r of
+            E _     -> mkHole o (f . f')
+            P _     -> undefined
+            B _ _ _ -> go (mkHole o (f . f')) r
+        where f' r' = p & pR .~ r'
 
-mkOp :: RlpExpr b -> RlpExpr b -> RlpExpr b -> RlpExpr b
-mkOp f a b = (f `AppE` a) `AppE` b
+mkHole :: (?pt :: OpTable)
+       => OpInfo
+       -> (PartialE -> PartialE)
+       -> PartialE
+       -> PartialE
+mkHole = undefined
 

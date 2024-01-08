@@ -19,10 +19,12 @@ module Rlp.Syntax
 
     -- TODO: ugh move this somewhere else later
     , showsTernaryWith
+
+    -- * Convenience re-exports
+    , Text
     )
     where
 ----------------------------------------------------------------------------------
-import Data.Functor.Const
 import Data.Text                    (Text)
 import Data.Text                    qualified as T
 import Data.String                  (IsString(..))
@@ -32,7 +34,7 @@ import Lens.Micro
 import Core.Syntax                  hiding (Lit)
 import Core                         (HasRHS(..), HasLHS(..))
 ----------------------------------------------------------------------------------
- 
+
 newtype RlpProgram b = RlpProgram [Decl RlpExpr b]
 
 -- | The @e@ parameter is used for partial results. When parsing an input, we
