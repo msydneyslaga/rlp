@@ -31,7 +31,8 @@ library
                     , Core.HindleyMilner
                     , Control.Monad.Errorful
                     , Rlp.Syntax
-                    , Rlp.ParseDecls
+                    , Rlp.Parse.Decls
+                    , Rlp.Parse.Types
 
     other-modules:    Data.Heap
                     , Data.Pretty
