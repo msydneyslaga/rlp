@@ -22,9 +22,6 @@ module Rlp.Parse.Types
     , RlpParseError(..)
     , OpTable
     , OpInfo
-
-    -- * Extras
-    , registerCustomFailure
     )
     where
 ----------------------------------------------------------------------------------
@@ -36,7 +33,6 @@ import Data.Functor.Const
 import Data.Functor.Classes
 import Data.Void
 import Data.Maybe
-import Data.Set                     qualified as S
 import Text.Megaparsec              hiding (State)
 import Text.Printf
 import Lens.Micro
@@ -120,7 +116,4 @@ type PartialExpr' = Fix Partial
 ----------------------------------------------------------------------------------
 
 makeLenses ''ParserState
-
-registerCustomFailure :: MonadParsec e s m => e -> m ()
-registerCustomFailure = registerFancyFailure . S.singleton . ErrorCustom
 
