@@ -18,6 +18,7 @@ import Data.Functor.Foldable
 import Data.Text                    (Text)
 import Data.Text                    qualified as T
 import Data.HashMap.Strict          qualified as H
+import Data.Maybe                   (maybeToList)
 import Data.List                    (foldl1')
 import Data.Char
 import Data.Functor
@@ -26,6 +27,7 @@ import Data.Fix                     hiding (cata)
 import Lens.Micro
 import Lens.Micro.Platform
 import Rlp.Parse.Types
+import Rlp.Parse.Utils
 import Rlp.Syntax
 ----------------------------------------------------------------------------------
 
@@ -38,6 +40,9 @@ parseTest' p s = case runState (runParserT p "test" s) init of
 
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
+
+flexeme :: Parser a -> Parser a
+flexeme p = L.lineFold scn $ \sc' -> L.lexeme sc' p
 
 symbol :: Text -> Parser Text
 symbol = L.symbol sc
@@ -66,7 +71,16 @@ decl = choice
     ]
 
 funD :: Parser PartialDecl'
-funD = FunD <$> varid <*> many pat1 <*> (symbol "=" *> fmap Const partialExpr)
+funD = FunD <$> flexeme varid <*> params <*> (symbol "=" *> body) <*> whereClause
+    where
+        params = many pat1
+        body = fmap Const partialExpr
+
+whereClause :: Parser Where'
+whereClause = optionalList $
+        flexeme "where" *> pure
+            [ FunB "fixme" [] (VarE "fixme")
+            ]
 
 standalonePartialExpr :: Parser PartialExpr'
 standalonePartialExpr = standaloneOf partialExpr
@@ -75,7 +89,7 @@ standaloneOf :: Parser a -> Parser a
 standaloneOf = (<* eof)
 
 partialExpr :: Parser PartialExpr'
-partialExpr = (choice . fmap foldedLexeme)
+partialExpr = (choice . fmap flexeme)
     [ try application
     , Fix <$> infixExpr
     ]
@@ -87,17 +101,14 @@ partialExpr = (choice . fmap foldedLexeme)
         mkB a f b = B f a b
         partialExpr1' = unFix <$> partialExpr1
         partialExpr' = unFix <$> partialExpr
-        infixOp' = foldedLexeme infixOp
+        infixOp' = flexeme infixOp
 
         mkApp :: PartialExpr' -> PartialExpr' -> PartialExpr'
         mkApp f x = Fix . E $ f `AppEF` x
 
-foldedLexeme :: Parser a -> Parser a
-foldedLexeme p = L.lineFold scn $ \sc' -> L.lexeme sc' p
-
 partialExpr1 :: Parser PartialExpr'
-partialExpr1 = (choice . fmap foldedLexeme)
-    [ foldedLexeme "(" *> partialExpr' <* foldedLexeme ")"
+partialExpr1 = (choice . fmap flexeme)
+    [ try $ flexeme "(" *> partialExpr' <* flexeme ")"
     , Fix <$> varid'
     , Fix <$> lit'
     ]
@@ -108,7 +119,7 @@ partialExpr1 = (choice . fmap foldedLexeme)
         lit' = E . LitEF <$> lit
 
 infixOp :: Parser Name
-infixOp = symvar <|> symcon <?> "infix operator"
+infixOp = symvar <|> symcon <?> "operator"
 
 symvar :: Parser Name
 symvar = T.pack <$>
@@ -119,20 +130,34 @@ symcon = T.pack <$>
     liftA2 (:) (char ':') (many $ satisfy isSym)
 
 pat1 :: Parser Pat'
-pat1 = VarP <$> varid
+pat1 = VarP <$> flexeme varid
     <?> "pattern"
 
+conid :: Parser ConId
+conid = NameCon <$> lexeme namecon
+    <|> SymCon <$> lexeme (char '(' *> symcon <* char ')')
+    <?> "constructor identifier"
+
+namecon :: Parser Name
+namecon = T.pack <$>
+    liftA2 (:) (satisfy isUpper)
+               (many $ satisfy isNameTail)
+
 varid :: Parser VarId
-varid = NameVar <$> lexeme namevar
+varid = NameVar <$> try (lexeme namevar)
     <|> SymVar <$> lexeme (char '(' *> symvar <* char ')')
     <?> "variable identifier"
-    where
-        namevar = T.pack <$>
+
+namevar :: Parser Name
+namevar = try word
+        & withPredicate (`notElem` ["where"]) empty
+    where word = T.pack <$>
             liftA2 (:) (satisfy isLower) (many $ satisfy isNameTail)
 
-        isNameTail c = isAlphaNum c
-                    || c == '\''
-                    || c == '_'
+isNameTail :: Char -> Bool
+isNameTail c = isAlphaNum c
+            || c == '\''
+            || c == '_'
 
 isVarSym :: Char -> Bool
 isVarSym = (`T.elem` "\\!#$%&*+./<=>?@^|-~")
@@ -159,7 +184,7 @@ infixD = do
         prec :: Parser Int
         prec = do
             o <- getOffset
-            n <- lexeme L.decimal
+            n <- lexeme L.decimal <?> "precedence level (an integer)"
             if 0 <= n && n <= 9 then
                 pure n
             else
@@ -173,10 +198,36 @@ infixD = do
                 psOpTable <~ H.alterF f op t
             where
                 f Nothing  = pure (Just (a,p))
-                f (Just _) = customFailure RlpParErrDuplicateInfixD
+                f (Just x) = registerCustomFailure RlpParErrDuplicateInfixD
+                           $> Just x
 
 tySigD = undefined
-dataD = undefined
+
+dataD :: Parser (Decl' e)
+dataD = DataD <$> (flexeme "data" *> conid) <*> many typaram
+      <*> optionalList (symbol "=" *> conalts)
+    where
+        typaram :: Parser Name
+        typaram = flexeme namevar
+
+        conalts :: Parser [ConAlt]
+        conalts = (:) <$> conalt <*> optionalList (symbol "|" *> conalts)
+
+        conalt :: Parser ConAlt
+        conalt = ConAlt <$> conid <*> many type1
+
+type1 :: Parser Type
+type1 = (choice . fmap flexeme)
+    [ flexeme "(" *> type_ <* flexeme ")"
+    , TyVar <$> namevar
+    , TyCon <$> namecon
+    ]
+
+type_ :: Parser Type
+type_ = (choice . fmap flexeme)
+    [ try $ (:->) <$> type1 <*> (flexeme "->" *> type_)
+    , type1
+    ]
 
 lit :: Parser Lit'
 lit = int
@@ -184,9 +235,9 @@ lit = int
     where
         int = IntL <$> L.decimal
 
-----------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- completing partial expressions
 
--- complete :: OpTable -> Fix Partial -> RlpExpr'
 complete :: (?pt :: OpTable) => PartialExpr' -> RlpExpr'
 complete = cata completePartial
 

@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 -- recursion-schemes
 {-# LANGUAGE TemplateHaskell, TypeFamilies #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, PatternSynonyms #-}
 module Rlp.Syntax
     ( RlpExpr(..)
     , RlpExpr'
@@ -10,8 +10,15 @@ module Rlp.Syntax
     , RlpExprF'
     , Decl(..)
     , Decl'
+    , Bind(..)
+    , Where
+    , Where'
+    , ConAlt(..)
+    , Type(..)
+    , pattern (:->)
     , Assoc(..)
     , VarId(..)
+    , ConId(..)
     , Pat(..)
     , Pat'
     , Lit(..)
@@ -45,9 +52,9 @@ newtype RlpProgram b = RlpProgram [Decl RlpExpr b]
 -- accounted for, we may complete the parsing task and get a proper @[Decl
 -- RlpExpr Name]@.
 
-data Decl e b = FunD    VarId [Pat b] (e b)
+data Decl e b = FunD    VarId [Pat b] (e b) (Where b)
               | TySigD  [VarId] Type
-              | DataD   ConId [ConId] [ConAlt]
+              | DataD   ConId [Name] [ConAlt]
               | InfixD  Assoc Int Name
               deriving Show
 
@@ -58,14 +65,14 @@ data Assoc = InfixL
            | Infix
            deriving Show
 
-data ConAlt = ConAlt ConId [ConId]
-               deriving Show
+data ConAlt = ConAlt ConId [Type]
+            deriving Show
 
 data RlpExpr b = LetE  [Bind b] (RlpExpr b)
                | VarE  VarId
                | ConE  ConId
                | LamE  [Pat b] (RlpExpr b)
-               | CaseE (RlpExpr b) [Alt b]
+               | CaseE (RlpExpr b) [(Alt b, Where b)]
                | IfE   (RlpExpr b) (RlpExpr b) (RlpExpr b)
                | AppE  (RlpExpr b) (RlpExpr b)
                | LitE  (Lit b)
@@ -73,9 +80,12 @@ data RlpExpr b = LetE  [Bind b] (RlpExpr b)
 
 type RlpExpr' = RlpExpr Name
 
+type Where b = [Bind b]
+type Where' = [Bind Name]
+
 -- do we want guards?
 data Alt b = AltA (Pat b) (RlpExpr b)
-               deriving Show
+           deriving Show
 
 data Bind b = PatB (Pat b) (RlpExpr b)
             | FunB VarId [Pat b] (RlpExpr b)
