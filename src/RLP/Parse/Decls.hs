@@ -45,6 +45,9 @@ symbol = L.symbol sc
 sc :: Parser ()
 sc = L.space hspace1 (void lineComment) (void blockComment)
 
+scn :: Parser ()
+scn = L.space space1 (void lineComment) (void blockComment)
+
 -- TODO: return comment text
 -- TODO: '---' should not start a comment
 lineComment :: Parser Text
@@ -72,27 +75,35 @@ standaloneOf :: Parser a -> Parser a
 standaloneOf = (<* eof)
 
 partialExpr :: Parser PartialExpr'
-partialExpr = choice
-    [ try $ fmap Fix $ mkB <$> partialExpr1' <*> lexeme infixOp <*> partialExpr'
-    , foldl1' papp <$> some partialExpr1
+partialExpr = (choice . fmap foldedLexeme)
+    [ try application
+    , Fix <$> infixExpr
     ]
     <?> "expression"
     where
+        application = foldl1' mkApp <$> some partialExpr1
+        infixExpr = mkB <$> partialExpr1' <*> infixOp' <*> partialExpr'
+
         mkB a f b = B f a b
         partialExpr1' = unFix <$> partialExpr1
         partialExpr' = unFix <$> partialExpr
+        infixOp' = foldedLexeme infixOp
 
-        papp :: PartialExpr' -> PartialExpr' -> PartialExpr'
-        papp f x = Fix . E $ f `AppEF` x
+        mkApp :: PartialExpr' -> PartialExpr' -> PartialExpr'
+        mkApp f x = Fix . E $ f `AppEF` x
+
+foldedLexeme :: Parser a -> Parser a
+foldedLexeme p = L.lineFold scn $ \sc' -> L.lexeme sc' p
 
 partialExpr1 :: Parser PartialExpr'
-partialExpr1 = choice
-    [ try $ char '(' *> (hoistFix P <$> partialExpr) <* char ')'
-    , fmap Fix $ varid'
-    , fmap Fix $ lit'
+partialExpr1 = (choice . fmap foldedLexeme)
+    [ foldedLexeme "(" *> partialExpr' <* foldedLexeme ")"
+    , Fix <$> varid'
+    , Fix <$> lit'
     ]
     <?> "expression"
     where
+        partialExpr' = wrapFix . P . unwrapFix <$> partialExpr
         varid' = E . VarEF <$> varid
         lit' = E . LitEF <$> lit
 
