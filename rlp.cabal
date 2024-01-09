@@ -63,7 +63,7 @@ library
                     -- TODO: either learn recursion-schemes, or stop depending
                     -- on it.
                     , recursion-schemes
-                    , megaparsec
+                    , megaparsec                ^>=9.6.0
                     , text
                     , data-fix
 

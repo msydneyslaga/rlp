@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ImplicitParams, ViewPatterns, PatternSynonyms #-}
 {-
 Description : Supporting types for the parser
@@ -16,8 +18,13 @@ module Rlp.Parse.Types
     -- * Parser types
     , Parser
     , ParserState(..)
+    , psOpTable
+    , RlpParseError(..)
     , OpTable
     , OpInfo
+
+    -- * Extras
+    , registerCustomFailure
     )
     where
 ----------------------------------------------------------------------------------
@@ -29,14 +36,17 @@ import Data.Functor.Const
 import Data.Functor.Classes
 import Data.Void
 import Data.Maybe
+import Data.Set                     qualified as S
 import Text.Megaparsec              hiding (State)
+import Text.Printf
 import Lens.Micro
+import Lens.Micro.TH
 import Rlp.Syntax
 ----------------------------------------------------------------------------------
 
 -- parser types
 
-type Parser = ParsecT Void Text (State ParserState)
+type Parser = ParsecT RlpParseError Text (State ParserState)
 
 data ParserState = ParserState
     { _psOpTable :: OpTable
@@ -45,6 +55,23 @@ data ParserState = ParserState
 
 type OpTable = H.HashMap Name OpInfo
 type OpInfo = (Assoc, Int)
+
+-- data WithLocation a = WithLocation [String] a
+
+data RlpParseError = RlpParErrOutOfBoundsPrecedence Int
+                   | RlpParErrDuplicateInfixD
+    deriving (Eq, Ord, Show)
+
+instance ShowErrorComponent RlpParseError where
+    showErrorComponent = \case
+        -- TODO: wrap text to 80 characters
+        RlpParErrOutOfBoundsPrecedence n ->
+            printf "%d is an invalid precedence level! rl' currently only\
+                   \allows custom precedences between 0 and 9 (inclusive).\
+                   \ This is an arbitrary limit put in place for legibility\
+                   \ concerns, and may change in the future." n
+        RlpParErrDuplicateInfixD ->
+            "duplicate infix decl"
 
 ----------------------------------------------------------------------------------
 
@@ -89,4 +116,11 @@ instance Show1 Partial where
             lshow = liftShowsPrec sp sl
 
 type PartialExpr' = Fix Partial
+
+----------------------------------------------------------------------------------
+
+makeLenses ''ParserState
+
+registerCustomFailure :: MonadParsec e s m => e -> m ()
+registerCustomFailure = registerFancyFailure . S.singleton . ErrorCustom
 

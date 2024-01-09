@@ -24,6 +24,7 @@ import Data.Functor
 import Data.Functor.Const
 import Data.Fix                     hiding (cata)
 import Lens.Micro
+import Lens.Micro.Platform
 import Rlp.Parse.Types
 import Rlp.Syntax
 ----------------------------------------------------------------------------------
@@ -128,7 +129,40 @@ isVarSym = (`T.elem` "\\!#$%&*+./<=>?@^|-~")
 isSym :: Char -> Bool
 isSym c = c == ':' || isVarSym c
 
-infixD = undefined
+infixD :: Parser (Decl' e)
+infixD = do
+        o <- getOffset
+        a <- infixWord
+        p <- prec
+        op <- infixOp
+        region (setErrorOffset o) $ updateOpTable a p op
+        pure $ InfixD a p op
+    where
+        infixWord :: Parser Assoc
+        infixWord = choice $ lexeme <$>
+            [ "infixr" $> InfixR
+            , "infixl" $> InfixL
+            , "infix"  $> Infix
+            ]
+        
+        prec :: Parser Int
+        prec = do
+            o <- getOffset
+            n <- lexeme L.decimal
+            if 0 <= n && n <= 9 then
+                pure n
+            else
+                region (setErrorOffset o) $
+                    registerCustomFailure (RlpParErrOutOfBoundsPrecedence n)
+                    $> 9
+
+        updateOpTable :: Assoc -> Int -> Name -> Parser ()
+        updateOpTable a p op = do
+                t <- use psOpTable
+                psOpTable <~ H.alterF f op t
+            where
+                f Nothing  = pure (Just (a,p))
+                f (Just _) = customFailure RlpParErrDuplicateInfixD
 
 tySigD = undefined
 dataD = undefined
