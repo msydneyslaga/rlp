@@ -64,11 +64,18 @@ decl = choice
 funD :: Parser PartialDecl'
 funD = FunD <$> varid <*> many pat1 <*> (symbol "=" *> fmap Const partialExpr)
 
+standalonePartialExpr :: Parser PartialExpr'
+standalonePartialExpr = standaloneOf partialExpr
+
+standaloneOf :: Parser a -> Parser a
+standaloneOf = (<* eof)
+
 partialExpr :: Parser PartialExpr'
 partialExpr = choice
     [ try $ fmap Fix $ mkB <$> partialExpr1' <*> lexeme infixOp <*> partialExpr'
     , foldl1' papp <$> some partialExpr1
     ]
+    <?> "expression"
     where
         mkB a f b = B f a b
         partialExpr1' = unFix <$> partialExpr1
@@ -83,12 +90,13 @@ partialExpr1 = choice
     , fmap Fix $ varid'
     , fmap Fix $ lit'
     ]
+    <?> "expression"
     where
         varid' = E . VarEF <$> varid
         lit' = E . LitEF <$> lit
 
 infixOp :: Parser Name
-infixOp = symvar <|> symcon
+infixOp = symvar <|> symcon <?> "infix operator"
 
 symvar :: Parser Name
 symvar = T.pack <$>
@@ -100,6 +108,7 @@ symcon = T.pack <$>
 
 pat1 :: Parser Pat'
 pat1 = VarP <$> varid
+    <?> "pattern"
 
 varid :: Parser VarId
 varid = NameVar <$> lexeme namevar
@@ -126,6 +135,7 @@ dataD = undefined
 
 lit :: Parser Lit'
 lit = int
+    <?> "literal"
     where
         int = IntL <$> L.decimal
 
