@@ -17,6 +17,7 @@ import Data.Functor.Classes
 import Data.Functor.Foldable
 import Data.Text                    (Text)
 import Data.Text                    qualified as T
+import Data.HashMap.Strict          qualified as H
 import Data.List                    (foldl1')
 import Data.Char
 import Data.Functor
@@ -130,42 +131,81 @@ lit = int
 
 ----------------------------------------------------------------------------------
 
-type PartialE = Partial RlpExpr'
-
 -- complete :: OpTable -> Fix Partial -> RlpExpr'
-complete :: OpTable -> PartialExpr' -> RlpExpr'
-complete pt = let ?pt = pt in cata completePartial
+complete :: (?pt :: OpTable) => PartialExpr' -> RlpExpr'
+complete = cata completePartial
 
-completePartial :: PartialE -> RlpExpr'
+completePartial :: (?pt :: OpTable) => PartialE -> RlpExpr'
 completePartial (E e)        = completeRlpExpr e
 completePartial p@(B o l r)  = completeB (build p)
 completePartial (P e)        = completePartial e
 
-completeRlpExpr :: RlpExprF' RlpExpr' -> RlpExpr'
+completeRlpExpr :: (?pt :: OpTable) => RlpExprF' RlpExpr' -> RlpExpr'
 completeRlpExpr = embed
 
-completeB :: PartialE -> RlpExpr'
-completeB = build
+completeB :: (?pt :: OpTable) => PartialE -> RlpExpr'
+completeB p = case build p of
+    B o l r     -> (o' `AppE` l') `AppE` r'
+        where
+            -- TODO: how do we know it's symbolic?
+            o' = VarE (SymVar o)
+            l' = completeB l
+            r' = completeB r
+    P e         -> completeB e
+    E e         -> completeRlpExpr e
 
-build :: PartialE -> PartialE
+build :: (?pt :: OpTable) => PartialE -> PartialE
 build e = go id e (rightmost e) where
-    rightmost :: Partial -> Partial
-    rightmost (B _ _ _) = rightmost r
-    rightmost (E n)     = undefined
+    rightmost :: PartialE -> PartialE
+    rightmost (B _ _ r) = rightmost r
+    rightmost p@(E _)   = p
+    rightmost p@(P _)   = p
 
     go :: (?pt :: OpTable)
        => (PartialE -> PartialE)
        -> PartialE -> PartialE -> PartialE
-    go f p@(WithPrec o _ r) = case r of
+    go f p@(WithInfo o _ r) = case r of
             E _     -> mkHole o (f . f')
-            P _     -> undefined
+            P _     -> mkHole o (f . f')
             B _ _ _ -> go (mkHole o (f . f')) r
         where f' r' = p & pR .~ r'
+    go f _ = id
 
 mkHole :: (?pt :: OpTable)
        => OpInfo
        -> (PartialE -> PartialE)
        -> PartialE
        -> PartialE
-mkHole = undefined
+mkHole _     hole p@(P _)                   = hole p
+mkHole _     hole p@(E _)                   = hole p
+mkHole (a,d) hole p@(WithInfo (a',d') _ _)
+    | d' < d  = above
+    | d' > d  = below
+    | d == d' = case (a,a') of
+                  -- left-associative operators of equal precedence are
+                  -- associated left
+                  (InfixL,InfixL) -> above
+                  -- right-associative operators are handled similarly
+                  (InfixR,InfixR) -> below
+                  -- non-associative operators of equal precedence, or equal
+                  -- precedence operators of different associativities are
+                  -- invalid
+                  (_,     _)      -> error "invalid expression"
+    where
+        above = p & pL %~ hole
+        below = hole p
+
+examplePrecTable :: OpTable
+examplePrecTable = H.fromList
+    [ ("+",    (InfixL,6))
+    , ("*",    (InfixL,7))
+    , ("^",    (InfixR,8))
+    , (".",    (InfixR,7))
+    , ("~",    (Infix, 9))
+    , ("=",    (Infix, 4))
+    , ("&&",   (Infix, 3))
+    , ("||",   (Infix, 2))
+    , ("$",    (InfixR,0))
+    , ("&",    (InfixL,0))
+    ]
 
