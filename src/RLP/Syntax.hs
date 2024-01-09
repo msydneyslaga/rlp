@@ -9,6 +9,7 @@ module Rlp.Syntax
     , RlpExprF(..)
     , RlpExprF'
     , Decl(..)
+    , Decl'
     , Assoc(..)
     , VarId(..)
     , Pat(..)
@@ -49,6 +50,8 @@ data Decl e b = FunD    VarId [Pat b] (e b)
               | DataD   ConId [ConId] [ConAlt]
               | InfixD  Assoc Int Name
               deriving Show
+
+type Decl' e = Decl e Name
 
 data Assoc = InfixL
            | InfixR
