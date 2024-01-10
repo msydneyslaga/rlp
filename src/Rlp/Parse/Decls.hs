@@ -83,7 +83,7 @@ layout item = scn *> (explicit <|> implicit) where
         let indentGuard = L.indentGuard scn EQ i
         -- override foldGuard in order with new indentation
         let ?foldGuard = void $ L.indentGuard scn GT i
-        fix \ds -> (:) <$> (indentGuard *> item)
+        fix \ds -> (:) <$> (indentGuard *> item <* scn)
                        <*> (ds <|> pure [])
 
 t :: (?foldGuard :: Parser ()) => Parser [Text]
@@ -95,7 +95,7 @@ decl = choice
     -- arbitrary name
     [ infixD
     , dataD
-    , funD
+    , try funD
     , tySigD
     ]
 
@@ -182,17 +182,11 @@ varid = NameVar <$> try (lexeme namevar)
     <|> SymVar <$> lexeme (char '(' *> symvar <* char ')')
     <?> "variable identifier"
 
-decls :: Parser [PartialDecl']
-decls = layout decl <* eof
-
--- decls :: Parser [PartialDecl']
--- decls = do
---     space
---     i <- L.indentLevel
---     let indentGuard = L.indentGuard scn EQ i
---     let ?foldGuard = void $ L.indentGuard scn GT i
---     fix \ds -> (:) <$> (indentGuard *> decl)
---                    <*> (try ds <|> eof *> pure [])
+program :: Parser [Decl' RlpExpr]
+program = do
+    ds <- layout decl <* eof
+    pt <- use psOpTable
+    pure $ complete pt <$> ds
 
 namevar :: Parser Name
 namevar = word
@@ -255,10 +249,10 @@ infixD = do
                 f (Just x) = registerCustomFailure RlpParErrDuplicateInfixD
                            $> Just x
 
-tySigD :: Parser (Decl' e)
-tySigD = undefined -- TySigD <$> (flexeme)
+tySigD :: (OnFold) => Parser (Decl' e)
+tySigD = TySigD <$> (pure <$> varid) <*> (flexeme "::" *> flexeme type_)
 
-dataD :: Parser (Decl' e)
+dataD :: (OnFold) => Parser (Decl' e)
 dataD = DataD <$> (lexeme "data" *> conid) <*> many typaram
       <*> optionalList (symbol "=" *> conalts)
     where
@@ -271,16 +265,16 @@ dataD = DataD <$> (lexeme "data" *> conid) <*> many typaram
         conalt :: Parser ConAlt
         conalt = ConAlt <$> conid <*> many type1
 
-type1 :: Parser Type
+type1 :: (OnFold) => Parser Type
 type1 = choice
     [ lexeme "(" *> type_ <* lexeme ")"
     , TyVar <$> namevar
     , TyCon <$> namecon
     ]
 
-type_ :: Parser Type
+type_ :: (OnFold) => Parser Type
 type_ = choice
-    [ try $ (:->) <$> type1 <*> (lexeme "->" *> type_)
+    [ try $ (:->) <$> type1 <*> (flexeme "->" *> type_)
     , type1
     ]
 
@@ -293,8 +287,15 @@ lit = int
 --------------------------------------------------------------------------------
 -- completing partial expressions
 
-complete :: (?pt :: OpTable) => PartialExpr' -> RlpExpr'
-complete = cata completePartial
+complete :: OpTable -> PartialDecl' -> Decl' RlpExpr
+complete pt (FunD n as b w)    = FunD n as b' w
+    where b' = let ?pt = pt in completeExpr (getConst b)
+complete pt (TySigD ns t)      = TySigD ns t
+complete pt (DataD n as cs)    = DataD n as cs
+complete pt (InfixD a p n)     = InfixD a p n
+
+completeExpr :: (?pt :: OpTable) => PartialExpr' -> RlpExpr'
+completeExpr = cata completePartial
 
 completePartial :: (?pt :: OpTable) => PartialE -> RlpExpr'
 completePartial (E e)        = completeRlpExpr e

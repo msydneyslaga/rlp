@@ -42,6 +42,9 @@ import Rlp.Syntax
 
 -- parser types
 
+-- TODO: the State is only used for building an operator table from infix[lr]
+-- declarations. we should switch to a normal Parsec monad in the future
+
 type Parser = ParsecT RlpParseError Text (State ParserState)
 
 data ParserState = ParserState
