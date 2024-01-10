@@ -128,18 +128,26 @@ standaloneOf = (<* eof)
 
 partialExpr :: (OnFold) => Parser PartialExpr'
 partialExpr = choice
-    [ try $ Fix <$> infixExpr
+    [ ifExpr
+    , try $ infixExpr
     , application
     ]
     <?> "expression"
     where
         application = foldl1' mkApp <$> some (flexeme partialExpr1)
-        infixExpr = mkB <$> partialExpr1' <*> infixOp' <*> partialExpr'
+        infixExpr = fmap Fix $
+            mkB <$> partialExpr1' <*> infixOp' <*> partialExpr'
+
+        ifExpr :: Parser PartialExpr'
+        ifExpr = fmap (Fix . E) $
+            IfEF <$> (flexeme "if" *> partialExpr)
+                 <*> (flexeme "then" *> partialExpr)
+                 <*> (flexeme "else" *> partialExpr)
 
         mkB a f b = B f a b
         partialExpr1' = unFix <$> partialExpr1
         partialExpr' = unFix <$> partialExpr
-        infixOp' = lexeme infixOp
+        infixOp' = flexeme infixOp
 
         mkApp :: PartialExpr' -> PartialExpr' -> PartialExpr'
         mkApp f x = Fix . E $ f `AppEF` x
