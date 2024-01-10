@@ -132,12 +132,10 @@ infixOp :: Parser Name
 infixOp = symvar <|> symcon <?> "operator"
 
 symvar :: Parser Name
-symvar = T.pack <$>
-    liftA2 (:) (satisfy isVarSym) (many $ satisfy isSym)
+symvar = T.cons <$> satisfy isVarSym <*> takeWhileP Nothing isSym
 
 symcon :: Parser Name
-symcon = T.pack <$>
-    liftA2 (:) (char ':') (many $ satisfy isSym)
+symcon = T.cons <$> char ':' <*> takeWhileP Nothing isSym
 
 pat1 :: (OnFold) => Parser Pat'
 pat1 = VarP <$> flexeme varid
@@ -149,9 +147,7 @@ conid = NameCon <$> lexeme namecon
     <?> "constructor identifier"
 
 namecon :: Parser Name
-namecon = T.pack <$>
-    liftA2 (:) (satisfy isUpper)
-               (many $ satisfy isNameTail)
+namecon = T.cons <$> satisfy isUpper <*> takeWhileP Nothing isNameTail
 
 varid :: Parser VarId
 varid = NameVar <$> try (lexeme namevar)
@@ -170,8 +166,8 @@ decls = do
 namevar :: Parser Name
 namevar = word
         & withPredicate (`notElem` keywords) empty
-    where word = T.pack <$>
-            liftA2 (:) (satisfy isLower) (many $ satisfy isNameTail)
+    where
+        word = T.cons <$> satisfy isLower <*> takeWhileP Nothing isNameTail
 
 keywords :: (IsString a) => [a]
 keywords =
