@@ -22,9 +22,11 @@ import Data.HashMap.Strict          qualified as H
 import Data.Maybe                   (maybeToList)
 import Data.List                    (foldl1')
 import Data.Char
+import Data.Function                (fix)
 import Data.Functor
 import Data.Functor.Const
 import Data.Fix                     hiding (cata)
+import GHC.Exts                     (IsString)
 import Lens.Micro
 import Lens.Micro.Platform
 import Rlp.Parse.Types
@@ -156,9 +158,8 @@ decls = do
     space
     i <- L.indentLevel
     let indentGuard = L.indentGuard scn EQ i
-    -- indentGuard *> decl *> eol *> indentGuard *> decl
-    many $ indentGuard *> decl
-    -- many $ indentGuard *> decl <* (eol <|> eof)
+    fix \ds -> (:) <$> (indentGuard *> decl)
+                   <*> (try ds <|> eof *> pure [])
 
 namevar :: Parser Name
 namevar = word
