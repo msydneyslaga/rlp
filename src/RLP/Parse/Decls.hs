@@ -64,6 +64,31 @@ lineComment = L.skipLineComment "--" $> "<unimpl>"
 blockComment :: Parser Text
 blockComment = L.skipBlockCommentNested "{-" "-}" $> "<unimpl>"
 
+layout :: forall a. ((OnFold) => Parser a) -> Parser [a]
+layout item = scn *> (explicit <|> implicit) where
+    explicit :: Parser [a]
+    explicit = let ?foldGuard = scn -- line folds just go to the semicolon
+        in sym "{" *> fix \items -> choice
+            [ sym "}" $> []
+            , (:) <$> item
+                  <*> (sym ";" *> items <|> sym "}" $> [])
+            ]
+        where
+            sym = L.symbol scn
+
+    implicit :: Parser [a]
+    implicit = do
+        i <- L.indentLevel
+        -- items must be aligned
+        let indentGuard = L.indentGuard scn EQ i
+        -- override foldGuard in order with new indentation
+        let ?foldGuard = void $ L.indentGuard scn GT i
+        fix \ds -> (:) <$> (indentGuard *> item)
+                       <*> (ds <|> pure [])
+
+t :: (?foldGuard :: Parser ()) => Parser [Text]
+t = (:) <$> lexeme "soge" <*> many (flexeme "doge")
+
 decl :: (OnFold) => Parser PartialDecl'
 decl = choice
     -- declarations that begin with a keyword before those beginning with an
@@ -80,11 +105,13 @@ funD = FunD <$> lexeme varid <*> params <*> (fsymbol "=" *> body) <*> whereClaus
         params = many pat1
         body = fmap Const partialExpr
 
+-- we may not need to call scn here
 fsymbol :: (OnFold) => Text -> Parser Text
-fsymbol p = scn *> ?foldGuard *> symbol p
+fsymbol p = try ?foldGuard *> symbol p
 
+-- we may not need to call scn here
 flexeme :: (OnFold) => Parser a -> Parser a
-flexeme p = scn *> ?foldGuard *> lexeme p
+flexeme p = try ?foldGuard *> lexeme p
 
 whereClause :: Parser Where'
 whereClause = optionalList $
@@ -94,18 +121,19 @@ whereClause = optionalList $
 
 standalonePartialExpr :: Parser PartialExpr'
 standalonePartialExpr = standaloneOf partialExpr
+    where ?foldGuard = undefined
 
 standaloneOf :: Parser a -> Parser a
 standaloneOf = (<* eof)
 
-partialExpr :: Parser PartialExpr'
+partialExpr :: (OnFold) => Parser PartialExpr'
 partialExpr = choice
     [ try application
     , Fix <$> infixExpr
     ]
     <?> "expression"
     where
-        application = foldl1' mkApp <$> some partialExpr1
+        application = foldl1' mkApp <$> some (flexeme partialExpr1)
         infixExpr = mkB <$> partialExpr1' <*> infixOp' <*> partialExpr'
 
         mkB a f b = B f a b
@@ -116,7 +144,7 @@ partialExpr = choice
         mkApp :: PartialExpr' -> PartialExpr' -> PartialExpr'
         mkApp f x = Fix . E $ f `AppEF` x
 
-partialExpr1 :: Parser PartialExpr'
+partialExpr1 :: (OnFold) => Parser PartialExpr'
 partialExpr1 = choice
     [ try $ lexeme "(" *> partialExpr' <* lexeme ")"
     , Fix <$> varid'
@@ -155,13 +183,16 @@ varid = NameVar <$> try (lexeme namevar)
     <?> "variable identifier"
 
 decls :: Parser [PartialDecl']
-decls = do
-    space
-    i <- L.indentLevel
-    let indentGuard = L.indentGuard scn EQ i
-    let ?foldGuard = void $ L.indentGuard scn GT i
-    fix \ds -> (:) <$> (indentGuard *> decl)
-                   <*> (try ds <|> eof *> pure [])
+decls = layout decl <* eof
+
+-- decls :: Parser [PartialDecl']
+-- decls = do
+--     space
+--     i <- L.indentLevel
+--     let indentGuard = L.indentGuard scn EQ i
+--     let ?foldGuard = void $ L.indentGuard scn GT i
+--     fix \ds -> (:) <$> (indentGuard *> decl)
+--                    <*> (try ds <|> eof *> pure [])
 
 namevar :: Parser Name
 namevar = word
