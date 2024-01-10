@@ -65,10 +65,12 @@ blockComment = L.skipBlockCommentNested "{-" "-}" $> "<unimpl>"
 
 decl :: Parser PartialDecl'
 decl = choice
-    [ funD
-    , tySigD
+    -- declarations that begin with a keyword before those beginning with an
+    -- arbitrary name
+    [ infixD
     , dataD
-    , infixD
+    , funD
+    , tySigD
     ]
 
 funD :: Parser PartialDecl'
@@ -150,25 +152,27 @@ varid = NameVar <$> try (lexeme namevar)
     <?> "variable identifier"
 
 decls :: Parser [PartialDecl']
-decls = L.indentBlock scn p where
-    p = do
-        a <- "wtf"
-        pure (L.IndentSome (Just pos1) pure decl)
-
-t :: Parser [PartialDecl']
-t = do
+decls = do
     space
     i <- L.indentLevel
     let indentGuard = L.indentGuard scn EQ i
     -- indentGuard *> decl *> eol *> indentGuard *> decl
-    rec ds <- indentGuard *> decl <|> eof
-    many $ indentGuard *> decl <* (eol <|> eof)
+    many $ indentGuard *> decl
+    -- many $ indentGuard *> decl <* (eol <|> eof)
 
 namevar :: Parser Name
 namevar = word
-        & withPredicate (`notElem` ["where"]) empty
+        & withPredicate (`notElem` keywords) empty
     where word = T.pack <$>
             liftA2 (:) (satisfy isLower) (many $ satisfy isNameTail)
+
+keywords :: (IsString a) => [a]
+keywords =
+    [ "where"
+    , "infix"
+    , "infixr"
+    , "infixl"
+    ]
 
 isNameTail :: Char -> Bool
 isNameTail c = isAlphaNum c
@@ -217,7 +221,8 @@ infixD = do
                 f (Just x) = registerCustomFailure RlpParErrDuplicateInfixD
                            $> Just x
 
-tySigD = undefined
+tySigD :: Parser (Decl' e)
+tySigD = undefined -- TySigD <$> (flexeme)
 
 dataD :: Parser (Decl' e)
 dataD = DataD <$> (lexeme "data" *> conid) <*> many typaram
