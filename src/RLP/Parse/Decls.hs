@@ -44,9 +44,6 @@ parseTest' p s = case runState (runParserT p "test" s) init of
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
 
-flexeme :: Parser a -> Parser a
-flexeme p = L.lineFold scn $ \sc' -> L.lexeme sc' p
-
 symbol :: Text -> Parser Text
 symbol = L.symbol sc
 
@@ -55,6 +52,8 @@ sc = L.space hspace1 (void lineComment) (void blockComment)
 
 scn :: Parser ()
 scn = L.space space1 (void lineComment) (void blockComment)
+
+type OnFold = (?foldGuard :: Parser ())
 
 -- TODO: return comment text
 -- TODO: '---' should not start a comment
@@ -65,7 +64,7 @@ lineComment = L.skipLineComment "--" $> "<unimpl>"
 blockComment :: Parser Text
 blockComment = L.skipBlockCommentNested "{-" "-}" $> "<unimpl>"
 
-decl :: Parser PartialDecl'
+decl :: (OnFold) => Parser PartialDecl'
 decl = choice
     -- declarations that begin with a keyword before those beginning with an
     -- arbitrary name
@@ -75,11 +74,17 @@ decl = choice
     , tySigD
     ]
 
-funD :: Parser PartialDecl'
-funD = FunD <$> lexeme varid <*> params <*> (symbol "=" *> body) <*> whereClause
+funD :: (OnFold) => Parser PartialDecl'
+funD = FunD <$> lexeme varid <*> params <*> (fsymbol "=" *> body) <*> whereClause
     where
         params = many pat1
         body = fmap Const partialExpr
+
+fsymbol :: (OnFold) => Text -> Parser Text
+fsymbol p = scn *> ?foldGuard *> symbol p
+
+flexeme :: (OnFold) => Parser a -> Parser a
+flexeme p = scn *> ?foldGuard *> lexeme p
 
 whereClause :: Parser Where'
 whereClause = optionalList $
@@ -134,8 +139,8 @@ symcon :: Parser Name
 symcon = T.pack <$>
     liftA2 (:) (char ':') (many $ satisfy isSym)
 
-pat1 :: Parser Pat'
-pat1 = VarP <$> lexeme varid
+pat1 :: (OnFold) => Parser Pat'
+pat1 = VarP <$> flexeme varid
     <?> "pattern"
 
 conid :: Parser ConId
@@ -158,6 +163,7 @@ decls = do
     space
     i <- L.indentLevel
     let indentGuard = L.indentGuard scn EQ i
+    let ?foldGuard = void $ L.indentGuard scn GT i
     fix \ds -> (:) <$> (indentGuard *> decl)
                    <*> (try ds <|> eof *> pure [])
 
