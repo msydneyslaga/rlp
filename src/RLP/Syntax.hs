@@ -4,7 +4,10 @@
 {-# LANGUAGE TemplateHaskell, TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings, PatternSynonyms #-}
 module Rlp.Syntax
-    ( RlpExpr(..)
+    ( RlpModule(..)
+    , rlpmodName
+    , rlpmodProgram
+    , RlpExpr(..)
     , RlpExpr'
     , RlpExprF(..)
     , RlpExprF'
@@ -39,9 +42,15 @@ import Data.String                  (IsString(..))
 import Data.Functor.Foldable.TH     (makeBaseFunctor)
 import Data.Functor.Classes
 import Lens.Micro
+import Lens.Micro.TH
 import Core.Syntax                  hiding (Lit)
 import Core                         (HasRHS(..), HasLHS(..))
 ----------------------------------------------------------------------------------
+
+data RlpModule b = RlpModule
+    { _rlpmodName       :: Text
+    , _rlpmodProgram    :: RlpProgram b
+    }
 
 newtype RlpProgram b = RlpProgram [Decl RlpExpr b]
 
@@ -156,4 +165,8 @@ showsTernaryWith sa sb sc name p a b c = showParen (p > 10)
     . showChar ' ' . sa 11 a 
     . showChar ' ' . sb 11 b
     . showChar ' ' . sc 11 c
+
+--------------------------------------------------------------------------------
+
+makeLenses ''RlpModule
 
