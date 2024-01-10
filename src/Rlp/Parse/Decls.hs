@@ -128,8 +128,8 @@ standaloneOf = (<* eof)
 
 partialExpr :: (OnFold) => Parser PartialExpr'
 partialExpr = choice
-    [ try application
-    , Fix <$> infixExpr
+    [ try $ Fix <$> infixExpr
+    , application
     ]
     <?> "expression"
     where
