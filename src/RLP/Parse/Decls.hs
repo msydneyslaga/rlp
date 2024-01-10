@@ -1,3 +1,4 @@
+{-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE LambdaCase, BlockArguments #-}
@@ -71,14 +72,14 @@ decl = choice
     ]
 
 funD :: Parser PartialDecl'
-funD = FunD <$> flexeme varid <*> params <*> (symbol "=" *> body) <*> whereClause
+funD = FunD <$> lexeme varid <*> params <*> (symbol "=" *> body) <*> whereClause
     where
         params = many pat1
         body = fmap Const partialExpr
 
 whereClause :: Parser Where'
 whereClause = optionalList $
-        flexeme "where" *> pure
+        lexeme "where" *> pure
             [ FunB "fixme" [] (VarE "fixme")
             ]
 
@@ -89,7 +90,7 @@ standaloneOf :: Parser a -> Parser a
 standaloneOf = (<* eof)
 
 partialExpr :: Parser PartialExpr'
-partialExpr = (choice . fmap flexeme)
+partialExpr = choice
     [ try application
     , Fix <$> infixExpr
     ]
@@ -101,14 +102,14 @@ partialExpr = (choice . fmap flexeme)
         mkB a f b = B f a b
         partialExpr1' = unFix <$> partialExpr1
         partialExpr' = unFix <$> partialExpr
-        infixOp' = flexeme infixOp
+        infixOp' = lexeme infixOp
 
         mkApp :: PartialExpr' -> PartialExpr' -> PartialExpr'
         mkApp f x = Fix . E $ f `AppEF` x
 
 partialExpr1 :: Parser PartialExpr'
-partialExpr1 = (choice . fmap flexeme)
-    [ try $ flexeme "(" *> partialExpr' <* flexeme ")"
+partialExpr1 = choice
+    [ try $ lexeme "(" *> partialExpr' <* lexeme ")"
     , Fix <$> varid'
     , Fix <$> lit'
     ]
@@ -130,7 +131,7 @@ symcon = T.pack <$>
     liftA2 (:) (char ':') (many $ satisfy isSym)
 
 pat1 :: Parser Pat'
-pat1 = VarP <$> flexeme varid
+pat1 = VarP <$> lexeme varid
     <?> "pattern"
 
 conid :: Parser ConId
@@ -148,8 +149,23 @@ varid = NameVar <$> try (lexeme namevar)
     <|> SymVar <$> lexeme (char '(' *> symvar <* char ')')
     <?> "variable identifier"
 
+decls :: Parser [PartialDecl']
+decls = L.indentBlock scn p where
+    p = do
+        a <- "wtf"
+        pure (L.IndentSome (Just pos1) pure decl)
+
+t :: Parser [PartialDecl']
+t = do
+    space
+    i <- L.indentLevel
+    let indentGuard = L.indentGuard scn EQ i
+    -- indentGuard *> decl *> eol *> indentGuard *> decl
+    rec ds <- indentGuard *> decl <|> eof
+    many $ indentGuard *> decl <* (eol <|> eof)
+
 namevar :: Parser Name
-namevar = try word
+namevar = word
         & withPredicate (`notElem` ["where"]) empty
     where word = T.pack <$>
             liftA2 (:) (satisfy isLower) (many $ satisfy isNameTail)
@@ -204,11 +220,11 @@ infixD = do
 tySigD = undefined
 
 dataD :: Parser (Decl' e)
-dataD = DataD <$> (flexeme "data" *> conid) <*> many typaram
+dataD = DataD <$> (lexeme "data" *> conid) <*> many typaram
       <*> optionalList (symbol "=" *> conalts)
     where
         typaram :: Parser Name
-        typaram = flexeme namevar
+        typaram = lexeme namevar
 
         conalts :: Parser [ConAlt]
         conalts = (:) <$> conalt <*> optionalList (symbol "|" *> conalts)
@@ -217,15 +233,15 @@ dataD = DataD <$> (flexeme "data" *> conid) <*> many typaram
         conalt = ConAlt <$> conid <*> many type1
 
 type1 :: Parser Type
-type1 = (choice . fmap flexeme)
-    [ flexeme "(" *> type_ <* flexeme ")"
+type1 = choice
+    [ lexeme "(" *> type_ <* lexeme ")"
     , TyVar <$> namevar
     , TyCon <$> namecon
     ]
 
 type_ :: Parser Type
-type_ = (choice . fmap flexeme)
-    [ try $ (:->) <$> type1 <*> (flexeme "->" *> type_)
+type_ = choice
+    [ try $ (:->) <$> type1 <*> (lexeme "->" *> type_)
     , type1
     ]
 
