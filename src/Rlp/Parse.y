@@ -4,6 +4,8 @@ module Rlp.Parse
     )
     where
 import Rlp.Lex
+import Rlp.Syntax
+import Rlp.Parse.Types
 }
 
 %name rlp
@@ -13,12 +15,20 @@ import Rlp.Lex
 %tokentype { Located RlpToken }
 
 %token
-    t { Located _ _ }
+    varname         { Located _ (TokenVarName $$) }
+    '='             { Located _ TokenEquals }
+    eof             { Located _ TokenEOF }
 
 %%
 
-P :: { () }
-P : { error "aa" }
+Decl        :: { PartialDecl' }
+Decl        : FunDecl                   { undefined }
+
+FunDecl     :: { PartialDecl' }
+FunDecl     : varname '=' Expr          { undefined }
+
+Expr :: { RlpExpr' }
+Expr :                  { undefined }
 
 {
 

@@ -1,5 +1,6 @@
 {
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Rlp.Lex
     ( P(..)
@@ -12,19 +13,34 @@ module Rlp.Lex
 import Control.Monad
 import Data.Functor.Identity
 import Core.Syntax              (Name)
+import Data.Monoid              (First)
 import Data.Text                (Text)
 import Data.Text                qualified as T
+import Lens.Micro.Mtl
 import Lens.Micro
+import Lens.Micro.TH
 }
 
-%wrapper "monad-strict-text"
+%wrapper "monadUserState-strict-text"
 
-$whitechar = [ \t\n\r\f\v]
+$whitechar      = [ \t\n\r\f\v]
+
+$lower          = [a-z \_]
+$upper          = [A-Z]
+$alpha          = [$lower $upper]
+$digit          = 0-9
+
+$nl             = [\n\r]
+$white_no_nl    = $white # $nl
+
+$namechar       = [$alpha $digit \' \#]
+
+@varname        = $lower $namechar*
 
 rlp :-
     
     -- skip whitespace
-    $white+             ;
+    $white_no_nl+       ;
     -- TODO: don't treat operators like (-->) as comments
     "--".*              ;
     ";"                 { constToken TokenSemicolon }
@@ -33,7 +49,15 @@ rlp :-
 
 <0>
 {
-    "a" { const $ const $ pure $ Located (AlexPn 0 0 0) (TokenVarName "a") }
+    @varname            { tokenWith TokenVarName }
+    "="                 { constToken TokenEquals }
+}
+
+<bol>
+{
+    $whitechar          ;
+    \n                  ;
+    ()                  { doBol }
 }
 
 {
@@ -41,53 +65,71 @@ rlp :-
 constToken :: RlpToken -> AlexAction (Located RlpToken)
 constToken t inp _ = pure $ Located (inp ^. _1) t
 
+tokenWith :: (Text -> RlpToken) -> AlexAction (Located RlpToken)
+tokenWith tf (p,_,_,s) l = pure $ Located p (tf $ T.take l s)
+
 alexEOF :: Alex (Located RlpToken)
 alexEOF = do
     inp <- alexGetInput
     pure (Located (inp ^. _1) TokenEOF)
 
-data RlpToken = TokenEquals
-              | TokenLitInt Int
-              | TokenVarName Name
-              | TokenConName Name
-              | TokenVarSym Name
-              | TokenConSym Name
-              | TokenData
-              | TokenPipe
-              -- syntax control
-              | TokenSemicolon
-              | TokenLBrace
-              | TokenRBrace
-              | TokenEOF
-              deriving (Show)
+data RlpToken
+    -- literals
+    = TokenLitInt Int
+    -- identifiers
+    | TokenVarName Name
+    | TokenConName Name
+    | TokenVarSym Name
+    | TokenConSym Name
+    -- keywords
+    | TokenData
+    | TokenPipe
+    | TokenLet
+    | TokenIn
+    -- control symbols
+    | TokenEquals
+    | TokenSemicolon
+    | TokenLBrace
+    | TokenRBrace
+    | TokenEOF
+    deriving (Show)
 
-newtype P a = P { runP :: PState -> Text -> Either String a }
+newtype P a = P { runP :: Text -> Either String a }
     deriving (Functor)
 
-data PState = PState
-    { psLayoutStack     :: [Layout]
+data AlexUserState = AlexUserState
+    { _ausLayoutStack     :: [Layout]
     }
 
-data Layout = ExplicitLayout
-            | ImplicitLayout Int
-            deriving (Show)
+alexInitUserState :: AlexUserState
+alexInitUserState = AlexUserState
+    { _ausLayoutStack = []
+    }
+
+data Layout = Explicit
+            | Implicit Int
+            deriving (Show, Eq)
 
 instance Applicative P where
-    pure = P . const . const . Right
+    pure = P . const . Right
 
     liftA2 = liftM2
 
 instance Monad P where
-    m >>= k = P $ \st s -> case runP m st s of
-        Right a -> runP (k a) st s
+    m >>= k = P $ \s -> case runP m s of
+        Right a -> runP (k a) s
         Left e -> Left e
 
 data Located a = Located AlexPosn a
     deriving (Show)
 
+ausLayoutStack :: Lens' AlexUserState [Layout]
+ausLayoutStack = lens _ausLayoutStack
+    (\ s l -> s { _ausLayoutStack = l })
+
 lexer :: (Located RlpToken -> P a) -> P a
-lexer f = P $ \st s -> case m s of
-        Right (a,s') -> runP (f a) st (s' ^. _4)
+lexer f = P $ \s -> case m s of
+        Right (a,s') -> runP (f a) (s' ^. _4)
         Left  e      -> error (show e)
     where
         m s = runAlex s ((,) <$> alexMonadScan <*> alexGetInput)
@@ -95,6 +137,39 @@ lexer f = P $ \st s -> case m s of
 lexStream :: P [RlpToken]
 lexStream = lexer go where
     go (Located _ TokenEOF) = pure [TokenEOF]
-    go (Located _ t)        = (t:) <$> lexStream
+    go (Located _ t)        = (t:) <$!> lexStream
+
+getsAus :: (AlexUserState -> b) -> Alex b
+getsAus k = alexGetUserState <&> k
+
+useAus :: Getting a AlexUserState a -> Alex a
+useAus l = do
+    aus <- alexGetUserState
+    pure (aus ^. l)
+
+preuseAus :: Getting (First a) AlexUserState a -> Alex (Maybe a)
+preuseAus l = do
+    aus <- alexGetUserState
+    pure (aus ^? l)
+
+indentLevel :: Alex Int
+indentLevel = do
+    inp <- alexGetInput
+    let col = inp ^. _1
+            & \ (AlexPn _ _ c) -> c
+    pure col
+
+cmpLayout :: Alex Ordering
+cmpLayout = do
+    i <- indentLevel
+    ctx <- preuseAus (ausLayoutStack . _head)
+    case ctx ^. non (Implicit 0) of
+        Implicit n -> pure (n `compare` i)
+        Explicit   -> pure GT
+
+doBol :: AlexAction (Located RlpToken)
+doBol _ _ = do
+    undefined
 
 }
+
