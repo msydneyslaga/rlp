@@ -9,6 +9,7 @@ module Rlp.Lex
     , lexer
     )
     where
+import Control.Monad
 import Data.Functor.Identity
 import Core.Syntax              (Name)
 import Data.Text                (Text)
@@ -18,17 +19,32 @@ import Lens.Micro
 
 %wrapper "monad-strict-text"
 
+$whitechar = [ \t\n\r\f\v]
+
 rlp :-
+    
+    -- skip whitespace
+    $white+             ;
+    -- TODO: don't treat operators like (-->) as comments
+    "--".*              ;
+    ";"                 { constToken TokenSemicolon }
+    "{"                 { constToken TokenLBrace }
+    "}"                 { constToken TokenRBrace }
+
 <0>
 {
     "a" { const $ const $ pure $ Located (AlexPn 0 0 0) (TokenVarName "a") }
-    "" { undefined }
 }
 
 {
 
-alexEOF :: Alex a
-alexEOF = undefined
+constToken :: RlpToken -> AlexAction (Located RlpToken)
+constToken t inp _ = pure $ Located (inp ^. _1) t
+
+alexEOF :: Alex (Located RlpToken)
+alexEOF = do
+    inp <- alexGetInput
+    pure (Located (inp ^. _1) TokenEOF)
 
 data RlpToken = TokenEquals
               | TokenLitInt Int
@@ -38,27 +54,47 @@ data RlpToken = TokenEquals
               | TokenConSym Name
               | TokenData
               | TokenPipe
+              -- syntax control
+              | TokenSemicolon
+              | TokenLBrace
+              | TokenRBrace
               | TokenEOF
               deriving (Show)
 
-newtype P a = P { runP :: Text -> Either String a }
+newtype P a = P { runP :: PState -> Text -> Either String a }
     deriving (Functor)
 
-instance Applicative P where
-    pure = P . const . Right
+data PState = PState
+    { psLayoutStack     :: [Layout]
+    }
 
-    liftA2 f p q = P $ \s -> undefined
+data Layout = ExplicitLayout
+            | ImplicitLayout Int
+            deriving (Show)
+
+instance Applicative P where
+    pure = P . const . const . Right
+
+    liftA2 = liftM2
 
 instance Monad P where
-    m >>= k = P $ \s -> case runP m s of
-        Right a -> runP (k a) s
+    m >>= k = P $ \st s -> case runP m st s of
+        Right a -> runP (k a) st s
         Left e -> Left e
 
 data Located a = Located AlexPosn a
     deriving (Show)
 
 lexer :: (Located RlpToken -> P a) -> P a
-lexer f = P $ \s -> case runAlex s ((,) <$> alexMonadScan <*> alexGetInput) of
-    Right (a,s') -> runP (f a) (s' ^. _4)
+lexer f = P $ \st s -> case m s of
+        Right (a,s') -> runP (f a) st (s' ^. _4)
+        Left  e      -> error (show e)
+    where
+        m s = runAlex s ((,) <$> alexMonadScan <*> alexGetInput)
+
+lexStream :: P [RlpToken]
+lexStream = lexer go where
+    go (Located _ TokenEOF) = pure [TokenEOF]
+    go (Located _ t)        = (t:) <$> lexStream
 
 }
