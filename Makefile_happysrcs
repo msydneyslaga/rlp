@@ -1,0 +1,19 @@
+HAPPY = happy
+HAPPY_OPTS =
+ALEX = alex
+ALEX_OPTS =
+
+SRC = src
+CABAL_BUILD = dist-newstyle/build/x86_64-osx/ghc-9.6.2/rlp-0.1.0.0/build
+
+all: parsers lexers
+
+parsers: $(CABAL_BUILD)/Rlp/Parse.hs
+lexers: $(CABAL_BUILD)/Rlp/Lex.hs
+
+$(CABAL_BUILD)/Rlp/Parse.hs: $(SRC)/Rlp/Parse.y
+	$(HAPPY) $(HAPPY_OPTS) $< -o $@
+
+$(CABAL_BUILD)/Rlp/Lex.hs: $(SRC)/Rlp/Lex.x
+	$(ALEX) $(ALEX_OPTS) $< -o $@
+
