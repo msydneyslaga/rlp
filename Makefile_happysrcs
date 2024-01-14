@@ -1,7 +1,7 @@
 HAPPY = happy
 HAPPY_OPTS =
 ALEX = alex
-ALEX_OPTS =
+ALEX_OPTS = -d
 
 SRC = src
 CABAL_BUILD = dist-newstyle/build/x86_64-osx/ghc-9.6.2/rlp-0.1.0.0/build

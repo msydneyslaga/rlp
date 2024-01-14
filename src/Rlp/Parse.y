@@ -10,7 +10,7 @@ import Rlp.Parse.Types
 
 %name rlp
 %monad { P }
-%lexer { lexer } { Located _ TokenEOF }
+%lexer { lexerCont } { Located _ TokenEOF }
 %error { parseError }
 %tokentype { Located RlpToken }
 

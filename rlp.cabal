@@ -50,6 +50,7 @@ library
                     -- required for happy
                     , array
                     , data-default-class
+                    , data-default
                     , unordered-containers
                     , hashable
                     , pretty

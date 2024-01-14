@@ -8,6 +8,7 @@ module Rlp.Lex
     , Located(..)
     , AlexPosn
     , lexer
+    , lexerCont
     )
     where
 import Control.Monad
@@ -17,6 +18,7 @@ import Data.Monoid              (First)
 import Data.Maybe
 import Data.Text                (Text)
 import Data.Text                qualified as T
+import Data.Default
 import Lens.Micro.Mtl
 import Lens.Micro
 import Lens.Micro.TH
@@ -47,21 +49,21 @@ rlp :-
     -- TODO: don't treat operators like (-->) as comments
     "--".*              ;
     ";"                 { constToken TokenSemicolon }
-    "{"                 { explicitLBrace }
-    "}"                 { explicitRBrace }
+    -- "{"                 { explicitLBrace }
+    -- "}"                 { explicitRBrace }
 
 <0>
 {
-    $whitechar+         ;
     \n                  ;
-    "{"                 { expectLBrace }
+    "{"                 { explicitLBrace `thenBegin` one }
+    ()                  { doLayout `thenBegin` one }
 }
 
 <one>
 {
-    \n                  { begin bol }
     @varname            { tokenWith TokenVarName }
     "="                 { constToken TokenEquals }
+    \n                  { begin bol }
 }
 
 -- consume all whitespace leaving us at the beginning of the next non-empty
@@ -71,10 +73,18 @@ rlp :-
 {
     $whitechar          ;
     \n                  ;
-    ()                  { doBol }
+    ()                  { doBol `andBegin` one }
 }
 
 {
+
+-- | @andBegin@, with the subtle difference that the start code is set
+--   /after/ the action
+thenBegin :: AlexAction a -> Int -> AlexAction a
+thenBegin act c inp l = do
+    a <- act inp l
+    alexSetStartCode c
+    pure a
 
 constToken :: RlpToken -> AlexAction (Located RlpToken)
 constToken t inp _ = pure $ Located (inp ^. _1) t
@@ -105,20 +115,33 @@ data RlpToken
     | TokenSemicolon
     | TokenLBrace
     | TokenRBrace
-    -- 'virtual' control symbols, implicitly inserted by the lexer
+    -- 'virtual' control symbols, inserted by the lexer without any correlation
+    -- to a specific symbol
     | TokenSemicolonV
     | TokenLBraceV
     | TokenRBraceV
     | TokenEOF
     deriving (Show)
 
-newtype P a = P {
-        runP :: AlexUserState -> Text -> Either String (AlexUserState, a)
-    }
+newtype P a = P { runP :: ParseState -> Alex (ParseState, a) }
     deriving (Functor)
 
-runPInit :: P a -> Text -> Either String (AlexUserState, a)
-runPInit p = runP p alexInitUserState
+execP :: P a -> ParseState -> Text -> Either String a
+execP p st s = snd <$> runAlex s (runP p st)
+
+data ParseState = ParseState { }
+
+instance Default ParseState where
+    def = ParseState { }
+
+instance Applicative P where
+    pure a = P $ \st -> pure (st,a)
+    liftA2 = liftM2
+
+instance Monad P where
+    p >>= k = P $ \st -> do
+        (st',a) <- runP p st
+        runP (k a) st'
 
 data AlexUserState = AlexUserState
     -- the layout context, along with a start code to return to when the layout
@@ -136,16 +159,6 @@ data Layout = Explicit
             | Implicit Int
             deriving (Show, Eq)
 
-instance Applicative P where
-    pure a = P $ \st _ -> Right (st,a)
-
-    liftA2 = liftM2
-
-instance Monad P where
-    m >>= k = P $ \st s -> case runP m st s of
-        Right (st',a) -> runP (k a) st' s
-        Left e        -> Left e
-
 data Located a = Located AlexPosn a
     deriving (Show)
 
@@ -153,20 +166,21 @@ ausLayoutStack :: Lens' AlexUserState [(Layout, Int)]
 ausLayoutStack = lens _ausLayoutStack
     (\ s l -> s { _ausLayoutStack = l })
 
-lexer :: (Located RlpToken -> P a) -> P a
-lexer f = P $ \st s -> case m st s of
-        Right (a,st',s') -> runP (f a) st' (s' ^. _4)
-        Left  e          -> error (show e)
-    where
-        m st s = runAlex s
-            ((,,) <$> (alexSetUserState st *> alexMonadScan)
-                  <*> alexGetUserState
-                  <*> alexGetInput)
+lexer :: P (Located RlpToken)
+lexer = P $ \st -> (st,) <$> lexToken
 
-lexStream :: P [RlpToken]
-lexStream = lexer go where
-    go (Located _ TokenEOF) = pure [TokenEOF]
-    go (Located _ t)        = (t:) <$!> lexStream
+lexerCont :: (Located RlpToken -> P a) -> P a
+lexerCont = (lexer >>=)
+
+lexStream :: Alex [RlpToken]
+lexStream = do
+    t <- lexToken
+    case t of
+        Located _ TokenEOF  -> pure [TokenEOF]
+        Located _ a         -> (a:) <$> lexStream
+
+lexTest :: Text -> Either String [RlpToken]
+lexTest = flip runAlex lexStream
 
 lexToken :: Alex (Located RlpToken)
 lexToken = alexMonadScan
@@ -210,13 +224,14 @@ insertToken t = do
     pure (Located (inp ^. _1) t)
 
 insertSemicolon, insertLBrace, insertRBrace :: Alex (Located RlpToken)
-insertSemicolon = insertToken TokenSemicolonV
-insertLBrace = insertToken TokenLBraceV
-insertRBrace = insertToken TokenRBraceV
+insertSemicolon = traceM "inserting semi" >> insertToken TokenSemicolonV
+insertLBrace = traceM "inserting lbrace" >> insertToken TokenLBraceV
+insertRBrace = traceM "inserting rbrace" >> insertToken TokenRBraceV
 
 -- pop the layout stack and jump to the popped return code
 popLayout :: Alex ()
 popLayout = do
+    traceM "pop layout"
     ctx <- preuseAus (ausLayoutStack . _head)
     modifyingAus ausLayoutStack (drop 1)
     case ctx of
@@ -225,6 +240,7 @@ popLayout = do
 
 pushLayout :: Layout -> Alex ()
 pushLayout l = do
+    traceM "push layout"
     c <- alexGetStartCode
     modifyingAus ausLayoutStack ((l,c):)
 
@@ -240,7 +256,7 @@ doBol inp len = do
         GT -> undefined -- alexSetStartCode one >> lexToken
         -- the line is indented less than the previous, pop the layout stack and
         -- insert a closing brace.
-        LT -> popLayout >> insertRBrace >> alexSetStartCode 0 >> lexToken
+        LT -> insertRBrace >> popLayout >> lexToken
 
 explicitLBrace, explicitRBrace :: AlexAction (Located RlpToken)
 
@@ -257,10 +273,6 @@ doLayout _ _ = do
     i <- indentLevel
     pushLayout (Implicit i)
     insertLBrace
-
-expectLBrace :: AlexAction (Located RlpToken)
-expectLBrace _ _ = do
-    off <- cmpLayout
 
 }
 
