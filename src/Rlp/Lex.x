@@ -133,7 +133,7 @@ alexGetByte inp = case inp ^. aiBytes of
                        & aiPrevChar .~ c
                        -- update the position
                        & aiPos %~ \ (ln,col) ->
-                                   if (inp ^. aiPrevChar) == '\n'
+                                   if c == '\n'
                                    then (ln+1,1)
                                    else (ln,col+1)
         pure (b, inp')
