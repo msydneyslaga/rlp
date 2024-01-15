@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms, ViewPatterns, ImplicitParams #-}
 module Rlp.Parse.Associate
     ( associate
