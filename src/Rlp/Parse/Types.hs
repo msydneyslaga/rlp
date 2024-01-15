@@ -44,11 +44,15 @@ data RlpToken
     | TokenConSym Name
     -- keywords
     | TokenData
-    | TokenPipe
     | TokenLet
     | TokenIn
-    -- control symbols
+    -- reserved ops
+    | TokenArrow
+    | TokenPipe
+    | TokenHasType
+    | TokenLambda
     | TokenEquals
+    -- control symbols
     | TokenSemicolon
     | TokenLBrace
     | TokenRBrace

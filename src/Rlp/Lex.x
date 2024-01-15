@@ -1,5 +1,5 @@
 {
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ViewPatterns, LambdaCase #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Rlp.Lex
@@ -39,10 +39,20 @@ $nl             = [\n\r]
 $white_no_nl    = $white # $nl
 
 $namechar       = [$alpha $digit \' \#]
+$reservedsym    = [\(\)\,\;\[\]\`\{\}]
+$asciisym       = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~\:]
+$namesym        = $asciisym # \;
 
-@varname        = $lower $namechar*
+@reservedop =
+    "=" | \\ | "->" | "::" | "|"
 
-@digits         = $digit+
+@varname   = $lower $namechar*
+@conname   = $upper $namechar*
+@varsym    = $namesym+
+@consym    = \: $namesym*
+
+
+@decimal   = $digit+
 
 rlp :-
     
@@ -55,8 +65,8 @@ rlp :-
 {
     \n                  { beginPush bol }
     @varname            { tokenWith TokenVarName }
-    @digits             { tokenWith (TokenLitInt . readInt) }
-    "="                 { constToken TokenEquals }
+    @decimal            { tokenWith (TokenLitInt . readInt) }
+    @reservedop         { tokenWith readReservedOp }
 }
 
 -- control characters
@@ -85,6 +95,14 @@ rlp :-
 }
 
 {
+
+readReservedOp :: Text -> RlpToken
+readReservedOp = \case
+    "="     -> TokenEquals
+    "\\"    -> TokenLambda
+    "->"    -> TokenArrow
+    "::"    -> TokenHasType
+    s       -> error (show s)
 
 -- | @andBegin@, with the subtle difference that the start code is set
 --   /after/ the action
@@ -127,6 +145,12 @@ alexGetByte inp = case inp ^. aiBytes of
 getInput :: P AlexInput
 getInput = use psInput
 
+takeInput :: Int -> AlexInput -> Text
+takeInput n inp = T.cons c cs
+    where
+        c = inp ^. aiPrevChar
+        cs = T.take (max 0 (n-1)) $ inp ^. aiSource
+
 getLexState :: P Int
 getLexState = use (psLexState . singular _head)
 
@@ -148,8 +172,8 @@ constToken t inp l = do
 tokenWith :: (Text -> RlpToken) -> LexerAction (Located RlpToken)
 tokenWith tf inp l = do
     pos <- getPos
-    let t = tf (T.take l $ inp ^. aiSource)
-    pure (Located (pos,l) t)
+    let t = takeInput l inp
+    pure (Located (pos,l) (tf t))
 
 getPos :: P Position
 getPos = use (psInput . aiPos)
@@ -176,10 +200,10 @@ initParseState s = ParseState
     }
 
 initAlexInput :: Text -> AlexInput
-initAlexInput s = AlexInput
-    { _aiPrevChar   = '\0'
+initAlexInput t = AlexInput
+    { _aiPrevChar   = c
     , _aiSource     = s
-    , _aiBytes      = []
+    , _aiBytes      = b
     , _aiPos        = (1,1)
     }
 
