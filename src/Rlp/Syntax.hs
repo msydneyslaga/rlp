@@ -5,6 +5,8 @@
 {-# LANGUAGE OverloadedStrings, PatternSynonyms #-}
 module Rlp.Syntax
     ( RlpModule(..)
+    , RlpProgram(..)
+    , RlpProgram'
     , rlpmodName
     , rlpmodProgram
     , RlpExpr(..)
@@ -53,6 +55,8 @@ data RlpModule b = RlpModule
     }
 
 newtype RlpProgram b = RlpProgram [Decl RlpExpr b]
+
+type RlpProgram' = RlpProgram Name
 
 -- | The @e@ parameter is used for partial results. When parsing an input, we
 -- first parse all top-level declarations in order to extract infix[lr]
