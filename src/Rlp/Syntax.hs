@@ -55,6 +55,7 @@ data RlpModule b = RlpModule
     }
 
 newtype RlpProgram b = RlpProgram [Decl RlpExpr b]
+    deriving Show
 
 type RlpProgram' = RlpProgram Name
 

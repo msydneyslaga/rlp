@@ -58,6 +58,8 @@ data RlpToken
     | TokenSemicolon
     | TokenLBrace
     | TokenRBrace
+    | TokenLParen
+    | TokenRParen
     -- 'virtual' control symbols, inserted by the lexer without any correlation
     -- to a specific symbol
     | TokenSemicolonV
