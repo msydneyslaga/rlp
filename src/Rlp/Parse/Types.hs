@@ -42,8 +42,10 @@ data RlpToken
     | TokenConName Name
     | TokenVarSym Name
     | TokenConSym Name
-    -- keywords
+    -- reserved words
     | TokenData
+    | TokenCase
+    | TokenOf
     | TokenLet
     | TokenIn
     -- reserved ops
@@ -87,6 +89,7 @@ data ParseState = ParseState
     { _psLayoutStack        :: [Layout]
     , _psLexState           :: [Int]
     , _psInput              :: AlexInput
+    , _psOpTable            :: OpTable
     }
     deriving Show
 

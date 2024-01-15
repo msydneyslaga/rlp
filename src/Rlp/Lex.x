@@ -1,5 +1,5 @@
 {
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ViewPatterns, LambdaCase #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Rlp.Lex
@@ -7,7 +7,8 @@ module Rlp.Lex
     , RlpToken(..)
     , Located(..)
     , lexToken
-    , lexerCont
+    , lexDebug
+    , lexCont
     )
     where
 import Codec.Binary.UTF8.String (encodeChar)
@@ -30,33 +31,60 @@ import Rlp.Parse.Types
 
 $whitechar      = [ \t\n\r\f\v]
 
+$nl             = [\n\r]
+$white_no_nl    = $white # $nl
+
 $lower          = [a-z \_]
 $upper          = [A-Z]
 $alpha          = [$lower $upper]
 $digit          = 0-9
 
-$nl             = [\n\r]
-$white_no_nl    = $white # $nl
-
+$special        = [\(\)\,\;\[\]\{\}]
 $namechar       = [$alpha $digit \' \#]
+$asciisym       = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~\:]
+
+@decimal        = $digit+
 
 @varname        = $lower $namechar*
+@conname        = $upper $namechar*
+@consym         = \: $asciisym*
+@varsym         = $asciisym+
 
-@digits         = $digit+
+@reservedname = 
+    case|data|do|import|in|let|letrec|module|of|where
+
+@reservedop =
+    "=" | \\ | "->" | "|"
 
 rlp :-
     
-    -- skip whitespace
-    $white_no_nl+       ;
-    -- TODO: don't treat operators like (-->) as comments
-    "--".*              ;
+-- everywhere: skip whitespace
+$white_no_nl+       ;
 
+-- everywhere: skip comments
+-- TODO: don't treat operators like (-->) as comments
+"--".*              ;
+
+-- we are indentation-sensitive! do not skip NLs!. upon encountering a newline,
+-- we check indentation and potentially insert extra tokens. search this file
+-- for the definition of `doBol`
+<0> \n                  { beginPush bol }
+
+-- scan various identifiers and reserved words. order is important here!
 <0>
 {
-    \n                  { beginPush bol }
+    @reservedname       { tokenWith lexReservedName }
+    @conname            { tokenWith TokenConName }
     @varname            { tokenWith TokenVarName }
-    @digits             { tokenWith (TokenLitInt . readInt) }
-    "="                 { constToken TokenEquals }
+    @reservedop         { tokenWith lexReservedOp }
+    @consym             { tokenWith TokenConSym }
+    @varsym             { tokenWith TokenVarSym }
+}
+
+-- literals -- currently this is just unsigned integer literals
+<0>
+{
+    @decimal            { tokenWith (TokenLitInt . readInt) }
 }
 
 -- control characters
@@ -85,6 +113,20 @@ rlp :-
 }
 
 {
+
+lexReservedName :: Text -> RlpToken
+lexReservedName = \case
+    "data"      -> TokenData
+    "case"      -> TokenCase
+    "of"        -> TokenOf
+    "let"       -> TokenLet
+    "in"        -> TokenIn
+
+lexReservedOp :: Text -> RlpToken
+lexReservedOp = \case
+    "="     -> TokenEquals
+    "::"    -> TokenHasType
+    "|"     -> TokenPipe
 
 -- | @andBegin@, with the subtle difference that the start code is set
 --   /after/ the action
@@ -173,6 +215,7 @@ initParseState s = ParseState
     -- which then returns to state 0 which continues the normal lexing process.
     , _psLexState = [layout_top,0]
     , _psInput = initAlexInput s
+    , _psOpTable = mempty
     }
 
 initAlexInput :: Text -> AlexInput
@@ -188,7 +231,7 @@ lexToken = do
     inp <- getInput
     c <- getLexState
     st <- use id
-    traceM $ "st: " <> show st
+    -- traceM $ "st: " <> show st
     case alexScan inp c of
         AlexEOF -> pure $ Located (inp ^. aiPos, 0) TokenEOF
         AlexSkip inp' l -> do
@@ -196,11 +239,10 @@ lexToken = do
             lexToken
         AlexToken inp' l act -> do
             psInput .= inp'
-            traceShowM inp'
             act inp l
 
-lexerCont :: (Located RlpToken -> P a) -> P a
-lexerCont = undefined
+lexCont :: (Located RlpToken -> P a) -> P a
+lexCont = (lexToken >>=)
 
 lexStream :: P [RlpToken]
 lexStream = do
@@ -208,6 +250,12 @@ lexStream = do
     case t of
         Located _ TokenEOF -> pure [TokenEOF]
         Located _ t        -> (t:) <$> lexStream
+
+lexDebug :: (Located RlpToken -> P a) -> P a
+lexDebug k = do
+    t <- lexToken
+    traceM $ "token: " <> show t
+    k t
 
 lexTest :: Text -> Maybe [RlpToken]
 lexTest s = execP' lexStream s
@@ -224,7 +272,7 @@ insertToken t = do
 
 popLayout :: P Layout
 popLayout = do
-    traceM "pop layout"
+    -- traceM "pop layout"
     ctx <- preuse (psLayoutStack . _head)
     psLayoutStack %= (drop 1)
     case ctx of
@@ -233,7 +281,7 @@ popLayout = do
 
 pushLayout :: Layout -> P ()
 pushLayout l = do
-    traceM "push layout"
+    -- traceM "push layout"
     psLayoutStack %= (l:)
 
 popLexState :: P ()
@@ -241,9 +289,9 @@ popLexState = do
     psLexState %= tail
 
 insertSemicolon, insertLBrace, insertRBrace :: P (Located RlpToken)
-insertSemicolon = traceM "inserting semi"   >> insertToken TokenSemicolonV
-insertLBrace    = traceM "inserting lbrace" >> insertToken TokenLBraceV
-insertRBrace    = traceM "inserting rbrace" >> insertToken TokenRBraceV
+insertSemicolon = {- traceM "inserting semi"   >> -} insertToken TokenSemicolonV
+insertLBrace    = {- traceM "inserting lbrace" >> -} insertToken TokenLBraceV
+insertRBrace    = {- traceM "inserting rbrace" >> -} insertToken TokenRBraceV
 
 cmpLayout :: P Ordering
 cmpLayout = do

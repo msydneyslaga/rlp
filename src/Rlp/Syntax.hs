@@ -65,7 +65,7 @@ type RlpProgram' = RlpProgram Name
 -- accounted for, we may complete the parsing task and get a proper @[Decl
 -- RlpExpr Name]@.
 
-data Decl e b = FunD    VarId [Pat b] (e b) (Where b)
+data Decl e b = FunD    VarId [Pat b] (e b) (Maybe (Where b))
               | TySigD  [VarId] Type
               | DataD   ConId [Name] [ConAlt]
               | InfixD  Assoc Int Name
