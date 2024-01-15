@@ -1,19 +1,19 @@
 {
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Rlp.Lex
     ( P(..)
     , RlpToken(..)
     , Located(..)
-    , lexer
+    , lexToken
     , lexerCont
     )
     where
+import Codec.Binary.UTF8.String (encodeChar)
 import Control.Monad
+import Core.Syntax              (Name)
 import Data.Functor.Identity
 import Data.Char                (digitToInt)
-import Core.Syntax              (Name)
 import Data.Monoid              (First)
 import Data.Maybe
 import Data.Text                (Text)
@@ -22,9 +22,9 @@ import Data.Word
 import Data.Default
 import Lens.Micro.Mtl
 import Lens.Micro
-import Lens.Micro.TH
 
 import Debug.Trace
+import Rlp.Parse.Types
 }
 
 $whitechar      = [ \t\n\r\f\v]
@@ -78,23 +78,31 @@ rlp :-
 
 {
 
+begin :: Int -> LexerAction a
 begin = undefined
 
-type LexerAction a = AlexInput -> Int -> P a
-
-type AlexInput =
-    ( Char      -- prev char
-    , Text      -- input
-    )
-
 alexGetByte :: AlexInput -> Maybe (Word8, AlexInput)
-alexGetByte (_,s) = undefined
+alexGetByte inp = case inp ^. aiBytes of
+    [] -> do
+        (c,t) <- T.uncons (inp ^. aiSource)
+        let (b:bs) = encodeChar c
+            inp' = inp & aiSource .~ t
+                       & aiBytes .~ bs
+                       & aiPrevChar .~ c
+        pure (b, inp')
+    
+    _ -> Just (head bs, inp')
+        where
+            (bs, inp') = inp & aiBytes <<%~ drop 1
 
 getInput :: P AlexInput
-getInput = undefined
+getInput = use psInput
+
+getLexState :: P Int
+getLexState = use (psLexState . singular _head)
 
 alexInputPrevChar :: AlexInput -> Char
-alexInputPrevChar = (^. _1)
+alexInputPrevChar = view aiPrevChar
 
 readInt :: Text -> Int
 readInt = T.foldr f 0 where
@@ -108,95 +116,116 @@ thenBegin act c inp l = do
     undefined
 
 constToken :: RlpToken -> LexerAction (Located RlpToken)
-constToken t inp _ = undefined
+constToken t inp l = do
+    pos <- use (psInput . aiPos)
+    pure (Located (pos,l) t)
 
 tokenWith :: (Text -> RlpToken) -> LexerAction (Located RlpToken)
-tokenWith tf inp l = undefined
+tokenWith tf inp l = do
+    pos <- getPos
+    let t = tf (T.take l $ inp ^. aiSource)
+    pure (Located (pos,l) t)
+
+getPos :: P Position
+getPos = use (psInput . aiPos)
 
 alexEOF :: P (Located RlpToken)
 alexEOF = do
     inp <- getInput
     pure (Located undefined TokenEOF)
 
-data RlpToken
-    -- literals
-    = TokenLitInt Int
-    -- identifiers
-    | TokenVarName Name
-    | TokenConName Name
-    | TokenVarSym Name
-    | TokenConSym Name
-    -- keywords
-    | TokenData
-    | TokenPipe
-    | TokenLet
-    | TokenIn
-    -- control symbols
-    | TokenEquals
-    | TokenSemicolon
-    | TokenLBrace
-    | TokenRBrace
-    -- 'virtual' control symbols, inserted by the lexer without any correlation
-    -- to a specific symbol
-    | TokenSemicolonV
-    | TokenLBraceV
-    | TokenRBraceV
-    | TokenEOF
-    deriving (Show)
+execP :: P a -> ParseState -> Maybe a
+execP p st = runP p st & snd
 
-newtype P a = P { runP :: ParseState -> (ParseState, Maybe a) }
-    deriving (Functor)
-
-execP :: P a -> ParseState -> Either String a
-execP p st = undefined
-
-execP' :: P a -> Text -> Either String a
+execP' :: P a -> Text -> Maybe a
 execP' p s = execP p st where
     st = initParseState s
 
 initParseState :: Text -> ParseState
 initParseState s = ParseState
     { _psLayoutStack = []
-    , _psLexState = [bol,0]
-    , _psInput = (undefined, s)
+    , _psLexState = [one,bol,0]
+    , _psInput = initAlexInput s
     }
 
-data ParseState = ParseState
-    { _psLayoutStack        :: [Layout]
-    , _psLexState           :: [Int]
-    , _psInput              :: AlexInput
+initAlexInput :: Text -> AlexInput
+initAlexInput s = AlexInput
+    { _aiPrevChar   = '\0'
+    , _aiSource     = s
+    , _aiBytes      = []
+    , _aiPos        = (1,1)
     }
 
-instance Applicative P where
-    pure a = P $ \st -> (st,Just a)
-    liftA2 = liftM2
-
-instance Monad P where
-    p >>= k = undefined
-
-data Layout = Explicit
-            | Implicit Int
-            deriving (Show, Eq)
-
-data Located a = Located (Int, Int) a
-    deriving (Show)
-
-lexer :: P (Located RlpToken)
-lexer = undefined
+lexToken :: P (Located RlpToken)
+lexToken = do
+    inp <- getInput
+    c <- getLexState
+    case alexScan inp c of
+        AlexEOF -> pure $ Located (inp ^. aiPos, 0) TokenEOF
+        AlexToken inp' l act -> do
+            psInput .= inp'
+            traceM $ "l: " <> show l
+            traceShowM inp'
+            act inp l
 
 lexerCont :: (Located RlpToken -> P a) -> P a
 lexerCont = undefined
 
 lexStream :: P [RlpToken]
-lexStream = undefined
+lexStream = do
+    t <- lexToken
+    case t of
+        Located _ TokenEOF -> pure [TokenEOF]
+        Located _ t        -> (t:) <$> lexStream
 
 lexTest :: Text -> Either String [RlpToken]
 lexTest = undefined
 
-lexToken :: P (Located RlpToken)
-lexToken = undefined
+indentLevel :: P Int
+indentLevel = do
+    pos <- use (psInput . aiPos)
+    pure (pos ^. _2)
 
-doBol = undefined
+insertToken :: RlpToken -> P (Located RlpToken)
+insertToken t = do
+    pos <- use (psInput . aiPos)
+    pure (Located (pos, 0) t)
+
+popLayout :: P Layout
+popLayout = do
+    traceM "pop layout"
+    ctx <- preuse (psLayoutStack . _head)
+    modifying psLayoutStack (drop 1)
+    case ctx of
+        Just l      -> pure l
+        Nothing     -> error "uhh"
+
+insertSemicolon, insertLBrace, insertRBrace :: P (Located RlpToken)
+insertSemicolon = traceM "inserting semi"   >> insertToken TokenSemicolonV
+insertLBrace    = traceM "inserting lbrace" >> insertToken TokenLBraceV
+insertRBrace    = traceM "inserting rbrace" >> insertToken TokenRBraceV
+
+cmpLayout :: P Ordering
+cmpLayout = do
+    i <- indentLevel
+    ctx <- preuse (psLayoutStack . _head)
+    case ctx ^. non (Implicit 1) of
+        Implicit n -> pure (i `compare` n)
+        Explicit   -> pure GT
+
+doBol :: LexerAction (Located RlpToken)
+doBol inp l = do
+    off <- cmpLayout
+    case off of
+        -- the line is aligned with the previous. it therefore belongs to the
+        -- same list
+        EQ -> insertSemicolon
+        -- the line is indented further than the previous, so we assume it is a
+        -- line continuation. ignore it and move on!
+        GT -> undefined -- alexSetStartCode one >> lexToken
+        -- the line is indented less than the previous, pop the layout stack and
+        -- insert a closing brace.
+        LT -> popLayout >> insertRBrace
 
 }
 

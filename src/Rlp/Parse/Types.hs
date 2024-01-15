@@ -1,56 +1,96 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ImplicitParams, ViewPatterns, PatternSynonyms #-}
-{-
-Description : Supporting types for the parser
--}
-module Rlp.Parse.Types
-    (
-    -- * Partial ASTs
-      Partial(..)
-    , PartialE
-    , PartialExpr'
-    , PartialDecl'
-    , pattern WithInfo
-    , pR
-    , pL
-
-    -- * Parser types
-    , Parser
-    , ParserState(..)
-    , psOpTable
-    , RlpParseError(..)
-    , OpTable
-    , OpInfo
-    )
-    where
-----------------------------------------------------------------------------------
-import Control.Monad.State
-import Data.HashMap.Strict          qualified as H
+{-# LANGUAGE LambdaCase #-}
+module Rlp.Parse.Types where
+--------------------------------------------------------------------------------
+import Core.Syntax                  (Name)
+import Control.Monad
+import Control.Monad.State.Class
+import Data.Text                    (Text)
+import Data.Maybe
 import Data.Fix
 import Data.Functor.Foldable
 import Data.Functor.Const
 import Data.Functor.Classes
-import Data.Void
-import Data.Maybe
-import Text.Megaparsec              hiding (State)
-import Text.Printf
-import Lens.Micro
+import Data.HashMap.Strict          qualified as H
+import Data.Word                    (Word8)
 import Lens.Micro.TH
+import Lens.Micro
 import Rlp.Syntax
-----------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
--- parser types
+type LexerAction a = AlexInput -> Int -> P a
 
--- TODO: the State is only used for building an operator table from infix[lr]
--- declarations. we should switch to a normal Parsec monad in the future
-
-type Parser = ParsecT RlpParseError Text (State ParserState)
-
-data ParserState = ParserState
-    { _psOpTable :: OpTable
+data AlexInput = AlexInput
+    { _aiPrevChar   :: Char
+    , _aiSource     :: Text
+    , _aiBytes      :: [Word8]
+    , _aiPos        :: Position
     }
     deriving Show
+
+type Position =
+    ( Int -- line
+    , Int -- column
+    )
+
+data RlpToken
+    -- literals
+    = TokenLitInt Int
+    -- identifiers
+    | TokenVarName Name
+    | TokenConName Name
+    | TokenVarSym Name
+    | TokenConSym Name
+    -- keywords
+    | TokenData
+    | TokenPipe
+    | TokenLet
+    | TokenIn
+    -- control symbols
+    | TokenEquals
+    | TokenSemicolon
+    | TokenLBrace
+    | TokenRBrace
+    -- 'virtual' control symbols, inserted by the lexer without any correlation
+    -- to a specific symbol
+    | TokenSemicolonV
+    | TokenLBraceV
+    | TokenRBraceV
+    | TokenEOF
+    deriving (Show)
+
+newtype P a = P { runP :: ParseState -> (ParseState, Maybe a) }
+    deriving (Functor)
+
+instance Applicative P where
+    pure a = P $ \st -> (st,Just a)
+    liftA2 = liftM2
+
+instance Monad P where
+    p >>= k = P $ \st ->
+        let (st',a) = runP p st
+        in case a of
+            Just x  -> runP (k x) st'
+            Nothing -> (st', Nothing)
+
+instance MonadState ParseState P where
+    state f = P $ \st ->
+        let (a,st') = f st
+        in (st', Just a)
+
+data ParseState = ParseState
+    { _psLayoutStack        :: [Layout]
+    , _psLexState           :: [Int]
+    , _psInput              :: AlexInput
+    }
+
+data Layout = Explicit
+            | Implicit Int
+            deriving (Show, Eq)
+
+data Located a = Located (Position, Int) a
+    deriving (Show)
 
 type OpTable = H.HashMap Name OpInfo
 type OpInfo = (Assoc, Int)
@@ -61,17 +101,6 @@ data RlpParseError = RlpParErrOutOfBoundsPrecedence Int
                    | RlpParErrDuplicateInfixD
     deriving (Eq, Ord, Show)
 
-instance ShowErrorComponent RlpParseError where
-    showErrorComponent = \case
-        -- TODO: wrap text to 80 characters
-        RlpParErrOutOfBoundsPrecedence n ->
-            printf "%d is an invalid precedence level! rl' currently only\
-                   \allows custom precedences between 0 and 9 (inclusive).\
-                   \ This is an arbitrary limit put in place for legibility\
-                   \ concerns, and may change in the future." n
-        RlpParErrDuplicateInfixD ->
-            "duplicate infix decl"
-
 ----------------------------------------------------------------------------------
 
 -- absolute psycho shit (partial ASTs)
@@ -80,7 +109,7 @@ type PartialDecl' = Decl (Const PartialExpr') Name
 
 data Partial a = E (RlpExprF Name a)
                | B Name (Partial a) (Partial a)
-               | P (Partial a)
+               | Par (Partial a)
                deriving (Show, Functor)
 
 pL :: Traversal' (Partial a) (Partial a)
@@ -109,14 +138,13 @@ instance Show1 Partial where
     liftShowsPrec sp sl p m = case m of
         (E e)       -> showsUnaryWith lshow "E" p e
         (B f a b)   -> showsTernaryWith showsPrec lshow lshow "B" p f a b
-        (P e)       -> showsUnaryWith lshow "P" p e
+        (Par e)     -> showsUnaryWith lshow "Par" p e
         where
             lshow :: forall f. (Show1 f) => Int -> f a -> ShowS
             lshow = liftShowsPrec sp sl
 
 type PartialExpr' = Fix Partial
 
-----------------------------------------------------------------------------------
-
-makeLenses ''ParserState
+makeLenses ''AlexInput
+makeLenses ''ParseState
 

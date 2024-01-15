@@ -60,6 +60,7 @@ library
                     , megaparsec                ^>=9.6.0
                     , text
                     , data-fix
+                    , utf8-string
 
     hs-source-dirs:   src
     default-language: GHC2021
