@@ -176,16 +176,12 @@ initParseState s = ParseState
     }
 
 initAlexInput :: Text -> AlexInput
-initAlexInput (unconsBytes -> (b,s)) = AlexInput
+initAlexInput s = AlexInput
     { _aiPrevChar   = '\0'
     , _aiSource     = s
-    , _aiBytes      = b
+    , _aiBytes      = []
     , _aiPos        = (1,1)
     }
-
-unconsBytes :: Text -> ([Word8], Text)
-unconsBytes s = (encodeChar c, t) where
-    (c,t) = fromJust $ T.uncons s
 
 lexToken :: P (Located RlpToken)
 lexToken = do
