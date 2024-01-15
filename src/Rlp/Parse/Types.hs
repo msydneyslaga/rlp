@@ -84,6 +84,7 @@ data ParseState = ParseState
     , _psLexState           :: [Int]
     , _psInput              :: AlexInput
     }
+    deriving Show
 
 data Layout = Explicit
             | Implicit Int
