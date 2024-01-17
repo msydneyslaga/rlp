@@ -48,6 +48,9 @@ data RlpToken
     | TokenOf
     | TokenLet
     | TokenIn
+    | TokenInfixL
+    | TokenInfixR
+    | TokenInfix
     -- reserved ops
     | TokenArrow
     | TokenPipe

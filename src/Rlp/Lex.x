@@ -90,6 +90,8 @@ $white_no_nl+       ;
 -- control characters
 <0>
 {
+    "("                 { constToken TokenLParen }
+    ")"                 { constToken TokenRParen }
     "{"                 { explicitLBrace }
     "}"                 { explicitRBrace }
     ";"                 { constToken TokenSemicolon }
