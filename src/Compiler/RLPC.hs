@@ -17,8 +17,6 @@ module Compiler.RLPC
     , RLPCIO
     , RLPCOptions(RLPCOptions)
     , RlpcError(..)
-    , IsRlpcError(..)
-    , rlpc
     , addFatal
     , addWound
     , MonadErrorful
@@ -27,9 +25,6 @@ module Compiler.RLPC
     , evalRLPCT
     , evalRLPCIO
     , evalRLPC
-    , addRlpcWound
-    , addRlpcFatal
-    , liftRlpcErrs
     , rlpcLogFile
     , rlpcDebugOpts
     , rlpcEvaluator
@@ -60,46 +55,25 @@ import Lens.Micro
 import Lens.Micro.TH
 ----------------------------------------------------------------------------------
 
--- TODO: fancy errors
-newtype RLPCT e m a = RLPCT {
-        runRLPCT :: ReaderT RLPCOptions (ErrorfulT e m) a
+newtype RLPCT m a = RLPCT {
+        runRLPCT :: forall e. (RlpcError e)
+                 => ReaderT RLPCOptions (ErrorfulT e m) a
     }
-    -- TODO: incorrect ussage of MonadReader. RLPC should have its own
-    -- environment access functions
-    deriving (Functor, Applicative, Monad, MonadReader RLPCOptions)
 
-deriving instance (MonadIO m) => MonadIO (RLPCT e m)
+type RLPC = RLPCT Identity
 
-instance MonadTrans (RLPCT e) where
-    lift = RLPCT . lift . lift
+type RLPCIO = RLPCT IO
 
-instance (MonadState s m) => MonadState s (RLPCT e m) where
-    state = lift . state
+instance Functor (RLPCT m) where
+instance Applicative (RLPCT m) where
+instance Monad (RLPCT m) where
 
-type RLPC e = RLPCT e Identity
+evalRLPC = undefined
+evalRLPCT = undefined
+evalRLPCIO = undefined
 
-type RLPCIO e = RLPCT e IO
-
-evalRLPCT :: RLPCOptions
-          -> RLPCT e m a
-          -> m (Either e (a, [e]))
-evalRLPCT o = runRLPCT >>> flip runReaderT o >>> runErrorfulT
-
-evalRLPC :: RLPCOptions
-         -> RLPC e a
-         -> Either e (a, [e])
-evalRLPC o m = coerce $ evalRLPCT o m
-
-evalRLPCIO :: (Exception e)
-           => RLPCOptions
-           -> RLPCIO e a
-           -> IO (a, [e])
-evalRLPCIO o m = do
-    m' <- evalRLPCT o m
-    case m' of
-        -- TODO: errors
-        Left e -> throwIO e
-        Right a -> pure a
+liftErrorful :: (RlpcError e) => ErrorfulT e m a -> RLPCT m a
+liftErrorful e = undefined
 
 data RLPCOptions = RLPCOptions
     { _rlpcLogFile     :: Maybe FilePath
@@ -112,32 +86,6 @@ data RLPCOptions = RLPCOptions
 
 data Evaluator = EvaluatorGM | EvaluatorTI
     deriving Show
-
-data Severity = Error
-              | Warning
-              | Debug
-              deriving Show
-
--- temporary until we have a new doc building system
-type ErrorDoc = String
-
-instance (Monad m) => MonadErrorful e (RLPCT e m) where
-    addWound = RLPCT . lift . addWound
-    addFatal = RLPCT . lift . addFatal
-
-liftRlpcErrs :: (IsRlpcError e, Monad m)
-             => RLPCT e m a -> RLPCT RlpcError m a
-liftRlpcErrs m = RLPCT . ReaderT $ \r ->
-    mapErrors liftRlpcErr $ runRLPCT >>> (`runReaderT` r) $ m
-
-addRlpcWound :: (IsRlpcError e, Monad m) => e -> RLPCT RlpcError m ()
-addRlpcWound = addWound . liftRlpcErr
-
-addRlpcFatal :: (IsRlpcError e, Monad m) => e -> RLPCT RlpcError m ()
-addRlpcFatal = addWound . liftRlpcErr
-
-rlpc :: (Monad m) => ErrorfulT e m a -> RLPCT e m a
-rlpc = RLPCT . ReaderT . const
 
 ----------------------------------------------------------------------------------
 

@@ -26,21 +26,22 @@ import Data.Function                    ((&))
 import GM
 ----------------------------------------------------------------------------------
 
-justLexSrc :: String -> Either RlpcError [CoreToken]
+-- justLexSrc :: String -> Either RlpcError [CoreToken]
 justLexSrc s = lexCoreR (T.pack s)
              & fmap (map $ \ (Located _ _ _ t) -> t)
              & rlpcToEither
 
-justParseSrc :: String -> Either RlpcError Program'
+-- justParseSrc :: String -> Either RlpcError Program'
 justParseSrc s = parse (T.pack s)
                & rlpcToEither
     where parse = lexCoreR >=> parseCoreProgR
 
-justTypeCheckSrc :: String -> Either RlpcError Program'
+-- justTypeCheckSrc :: String -> Either RlpcError Program'
 justTypeCheckSrc s = typechk (T.pack s)
                    & rlpcToEither
     where typechk = lexCoreR >=> parseCoreProgR >=> checkCoreProgR
 
-rlpcToEither :: RLPC e a -> Either e a
-rlpcToEither = evalRLPC def >>> fmap fst
+rlpcToEither = undefined
+
+{-# WARNING rlpcToEither "unimpl" #-}
 

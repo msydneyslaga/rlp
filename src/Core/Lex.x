@@ -167,24 +167,23 @@ lexWith :: (Text -> CoreToken) -> Lexer
 lexWith f (AlexPn _ y x,_,_,s) l = pure $ Located y x l (f $ T.take l s)
 
 -- | The main lexer driver.
-lexCore :: Text -> RLPC SrcError [Located CoreToken]
+lexCore :: Text -> RLPC [Located CoreToken]
 lexCore s = case m of
-    Left e   -> addFatal err
-        where err = SrcError
-                { _errSpan       = (0,0,0) -- TODO: location
-                , _errSeverity   = Error
-                , _errDiagnostic = SrcErrLexical e
-                }
+    Left e   -> undefined
     Right ts -> pure ts
     where
         m = runAlex s lexStream
 
-lexCoreR :: Text -> RLPC RlpcError [Located CoreToken]
-lexCoreR = liftRlpcErrs . lexCore
+{-# WARNING lexCore "unimpl" #-}
+
+lexCoreR :: Text -> RLPC [Located CoreToken]
+lexCoreR t = undefined
+
+{-# WARNING lexCoreR "unimpl" #-}
 
 -- | @lexCore@, but the tokens are stripped of location info. Useful for
 -- debugging
-lexCore' :: Text -> RLPC SrcError [CoreToken]
+lexCore' :: Text -> RLPC [CoreToken]
 lexCore' s = fmap f <$> lexCore s
     where f (Located _ _ _ t) = t
 
@@ -200,12 +199,10 @@ data ParseError = ParErrLexical String
                 deriving Show
 
 -- TODO:
-instance IsRlpcError SrcError where
-    liftRlpcErr = RlpcErr . show
+instance RlpcError SrcError where
 
 -- TODO:
-instance IsRlpcError ParseError where
-    liftRlpcErr = RlpcErr . show
+instance RlpcError ParseError where
 
 alexEOF :: Alex (Located CoreToken)
 alexEOF = Alex $ \ st@(AlexState { alex_pos = AlexPn _ y x }) ->

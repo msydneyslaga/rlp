@@ -49,8 +49,7 @@ data TypeError
     deriving (Show, Eq)
 
 -- TODO:
-instance IsRlpcError TypeError where
-    liftRlpcErr = RlpcErr . show
+instance RlpcError TypeError where
 
 -- | Synonym for @Errorful [TypeError]@. This means an @HMError@ action may
 -- throw any number of fatal or nonfatal errors. Run with @runErrorful@.
@@ -88,10 +87,10 @@ checkCoreProg p = scDefs
              where scname = sc ^. _lhs._1
 
 -- | @checkCoreProgR p@ returns @p@ if @p@ successfully typechecks.
-checkCoreProgR :: Program' -> RLPC RlpcError Program'
-checkCoreProgR p = do
-    liftRlpcErrs . rlpc . checkCoreProg $ p
-    pure p
+-- checkCoreProgR :: Program' -> RLPC Program'
+checkCoreProgR = undefined
+
+{-# WARNING checkCoreProgR "unimpl" #-}
 
 -- | Infer the type of an expression under some context.
 --

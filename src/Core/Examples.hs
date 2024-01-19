@@ -15,6 +15,13 @@ import Core.Syntax
 import Core.TH
 ----------------------------------------------------------------------------------
 
+fac3 = undefined
+sumList = undefined
+constDivZero = undefined
+idCase = undefined
+
+{--
+
 letrecExample :: Program'
 letrecExample = [coreProg|
     pair x y f = f x y;
@@ -216,3 +223,4 @@ idCase = [coreProg|
 --         , ScDef "Cons" [] $ Con 2 2
 --         ]
 
+--}

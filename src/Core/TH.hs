@@ -19,6 +19,7 @@ import Data.Default.Class           (def)
 import Data.Text                    qualified as T
 import Core.Parse
 import Core.Lex
+import Core.Syntax                  (Expr(Var))
 import Core.HindleyMilner           (checkCoreProgR)
 ----------------------------------------------------------------------------------
 
@@ -58,30 +59,20 @@ coreProgT = QuasiQuoter
     }
 
 qCore :: String -> Q Exp
-qCore s = case parse (T.pack s) of
-    Left e       -> error (show e)
-    Right (m,ts) -> lift m
-    where
-        parse = evalRLPC def . (lexCore >=> parseCore)
+qCore s = undefined
+
+{-# WARNING qCore "unimpl" #-}
 
 qCoreExpr :: String -> Q Exp
-qCoreExpr s = case parseExpr (T.pack s) of
-    Left e       -> error (show e)
-    Right (m,ts) -> lift m
-    where
-        parseExpr = evalRLPC def . (lexCore >=> parseCoreExpr)
+qCoreExpr s = undefined
+
+{-# WARNING qCoreExpr "unimpl" #-}
 
 qCoreProg :: String -> Q Exp
-qCoreProg s = case parse (T.pack s) of
-    Left e       -> error (show e)
-    Right (m,ts) -> lift m
-    where
-        parse = evalRLPC def . (lexCoreR >=> parseCoreProgR)
+qCoreProg s = undefined
+
+{-# WARNING qCoreProg "unimpl" #-}
 
 qCoreProgT :: String -> Q Exp
-qCoreProgT s = case parse (T.pack s) of
-    Left e      -> error (show e)
-    Right (m,_) -> lift m
-    where
-        parse = evalRLPC def . (lexCoreR >=> parseCoreProgR >=> checkCoreProgR)
+qCoreProgT s = undefined
 

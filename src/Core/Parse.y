@@ -10,7 +10,6 @@ module Core.Parse
     , parseCoreProg
     , parseCoreProgR
     , module Core.Lex -- temp convenience
-    , parseTmp
     , SrcError
     , Module
     )
@@ -34,7 +33,7 @@ import Data.HashMap.Strict  qualified as H
 %name parseCoreProg StandaloneProgram
 %tokentype { Located CoreToken }
 %error { parseError }
-%monad { RLPC SrcError }
+%monad { RLPC } { happyBind } { happyPure }
 
 %token
       let             { Located _ _ _ TokenLet }
@@ -189,34 +188,21 @@ Con             : '(' consym ')'                    { $2 }
 
 {
 
-parseError :: [Located CoreToken] -> RLPC SrcError a
-parseError (Located y x l _ : _) = addFatal err
-    where err = SrcError
-            { _errSpan       = (y,x,l)
-            , _errSeverity   = Error
-            , _errDiagnostic = SrcErrParse
-            }
+parseError :: [Located CoreToken] -> RLPC a
+parseError (Located y x l _ : _) = undefined
 
-parseTmp :: IO (Module Name)
-parseTmp = do
-    s <- TIO.readFile "/tmp/t.hs"
-    case parse s of
-        Left e -> error (show e)
-        Right (ts,_) -> pure ts
-    where
-        parse = evalRLPC def . (lexCore >=> parseCore)
+{-# WARNING parseError "unimpl" #-}
 
-exprPragma :: [String] -> RLPC SrcError (Expr Name)
-exprPragma ("AST" : e) = astPragma e
-exprPragma _           = addFatal err
-    where err = SrcError
-            { _errSpan       = (0,0,0) -- TODO: span
-            , _errSeverity   = Warning
-            , _errDiagnostic = SrcErrUnknownPragma "" -- TODO: missing pragma
-            }
+exprPragma :: [String] -> RLPC (Expr Name)
+exprPragma ("AST" : e) = undefined
+exprPragma _           = undefined
 
-astPragma :: [String] -> RLPC SrcError (Expr Name)
-astPragma = pure . read . unwords
+{-# WARNING exprPragma "unimpl" #-}
+
+astPragma :: [String] -> RLPC (Expr Name)
+astPragma _ = undefined
+
+{-# WARNING astPragma "unimpl" #-}
 
 insTypeSig :: (Hashable b) => (b, Type) -> Program b -> Program b
 insTypeSig ts = programTypeSigs %~ uncurry H.insert ts
@@ -230,8 +216,16 @@ insScDef sc = programScDefs %~ (sc:)
 singletonScDef :: (Hashable b) => ScDef b -> Program b
 singletonScDef sc = insScDef sc mempty
 
-parseCoreProgR :: [Located CoreToken] -> RLPC RlpcError Program'
-parseCoreProgR = liftRlpcErrs . parseCoreProg
+parseCoreProgR :: [Located CoreToken] -> RLPC Program'
+parseCoreProgR a = undefined
+
+{-# WARNING parseCoreProgR "unimpl" #-}
+
+happyBind :: RLPC a -> (a -> RLPC b) -> RLPC b
+happyBind m k = m >>= k
+
+happyPure :: a -> RLPC a
+happyPure a = pure a
 
 }
 
