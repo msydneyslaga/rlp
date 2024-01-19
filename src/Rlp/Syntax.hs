@@ -45,6 +45,7 @@ import Data.Functor.Foldable.TH     (makeBaseFunctor)
 import Data.Functor.Classes
 import Lens.Micro
 import Lens.Micro.TH
+import Language.Haskell.TH.Syntax   (Lift)
 import Core.Syntax                  hiding (Lit)
 import Core                         (HasRHS(..), HasLHS(..))
 ----------------------------------------------------------------------------------
@@ -55,7 +56,7 @@ data RlpModule b = RlpModule
     }
 
 newtype RlpProgram b = RlpProgram [Decl RlpExpr b]
-    deriving Show
+    deriving (Show, Lift)
 
 type RlpProgram' = RlpProgram Name
 
@@ -70,17 +71,17 @@ data Decl e b = FunD    VarId [Pat b] (e b) (Maybe (Where b))
               | TySigD  [VarId] Type
               | DataD   ConId [Name] [ConAlt]
               | InfixD  Assoc Int Name
-              deriving Show
+              deriving (Show, Lift)
 
 type Decl' e = Decl e Name
 
 data Assoc = InfixL
            | InfixR
            | Infix
-           deriving Show
+           deriving (Show, Lift)
 
 data ConAlt = ConAlt ConId [Type]
-            deriving Show
+            deriving (Show, Lift)
 
 data RlpExpr b = LetE  [Bind b] (RlpExpr b)
                | VarE  VarId
@@ -90,7 +91,7 @@ data RlpExpr b = LetE  [Bind b] (RlpExpr b)
                | IfE   (RlpExpr b) (RlpExpr b) (RlpExpr b)
                | AppE  (RlpExpr b) (RlpExpr b)
                | LitE  (Lit b)
-               deriving Show
+               deriving (Show, Lift)
 
 type RlpExpr' = RlpExpr Name
 
@@ -99,15 +100,15 @@ type Where' = [Bind Name]
 
 -- do we want guards?
 data Alt b = AltA (Pat b) (RlpExpr b)
-           deriving Show
+           deriving (Show, Lift)
 
 data Bind b = PatB (Pat b) (RlpExpr b)
             | FunB VarId [Pat b] (RlpExpr b)
-            deriving Show
+            deriving (Show, Lift)
 
 data VarId = NameVar Text
            | SymVar Text
-           deriving Show
+           deriving (Show, Lift)
 
 instance IsString VarId where
     -- TODO: use symvar if it's an operator
@@ -115,19 +116,19 @@ instance IsString VarId where
 
 data ConId = NameCon Text
            | SymCon Text
-           deriving Show
+           deriving (Show, Lift)
 
 data Pat b = VarP VarId
            | LitP (Lit b)
            | ConP ConId [Pat b]
-           deriving Show
+           deriving (Show, Lift)
 
 type Pat' = Pat Name
 
 data Lit b = IntL Int
            | CharL Char
            | ListL [RlpExpr b]
-           deriving Show
+           deriving (Show, Lift)
 
 type Lit' = Lit Name
 

@@ -37,12 +37,14 @@ library
                     , Rlp.Parse.Associate
                     , Rlp.Lex
                     , Rlp.Parse.Types
+                    , Rlp.TH
 
     other-modules:    Data.Heap
                     , Data.Pretty
                     , Core.Parse
                     , Core.Lex
                     , Core2Core
+                    , Rlp2Core
                     , Control.Monad.Utils
 
     build-tool-depends: happy:happy, alex:alex

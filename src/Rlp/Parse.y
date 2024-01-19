@@ -2,6 +2,8 @@
 {-# LANGUAGE LambdaCase #-}
 module Rlp.Parse
     ( parseRlpProg
+    , execP
+    , execP'
     )
     where
 import Rlp.Lex
@@ -30,6 +32,7 @@ import Data.Functor.Const
     varsym          { Located _ (TokenVarSym $$) }
     data            { Located _ TokenData }
     litint          { Located _ (TokenLitInt $$) }
+    '::'            { Located _ TokenHasType }
     '='             { Located _ TokenEquals }
     '|'             { Located _ TokenPipe }
     ';'             { Located _ TokenSemicolon }
@@ -76,8 +79,14 @@ VS                  : ';'                   { $1 }
 
 Decl        :: { PartialDecl' }
             : FunDecl                   { $1 }
+            | TySigDecl                 { $1 }
             | DataDecl                  { $1 }
             | InfixDecl                 { $1 }
+
+-- TODO: multiple vars
+
+TySigDecl   :: { PartialDecl' }
+            : Var '::' Type             { TySigD [$1] $3 }
 
 InfixDecl   :: { PartialDecl' }
             : InfixWord litint InfixOp  {% mkInfixD $1 $2 $3 }
@@ -168,8 +177,7 @@ mkInfixD a p n = do
     let opl :: Lens' ParseState (Maybe OpInfo)
         opl = psOpTable . at n
     opl <~ (use opl >>= \case
-        -- TODO: non-fatal error
-        Just o  -> pure (Just o)
+        Just o  -> error "(TODO: non-fatal) duplicate inix decls"
         Nothing -> pure (Just (a,p))
         )
     pure $ InfixD a p n

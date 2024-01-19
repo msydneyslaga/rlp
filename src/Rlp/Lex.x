@@ -9,6 +9,8 @@ module Rlp.Lex
     , lexToken
     , lexDebug
     , lexCont
+    , execP
+    , execP'
     )
     where
 import Codec.Binary.UTF8.String (encodeChar)
@@ -54,7 +56,7 @@ $asciisym       = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~\:]
     case|data|do|import|in|let|letrec|module|of|where
 
 @reservedop =
-    "=" | \\ | "->" | "|"
+    "=" | \\ | "->" | "|" | "::"
 
 rlp :-
     
