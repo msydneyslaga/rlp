@@ -199,10 +199,10 @@ data ParseError = ParErrLexical String
                 deriving Show
 
 -- TODO:
-instance RlpcError SrcError where
+instance IsRlpcError SrcError where
 
 -- TODO:
-instance RlpcError ParseError where
+instance IsRlpcError ParseError where
 
 alexEOF :: Alex (Located CoreToken)
 alexEOF = Alex $ \ st@(AlexState { alex_pos = AlexPn _ y x }) ->

@@ -1,9 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Compiler.RlpcError
-    ( RlpcError(..)
+    ( IsRlpcError(..)
     , MsgEnvelope(..)
     , Severity
-    , RlpcErrorDoc(..)
+    , RlpcError(..)
     , SrcSpan(..)
     , msgSpan
     , msgDiagnostic
@@ -15,16 +15,16 @@ import Control.Monad.Errorful
 import Lens.Micro.TH
 ----------------------------------------------------------------------------------
 
-data MsgEnvelope = MsgEnvelope
+data MsgEnvelope e = MsgEnvelope
    { _msgSpan        :: SrcSpan
-   , _msgDiagnostic  :: forall e. (RlpcError e) => e
+   , _msgDiagnostic  :: e
    , _msgSeverity    :: Severity
    }
 
-class RlpcError e where
-    liftRlpcError :: e -> RlpcErrorDoc
+class IsRlpcError e where
+    liftRlpcError :: e -> RlpcError
 
-data RlpcErrorDoc
+data RlpcError
 
 data Severity = SevWarning
               | SevError

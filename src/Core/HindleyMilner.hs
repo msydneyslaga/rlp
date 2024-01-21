@@ -49,7 +49,7 @@ data TypeError
     deriving (Show, Eq)
 
 -- TODO:
-instance RlpcError TypeError where
+instance IsRlpcError TypeError where
 
 -- | Synonym for @Errorful [TypeError]@. This means an @HMError@ action may
 -- throw any number of fatal or nonfatal errors. Run with @runErrorful@.

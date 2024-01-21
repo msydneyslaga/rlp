@@ -16,6 +16,7 @@ module Compiler.RLPC
     , RLPCT(..)
     , RLPCIO
     , RLPCOptions(RLPCOptions)
+    , IsRlpcError(..)
     , RlpcError(..)
     , addFatal
     , addWound
@@ -56,8 +57,7 @@ import Lens.Micro.TH
 ----------------------------------------------------------------------------------
 
 newtype RLPCT m a = RLPCT {
-        runRLPCT :: forall e. (RlpcError e)
-                 => ReaderT RLPCOptions (ErrorfulT e m) a
+        runRLPCT :: ReaderT RLPCOptions (ErrorfulT RlpcError m) a
     }
 
 type RLPC = RLPCT Identity
@@ -72,7 +72,7 @@ evalRLPC = undefined
 evalRLPCT = undefined
 evalRLPCIO = undefined
 
-liftErrorful :: (RlpcError e) => ErrorfulT e m a -> RLPCT m a
+liftErrorful :: ErrorfulT e m a -> RLPCT m a
 liftErrorful e = undefined
 
 data RLPCOptions = RLPCOptions
