@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns #-}
 module Compiler.RlpcError
     ( IsRlpcError(..)
     , MsgEnvelope(..)
@@ -8,11 +9,16 @@ module Compiler.RlpcError
     , msgSpan
     , msgDiagnostic
     , msgSeverity
+    , liftRlpcErrors
     )
     where
 ----------------------------------------------------------------------------------
 import Control.Monad.Errorful
-import Lens.Micro.TH
+import Data.Text                (Text)
+import Data.Text                qualified as T
+import GHC.Exts                 (IsString(..))
+import Lens.Micro.Platform
+import Lens.Micro.Platform.Internal
 ----------------------------------------------------------------------------------
 
 data MsgEnvelope e = MsgEnvelope
@@ -21,10 +27,17 @@ data MsgEnvelope e = MsgEnvelope
    , _msgSeverity    :: Severity
    }
 
+newtype RlpcError = Text [Text]
+    deriving Show
+
+instance IsString RlpcError where
+    fromString = Text . pure . T.pack
+
 class IsRlpcError e where
     liftRlpcError :: e -> RlpcError
 
-data RlpcError
+instance IsRlpcError RlpcError where
+    liftRlpcError = id
 
 data Severity = SevWarning
               | SevError
@@ -36,4 +49,9 @@ data SrcSpan = SrcSpan
     !Int -- ^ Length
 
 makeLenses ''MsgEnvelope
+
+liftRlpcErrors :: (Functor m, IsRlpcError e)
+               => ErrorfulT e m a
+               -> ErrorfulT RlpcError m a
+liftRlpcErrors = mapErrorful liftRlpcError
 

@@ -6,7 +6,7 @@ module Control.Monad.Errorful
     , runErrorfulT
     , Errorful
     , runErrorful
-    , mapErrors
+    , mapErrorful
     , MonadErrorful(..)
     )
     where
@@ -60,6 +60,11 @@ instance (Monad m) => Monad (ErrorfulT e m) where
             Just x      -> runErrorfulT (k x)
             Nothing     -> pure (Nothing, es)
 
-mapErrors :: (Monad m) => (e -> e') -> ErrorfulT e m a -> ErrorfulT e' m a
-mapErrors f m = undefined
+mapErrorful :: (Functor m) => (e -> e') -> ErrorfulT e m a -> ErrorfulT e' m a
+mapErrorful f (ErrorfulT m) = ErrorfulT $
+    m & mapped . _2 . mapped %~ f
+
+-- when microlens-pro drops we can write this as
+--    mapErrorful f = coerced . mapped . _2 . mappd %~ f
+-- lol
 

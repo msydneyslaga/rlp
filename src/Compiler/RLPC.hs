@@ -36,6 +36,7 @@ module Compiler.RLPC
     , flagDDumpOpts
     , flagDDumpAST
     , def
+    , liftErrorful
     )
     where
 ----------------------------------------------------------------------------------
@@ -47,6 +48,7 @@ import Control.Monad.Errorful
 import Compiler.RlpcError
 import Data.Functor.Identity
 import Data.Default.Class
+import Data.Foldable
 import GHC.Generics             (Generic)
 import Data.Hashable            (Hashable)
 import Data.HashSet             (HashSet)
@@ -54,26 +56,44 @@ import Data.HashSet             qualified as S
 import Data.Coerce
 import Lens.Micro
 import Lens.Micro.TH
+import System.Exit
 ----------------------------------------------------------------------------------
 
 newtype RLPCT m a = RLPCT {
         runRLPCT :: ReaderT RLPCOptions (ErrorfulT RlpcError m) a
     }
+    deriving (Functor, Applicative, Monad)
 
 type RLPC = RLPCT Identity
 
 type RLPCIO = RLPCT IO
 
-instance Functor (RLPCT m) where
-instance Applicative (RLPCT m) where
-instance Monad (RLPCT m) where
+evalRLPC :: RLPCOptions
+         -> RLPC a
+         -> (Maybe a, [RlpcError])
+evalRLPC opt r = runRLPCT r
+               & flip runReaderT opt
+               & runErrorful
 
-evalRLPC = undefined
+evalRLPCT :: (Monad m)
+          => RLPCOptions
+          -> RLPCT m a
+          -> m (Maybe a, [RlpcError])
 evalRLPCT = undefined
-evalRLPCIO = undefined
 
-liftErrorful :: ErrorfulT e m a -> RLPCT m a
-liftErrorful e = undefined
+evalRLPCIO :: RLPCOptions -> RLPCIO a -> IO a
+evalRLPCIO opt r = do
+    (ma,es) <- evalRLPCT opt r
+    putRlpcErrs es
+    case ma of
+        Just x  -> pure x
+        Nothing -> die "Failed, no code compiled."
+
+putRlpcErrs :: [RlpcError] -> IO ()
+putRlpcErrs = traverse_ print
+
+liftErrorful :: (Monad m, IsRlpcError e) => ErrorfulT e m a -> RLPCT m a
+liftErrorful e = RLPCT $ lift (liftRlpcErrors e)
 
 data RLPCOptions = RLPCOptions
     { _rlpcLogFile     :: Maybe FilePath

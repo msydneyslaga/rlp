@@ -169,17 +169,13 @@ lexWith f (AlexPn _ y x,_,_,s) l = pure $ Located y x l (f $ T.take l s)
 -- | The main lexer driver.
 lexCore :: Text -> RLPC [Located CoreToken]
 lexCore s = case m of
-    Left e   -> undefined
+    Left e   -> error "core lex error"
     Right ts -> pure ts
     where
         m = runAlex s lexStream
 
-{-# WARNING lexCore "unimpl" #-}
-
 lexCoreR :: Text -> RLPC [Located CoreToken]
-lexCoreR t = undefined
-
-{-# WARNING lexCoreR "unimpl" #-}
+lexCoreR = lexCore
 
 -- | @lexCore@, but the tokens are stripped of location info. Useful for
 -- debugging
@@ -200,9 +196,11 @@ data ParseError = ParErrLexical String
 
 -- TODO:
 instance IsRlpcError SrcError where
+    liftRlpcError = Text . pure . T.pack . show
 
 -- TODO:
 instance IsRlpcError ParseError where
+    liftRlpcError = Text . pure . T.pack . show
 
 alexEOF :: Alex (Located CoreToken)
 alexEOF = Alex $ \ st@(AlexState { alex_pos = AlexPn _ y x }) ->

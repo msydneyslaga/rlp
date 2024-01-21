@@ -38,9 +38,13 @@ spec = do
         let e = [coreExpr|3|]
         in check' [] (TyCon "Bool") e `shouldSatisfy` isLeft
 
-infer' :: Context' -> Expr' -> Either TypeError Type
-infer' g e = fmap fst . runErrorful $ infer g e
+infer' :: Context' -> Expr' -> Either [TypeError] Type
+infer' g e = case runErrorful $ infer g e of
+    (Just t,   _) -> Right t
+    (Nothing, es) -> Left es
 
-check' :: Context' -> Type -> Expr' -> Either TypeError ()
-check' g t e = fmap fst . runErrorful $ check g t e
+check' :: Context' -> Type -> Expr' -> Either [TypeError] ()
+check' g t e = case runErrorful $ check g t e of
+    (Just t,   _) -> Right ()
+    (Nothing, es) -> Left es
 

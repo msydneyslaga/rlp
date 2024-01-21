@@ -189,7 +189,9 @@ Con             : '(' consym ')'                    { $2 }
 {
 
 parseError :: [Located CoreToken] -> RLPC a
-parseError (Located y x l _ : _) = undefined
+parseError (Located y x l t : _) =
+    error $ show y <> ":" <> show x
+         <> ": parse error at token `" <> show t <> "'"
 
 {-# WARNING parseError "unimpl" #-}
 
@@ -217,9 +219,7 @@ singletonScDef :: (Hashable b) => ScDef b -> Program b
 singletonScDef sc = insScDef sc mempty
 
 parseCoreProgR :: [Located CoreToken] -> RLPC Program'
-parseCoreProgR a = undefined
-
-{-# WARNING parseCoreProgR "unimpl" #-}
+parseCoreProgR = parseCoreProg
 
 happyBind :: RLPC a -> (a -> RLPC b) -> RLPC b
 happyBind m k = m >>= k

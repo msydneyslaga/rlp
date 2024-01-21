@@ -73,6 +73,9 @@ library
     hs-source-dirs:   src
     default-language: GHC2021
 
+    default-extensions:
+        OverloadedStrings
+
 executable rlpc
     import:           warnings
     main-is:          Main.hs

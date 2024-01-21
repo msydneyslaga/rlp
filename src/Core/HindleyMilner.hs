@@ -25,6 +25,7 @@ import Control.Monad            (foldM, void)
 import Control.Monad.Errorful   (Errorful, addFatal)
 import Control.Monad.State
 import Control.Monad.Utils      (mapAccumLM)
+import Text.Printf
 import Core.Syntax
 ----------------------------------------------------------------------------------
 
@@ -48,8 +49,20 @@ data TypeError
     | TyErrMissingTypeSig Name
     deriving (Show, Eq)
 
--- TODO:
 instance IsRlpcError TypeError where
+    liftRlpcError = \case
+        -- todo: use anti-parser instead of show
+        TyErrCouldNotUnify t u -> Text
+            [ T.pack $ printf "Could not match type `%s' with `%s'."
+                              (show t) (show u)
+            , "Expected: " <> tshow t
+            , "Got: " <> tshow u
+            ]
+        TyErrRecursiveType t x -> Text
+            [ T.pack $ printf "recursive type error lol"
+            ]
+
+        where tshow = T.pack . show
 
 -- | Synonym for @Errorful [TypeError]@. This means an @HMError@ action may
 -- throw any number of fatal or nonfatal errors. Run with @runErrorful@.
@@ -87,10 +100,10 @@ checkCoreProg p = scDefs
              where scname = sc ^. _lhs._1
 
 -- | @checkCoreProgR p@ returns @p@ if @p@ successfully typechecks.
--- checkCoreProgR :: Program' -> RLPC Program'
-checkCoreProgR = undefined
-
-{-# WARNING checkCoreProgR "unimpl" #-}
+checkCoreProgR :: Program' -> RLPC Program'
+checkCoreProgR p = do
+    liftErrorful (checkCoreProg p)
+    pure p
 
 -- | Infer the type of an expression under some context.
 --
