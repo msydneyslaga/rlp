@@ -8,12 +8,18 @@ CABAL_BUILD = dist-newstyle/build/x86_64-osx/ghc-9.6.2/rlp-0.1.0.0/build
 
 all: parsers lexers
 
-parsers: $(CABAL_BUILD)/Rlp/Parse.hs
-lexers: $(CABAL_BUILD)/Rlp/Lex.hs
+parsers: $(CABAL_BUILD)/Rlp/Parse.hs $(CABAL_BUILD)/Core/Parse.hs
+lexers: $(CABAL_BUILD)/Rlp/Lex.hs $(CABAL_BUILD)/Core/Lex.hs
 
 $(CABAL_BUILD)/Rlp/Parse.hs: $(SRC)/Rlp/Parse.y
 	$(HAPPY) $(HAPPY_OPTS) $< -o $@
 
 $(CABAL_BUILD)/Rlp/Lex.hs: $(SRC)/Rlp/Lex.x
+	$(ALEX) $(ALEX_OPTS) $< -o $@
+
+$(CABAL_BUILD)/Core/Parse.hs: $(SRC)/Core/Parse.y
+	$(HAPPY) $(HAPPY_OPTS) $< -o $@
+
+$(CABAL_BUILD)/Core/Lex.hs: $(SRC)/Core/Lex.x
 	$(ALEX) $(ALEX_OPTS) $< -o $@
 

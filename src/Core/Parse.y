@@ -98,6 +98,8 @@ ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
 
 ScDef           :: { ScDef Name }
 ScDef           : Var ParList '=' Expr          { ScDef $1 $2 $4 }
+                -- hack to allow constructors to be compiled into scs
+                | Con ParList '=' Expr          { ScDef $1 $2 $4 }
 
 Type            :: { Type }
 Type            : Type1                         { $1 }
