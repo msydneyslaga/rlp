@@ -37,6 +37,7 @@ import Core.Syntax                  (Name)
 import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Errorful
+import Compiler.RlpcError
 import Data.Text                    (Text)
 import Data.Maybe
 import Data.Fix
@@ -151,8 +152,10 @@ type OpInfo = (Assoc, Int)
 data RlpParseError = RlpParErrOutOfBoundsPrecedence Int
                    | RlpParErrDuplicateInfixD
                    | RlpParErrLexical
-                   | RlpParErrUnknown
-    deriving (Eq, Ord, Show)
+                   | RlpParErrUnexpectedToken
+                   deriving (Eq, Ord, Show)
+
+instance IsRlpcError RlpParseError where
 
 ----------------------------------------------------------------------------------
 
@@ -200,6 +203,4 @@ type PartialExpr' = Fix Partial
 
 makeLenses ''AlexInput
 makeLenses ''ParseState
-
---------------------------------------------------------------------------------
 

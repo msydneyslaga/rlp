@@ -26,6 +26,7 @@ data MsgEnvelope e = MsgEnvelope
    , _msgDiagnostic  :: e
    , _msgSeverity    :: Severity
    }
+   deriving Functor
 
 newtype RlpcError = Text [Text]
     deriving Show
@@ -54,4 +55,7 @@ liftRlpcErrors :: (Functor m, IsRlpcError e)
                => ErrorfulT e m a
                -> ErrorfulT RlpcError m a
 liftRlpcErrors = mapErrorful liftRlpcError
+
+instance (IsRlpcError e) => IsRlpcError (MsgEnvelope e) where
+    liftRlpcError msg = msg ^. msgDiagnostic & liftRlpcError
 
