@@ -60,7 +60,7 @@ import System.Exit
 ----------------------------------------------------------------------------------
 
 newtype RLPCT m a = RLPCT {
-        runRLPCT :: ReaderT RLPCOptions (ErrorfulT RlpcError m) a
+        runRLPCT :: ReaderT RLPCOptions (ErrorfulT (MsgEnvelope RlpcError) m) a
     }
     deriving (Functor, Applicative, Monad)
 
@@ -70,7 +70,7 @@ type RLPCIO = RLPCT IO
 
 evalRLPC :: RLPCOptions
          -> RLPC a
-         -> (Maybe a, [RlpcError])
+         -> (Maybe a, [MsgEnvelope RlpcError])
 evalRLPC opt r = runRLPCT r
                & flip runReaderT opt
                & runErrorful
@@ -78,7 +78,7 @@ evalRLPC opt r = runRLPCT r
 evalRLPCT :: (Monad m)
           => RLPCOptions
           -> RLPCT m a
-          -> m (Maybe a, [RlpcError])
+          -> m (Maybe a, [MsgEnvelope RlpcError])
 evalRLPCT = undefined
 
 evalRLPCIO :: RLPCOptions -> RLPCIO a -> IO a
@@ -89,11 +89,11 @@ evalRLPCIO opt r = do
         Just x  -> pure x
         Nothing -> die "Failed, no code compiled."
 
-putRlpcErrs :: [RlpcError] -> IO ()
+putRlpcErrs :: [MsgEnvelope RlpcError] -> IO ()
 putRlpcErrs = traverse_ print
 
-liftErrorful :: (Monad m, IsRlpcError e) => ErrorfulT e m a -> RLPCT m a
-liftErrorful e = RLPCT $ lift (liftRlpcErrors e)
+liftErrorful :: (Monad m, IsRlpcError e) => ErrorfulT (MsgEnvelope e) m a -> RLPCT m a
+liftErrorful e = RLPCT $ lift (fmap liftRlpcError `mapErrorful` e)
 
 data RLPCOptions = RLPCOptions
     { _rlpcLogFile     :: Maybe FilePath

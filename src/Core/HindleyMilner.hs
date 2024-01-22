@@ -101,9 +101,9 @@ checkCoreProg p = scDefs
 
 -- | @checkCoreProgR p@ returns @p@ if @p@ successfully typechecks.
 checkCoreProgR :: Program' -> RLPC Program'
-checkCoreProgR p = do
-    liftErrorful (checkCoreProg p)
-    pure p
+checkCoreProgR p = undefined
+
+{-# WARNING checkCoreProgR "unimpl" #-}
 
 -- | Infer the type of an expression under some context.
 --

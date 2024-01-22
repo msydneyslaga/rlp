@@ -26,7 +26,7 @@ data MsgEnvelope e = MsgEnvelope
    , _msgDiagnostic  :: e
    , _msgSeverity    :: Severity
    }
-   deriving Functor
+   deriving (Functor, Show)
 
 newtype RlpcError = Text [Text]
     deriving Show
@@ -48,6 +48,7 @@ data SrcSpan = SrcSpan
     !Int -- ^ Line
     !Int -- ^ Column
     !Int -- ^ Length
+    deriving Show
 
 makeLenses ''MsgEnvelope
 
