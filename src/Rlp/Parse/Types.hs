@@ -3,6 +3,8 @@
 {-# LANGUAGE LambdaCase #-}
 module Rlp.Parse.Types
     ( LexerAction
+    , MsgEnvelope(..)
+    , RlpcError(..)
     , AlexInput(..)
     , Position(..)
     , RlpToken(..)
@@ -30,6 +32,8 @@ module Rlp.Parse.Types
     , aiPos
     , addFatal
     , addWound
+    , addFatalHere
+    , addWoundHere
     )
     where
 --------------------------------------------------------------------------------
@@ -65,6 +69,12 @@ type Position =
     ( Int -- line
     , Int -- column
     )
+
+posLine :: Lens' Position Int
+posLine = _1
+
+posColumn :: Lens' Position Int
+posColumn = _2
 
 data RlpToken
     -- literals
@@ -103,7 +113,10 @@ data RlpToken
     | TokenEOF
     deriving (Show)
 
-newtype P a = P { runP :: ParseState -> (ParseState, [RlpParseError], Maybe a) }
+newtype P a = P {
+        runP :: ParseState
+             -> (ParseState, [MsgEnvelope RlpParseError], Maybe a)
+    }
     deriving (Functor)
 
 instance Applicative P where
@@ -125,7 +138,7 @@ instance MonadState ParseState P where
         let (a,st') = f st
         in (st', [], Just a)
 
-instance MonadErrorful RlpParseError P where
+instance MonadErrorful (MsgEnvelope RlpParseError) P where
     addWound e = P $ \st -> (st, [e], Just ())
     addFatal e = P $ \st -> (st, [e], Nothing)
 
@@ -150,7 +163,7 @@ type OpInfo = (Assoc, Int)
 -- data WithLocation a = WithLocation [String] a
 
 data RlpParseError = RlpParErrOutOfBoundsPrecedence Int
-                   | RlpParErrDuplicateInfixD
+                   | RlpParErrDuplicateInfixD Name
                    | RlpParErrLexical
                    | RlpParErrUnexpectedToken
                    deriving (Eq, Ord, Show)
@@ -158,7 +171,6 @@ data RlpParseError = RlpParErrOutOfBoundsPrecedence Int
 instance IsRlpcError RlpParseError where
 
 ----------------------------------------------------------------------------------
-
 -- absolute psycho shit (partial ASTs)
 
 type PartialDecl' = Decl (Const PartialExpr') Name
@@ -203,4 +215,28 @@ type PartialExpr' = Fix Partial
 
 makeLenses ''AlexInput
 makeLenses ''ParseState
+
+addWoundHere :: Int -> RlpParseError -> P ()
+addWoundHere l e = P $ \st ->
+    let e' = MsgEnvelope
+            { _msgSpan = let pos = psInput . aiPos
+                         in SrcSpan (st ^. pos . posLine)
+                                   (st ^. pos . posColumn)
+                                   l
+            , _msgDiagnostic = e
+            , _msgSeverity = SevError
+            }
+    in (st, [e'], Just ())
+
+addFatalHere :: Int -> RlpParseError -> P a
+addFatalHere l e = P $ \st ->
+    let e' = MsgEnvelope
+            { _msgSpan = let pos = psInput . aiPos
+                         in SrcSpan (st ^. pos . posLine)
+                                    (st ^. pos . posColumn)
+                                    l
+            , _msgDiagnostic = e
+            , _msgSeverity = SevError
+            }
+    in (st, [e'], Nothing)
 

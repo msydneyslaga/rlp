@@ -3,13 +3,14 @@
 module Compiler.RlpcError
     ( IsRlpcError(..)
     , MsgEnvelope(..)
-    , Severity
+    , Severity(..)
     , RlpcError(..)
     , SrcSpan(..)
     , msgSpan
     , msgDiagnostic
     , msgSeverity
     , liftRlpcErrors
+    , errorMsg
     )
     where
 ----------------------------------------------------------------------------------
@@ -59,4 +60,11 @@ liftRlpcErrors = mapErrorful liftRlpcError
 
 instance (IsRlpcError e) => IsRlpcError (MsgEnvelope e) where
     liftRlpcError msg = msg ^. msgDiagnostic & liftRlpcError
+
+errorMsg :: SrcSpan -> e -> MsgEnvelope e
+errorMsg s e = MsgEnvelope
+    { _msgSpan = s
+    , _msgDiagnostic = e
+    , _msgSeverity = SevError
+    }
 

@@ -4,6 +4,7 @@ module Rlp.Parse
     ( parseRlpProg
     )
     where
+import Compiler.RlpcError
 import Rlp.Lex
 import Rlp.Syntax
 import Rlp.Parse.Types
@@ -14,6 +15,7 @@ import Lens.Micro.Platform          ()
 import Data.List.Extra
 import Data.Fix
 import Data.Functor.Const
+import Data.Text                    qualified as T
 }
 
 %name parseRlpProg StandaloneProgram
@@ -161,16 +163,19 @@ mkProgram ds = do
     pure $ RlpProgram (associate pt <$> ds)
 
 parseError :: Located RlpToken -> P a
-parseError (Located ((l,c),s) t) = addFatal RlpParErrUnexpectedToken
+parseError (Located ((l,c),s) t) = addFatal $
+    errorMsg (SrcSpan l c s) RlpParErrUnexpectedToken
 
 mkInfixD :: Assoc -> Int -> Name -> P PartialDecl'
 mkInfixD a p n = do
     let opl :: Lens' ParseState (Maybe OpInfo)
         opl = psOpTable . at n
     opl <~ (use opl >>= \case
-        -- TODO: non-fatal error
-        Just o  -> pure (Just o)
+        Just o  -> addWoundHere l e >> pure (Just o) where
+            e = RlpParErrDuplicateInfixD n
+            l = T.length n
         Nothing -> pure (Just (a,p))
         )
     pure $ InfixD a p n
+
 }

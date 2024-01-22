@@ -18,6 +18,7 @@ module Compiler.RLPC
     , RLPCOptions(RLPCOptions)
     , IsRlpcError(..)
     , RlpcError(..)
+    , MsgEnvelope(..)
     , addFatal
     , addWound
     , MonadErrorful

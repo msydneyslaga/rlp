@@ -54,6 +54,7 @@ $asciisym       = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~\:]
 
 @reservedname = 
     case|data|do|import|in|let|letrec|module|of|where
+    |infixr|infixl|infix
 
 @reservedop =
     "=" | \\ | "->" | "|"
@@ -125,6 +126,9 @@ lexReservedName = \case
     "of"        -> TokenOf
     "let"       -> TokenLet
     "in"        -> TokenIn
+    "infix"     -> TokenInfix
+    "infixl"    -> TokenInfixL
+    "infixr"    -> TokenInfixR
 
 lexReservedOp :: Text -> RlpToken
 lexReservedOp = \case
@@ -223,7 +227,7 @@ initAlexInput s = AlexInput
     , _aiPos        = (1,1)
     }
 
-runP' :: P a -> Text -> (ParseState, [RlpParseError], Maybe a)
+runP' :: P a -> Text -> (ParseState, [MsgEnvelope RlpParseError], Maybe a)
 runP' p s = runP p st where
     st = initParseState s
 
@@ -241,7 +245,7 @@ lexToken = do
         AlexToken inp' l act -> do
             psInput .= inp'
             act inp l
-        AlexError inp' -> addFatal RlpParErrLexical
+        AlexError inp' -> addFatalHere 1 RlpParErrLexical
 
 lexCont :: (Located RlpToken -> P a) -> P a
 lexCont = (lexToken >>=)
