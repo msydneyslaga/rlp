@@ -161,7 +161,7 @@ mkProgram ds = do
     pure $ RlpProgram (associate pt <$> ds)
 
 parseError :: Located RlpToken -> P a
-parseError = error . show
+parseError (Located ((l,c),s) t) = addFatal RlpParErrUnknown
 
 mkInfixD :: Assoc -> Int -> Name -> P PartialDecl'
 mkInfixD a p n = do

@@ -7,12 +7,14 @@ module Rlp.Lex
     , RlpToken(..)
     , Located(..)
     , lexToken
+    , lexStream
     , lexDebug
     , lexCont
     )
     where
 import Codec.Binary.UTF8.String (encodeChar)
 import Control.Monad
+import Control.Monad.Errorful
 import Core.Syntax              (Name)
 import Data.Functor.Identity
 import Data.Char                (digitToInt)
@@ -203,13 +205,6 @@ alexEOF = do
     inp <- getInput
     pure (Located undefined TokenEOF)
 
-execP :: P a -> ParseState -> Maybe a
-execP p st = runP p st & snd
-
-execP' :: P a -> Text -> Maybe a
-execP' p s = execP p st where
-    st = initParseState s
-
 initParseState :: Text -> ParseState
 initParseState s = ParseState
     { _psLayoutStack = []
@@ -228,6 +223,10 @@ initAlexInput s = AlexInput
     , _aiPos        = (1,1)
     }
 
+runP' :: P a -> Text -> (ParseState, [RlpParseError], Maybe a)
+runP' p s = runP p st where
+    st = initParseState s
+
 lexToken :: P (Located RlpToken)
 lexToken = do
     inp <- getInput
@@ -242,6 +241,7 @@ lexToken = do
         AlexToken inp' l act -> do
             psInput .= inp'
             act inp l
+        AlexError inp' -> addFatal RlpParErrLexical
 
 lexCont :: (Located RlpToken -> P a) -> P a
 lexCont = (lexToken >>=)
@@ -260,7 +260,7 @@ lexDebug k = do
     k t
 
 lexTest :: Text -> Maybe [RlpToken]
-lexTest s = execP' lexStream s
+lexTest s = runP' lexStream s ^. _3
 
 indentLevel :: P Int
 indentLevel = do

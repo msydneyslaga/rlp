@@ -1,11 +1,42 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ImplicitParams, ViewPatterns, PatternSynonyms #-}
 {-# LANGUAGE LambdaCase #-}
-module Rlp.Parse.Types where
+module Rlp.Parse.Types
+    ( LexerAction
+    , AlexInput(..)
+    , Position(..)
+    , RlpToken(..)
+    , P(..)
+    , ParseState(..)
+    , psLayoutStack
+    , psLexState
+    , psInput
+    , psOpTable
+    , Layout(..)
+    , Located(..)
+    , OpTable
+    , OpInfo
+    , RlpParseError(..)
+    , PartialDecl'
+    , Partial(..)
+    , pL, pR
+    , PartialE
+    , pattern WithInfo
+    , opInfoOrDef
+    , PartialExpr'
+    , aiPrevChar
+    , aiSource
+    , aiBytes
+    , aiPos
+    , addFatal
+    , addWound
+    )
+    where
 --------------------------------------------------------------------------------
 import Core.Syntax                  (Name)
 import Control.Monad
-import Control.Monad.State.Class
+import Control.Monad.State.Strict
+import Control.Monad.Errorful
 import Data.Text                    (Text)
 import Data.Maybe
 import Data.Fix
@@ -71,24 +102,31 @@ data RlpToken
     | TokenEOF
     deriving (Show)
 
-newtype P a = P { runP :: ParseState -> (ParseState, Maybe a) }
+newtype P a = P { runP :: ParseState -> (ParseState, [RlpParseError], Maybe a) }
     deriving (Functor)
 
 instance Applicative P where
-    pure a = P $ \st -> (st,Just a)
+    pure a = P $ \st -> (st, [], pure a)
     liftA2 = liftM2
 
 instance Monad P where
     p >>= k = P $ \st ->
-        let (st',a) = runP p st
-        in case a of
-            Just x  -> runP (k x) st'
-            Nothing -> (st', Nothing)
+        let (st',es,ma) = runP p st
+        in case ma of
+            Just a  -> runP (k a) st'
+                     & _2 %~ (es<>)
+            Nothing -> (st',es,Nothing)
+
+    {-# INLINE (>>=) #-}
 
 instance MonadState ParseState P where
     state f = P $ \st ->
         let (a,st') = f st
-        in (st', Just a)
+        in (st', [], Just a)
+
+instance MonadErrorful RlpParseError P where
+    addWound e = P $ \st -> (st, [e], Just ())
+    addFatal e = P $ \st -> (st, [e], Nothing)
 
 data ParseState = ParseState
     { _psLayoutStack        :: [Layout]
@@ -112,6 +150,8 @@ type OpInfo = (Assoc, Int)
 
 data RlpParseError = RlpParErrOutOfBoundsPrecedence Int
                    | RlpParErrDuplicateInfixD
+                   | RlpParErrLexical
+                   | RlpParErrUnknown
     deriving (Eq, Ord, Show)
 
 ----------------------------------------------------------------------------------
@@ -160,4 +200,6 @@ type PartialExpr' = Fix Partial
 
 makeLenses ''AlexInput
 makeLenses ''ParseState
+
+--------------------------------------------------------------------------------
 

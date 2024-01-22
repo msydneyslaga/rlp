@@ -1,6 +1,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TupleSections, PatternSynonyms #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Errorful
     ( ErrorfulT
     , runErrorfulT
@@ -11,11 +12,12 @@ module Control.Monad.Errorful
     )
     where
 ----------------------------------------------------------------------------------
+import Control.Monad.State.Strict
 import Control.Monad.Trans
 import Data.Functor.Identity
 import Data.Coerce
-import Data.HashSet             (HashSet)
-import Data.HashSet             qualified as H
+import Data.HashSet                 (HashSet)
+import Data.HashSet                 qualified as H
 import Lens.Micro
 ----------------------------------------------------------------------------------
 
@@ -67,4 +69,11 @@ mapErrorful f (ErrorfulT m) = ErrorfulT $
 -- when microlens-pro drops we can write this as
 --    mapErrorful f = coerced . mapped . _2 . mappd %~ f
 -- lol
+
+--------------------------------------------------------------------------------
+-- daily dose of n^2 instances
+
+instance (Monad m, MonadErrorful e m) => MonadErrorful e (StateT s m) where
+    addWound = undefined
+    addFatal = undefined
 
