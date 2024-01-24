@@ -11,3 +11,7 @@ rl' Inference Rules
 .. rubric::
    [App]
 
+.. math::
+   \frac{\Gamma \vdash f : \alpha \to \beta \qquad \Gamma \vdash x : \alpha}
+        {\Gamma \vdash f x : \beta}
+
