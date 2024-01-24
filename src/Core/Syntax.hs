@@ -5,6 +5,7 @@ Description : Core ASTs and the like
 {-# LANGUAGE PatternSynonyms, OverloadedStrings #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DerivingStrategies, DerivingVia #-}
 module Core.Syntax
     ( Expr(..)
     , Type(..)
@@ -45,6 +46,7 @@ import Data.HashMap.Strict          qualified as H
 import Data.Hashable
 import Data.Text                    qualified as T
 import Data.Char
+import GHC.Generics
 -- Lift instances for the Core quasiquoters
 import Language.Haskell.TH.Syntax   (Lift)
 import Lens.Micro.TH                (makeLenses)
@@ -127,7 +129,9 @@ data Program b = Program
     { _programScDefs   :: [ScDef b]
     , _programTypeSigs :: H.HashMap b Type
     }
-    deriving (Show, Lift)
+    deriving (Show, Lift, Generic)
+    deriving (Semigroup, Monoid)
+        via Generically (Program b)
 
 makeLenses ''Program
 pure []
@@ -148,11 +152,12 @@ instance IsString Type where
         | otherwise     = TyVar . fromString $ s
         where (c:_) = s
 
-instance (Hashable b) => Semigroup (Program b) where
-    (<>) = undefined
+-- instance (Hashable b) => Semigroup (Program b) where
+--     p <> q = Program
+--         { _programScDefs = _programScDefs p <> _programScDefs q }
 
-instance (Hashable b) => Monoid (Program b) where
-    mempty = Program mempty mempty
+-- instance (Hashable b) => Monoid (Program b) where
+--     mempty = Program mempty mempty
 
 ----------------------------------------------------------------------------------
 

@@ -55,10 +55,13 @@ instance IsRlpcError TypeError where
     liftRlpcError = \case
         -- todo: use anti-parser instead of show
         TyErrCouldNotUnify t u -> Text
-            [ T.pack $ printf "Could not match type `%s' with `%s'."
+            [ T.pack $ printf "Could not match type `%s` with `%s`."
                               (show t) (show u)
             , "Expected: " <> tshow t
             , "Got: " <> tshow u
+            ]
+        TyErrUntypedVariable n -> Text
+            [ "Untyped (likely undefined) variable `" <> n <> "`"
             ]
         TyErrRecursiveType t x -> Text
             [ T.pack $ printf "recursive type error lol"
@@ -157,7 +160,12 @@ gather = \g e -> runStateT (go g e) ([],0) <&> \ (t,(cs,_)) -> (t,cs) where
         Let Rec bs e -> do
             g' <- buildLetrecContext g bs
             go g' e
-
+        Lam bs e -> case bs of
+            [x] -> do
+                tx <- uniqueVar
+                let g' = (x,tx) : g
+                te <- go g' e
+                pure (tx :-> te)
         -- TODO lambda, case
 
     buildLetrecContext :: Context' -> [Binding']
