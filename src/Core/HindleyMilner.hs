@@ -3,6 +3,7 @@ Module      : Core.HindleyMilner
 Description : Hindley-Milner type system
 -}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Core.HindleyMilner
     ( Context'
     , infer
@@ -16,12 +17,13 @@ module Core.HindleyMilner
 ----------------------------------------------------------------------------------
 import Lens.Micro
 import Lens.Micro.Mtl
+import Lens.Micro.Platform
 import Data.Maybe               (fromMaybe)
 import Data.Text                qualified as T
 import Data.HashMap.Strict      qualified as H
 import Data.Foldable            (traverse_)
 import Compiler.RLPC
-import Control.Monad            (foldM, void)
+import Control.Monad            (foldM, void, forM)
 import Control.Monad.Errorful   (Errorful, addFatal)
 import Control.Monad.State
 import Control.Monad.Utils      (mapAccumLM)
@@ -152,7 +154,27 @@ gather = \g e -> runStateT (go g e) ([],0) <&> \ (t,(cs,_)) -> (t,cs) where
         Let NonRec bs e -> do
             g' <- buildLetContext g bs
             go g' e
+        Let Rec bs e -> do
+            g' <- buildLetrecContext g bs
+            go g' e
+
         -- TODO letrec, lambda, case
+
+    buildLetrecContext :: Context' -> [Binding']
+                       -> StateT ([Constraint], Int) HMError Context'
+    buildLetrecContext g bs = do
+        let f ag (k := _) = do
+                n <- uniqueVar
+                pure ((k,n) : ag)
+        rg <- foldM f g bs
+        let k ag (k := v) = do
+                t <- go rg v
+                pure ((k,t) : ag)
+        foldM k g bs
+
+    -- | augment a context with the inferred types of each binder. the returned
+    -- context is linearly accumulated, meaning that the context used to infer each binder
+    -- will include the inferred types of all previous binder
 
     buildLetContext :: Context' -> [Binding']
                     -> StateT ([Constraint], Int) HMError Context'
@@ -229,4 +251,18 @@ subst :: Name -> Type -> Type -> Type
 subst x t (TyVar y) | x == y  = t
 subst x t (a :-> b)           = subst x t a :-> subst x t b
 subst _ _ e                   = e
+
+--------------------------------------------------------------------------------
+
+demoContext :: Context'
+demoContext =
+    [ ("fix", (TyVar "a" :-> TyVar "a") :-> TyVar "a")
+    , ("add", TyInt :-> TyInt :-> TyInt)
+    ]
+
+pprintType :: Type -> String
+pprintType (s :-> t) = "(" <> pprintType s <> " -> " <> pprintType t <> ")"
+pprintType TyFun = "(->)"
+pprintType (TyVar x) = x ^. unpacked
+pprintType (TyCon t) = t ^. unpacked
 
