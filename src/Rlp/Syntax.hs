@@ -82,7 +82,7 @@ data Assoc = InfixL
 data ConAlt = ConAlt ConId [Type]
             deriving Show
 
-data RlpExpr b = LetE  [Bind b] (RlpExpr b)
+data RlpExpr b = LetE  Rec [Bind b] (RlpExpr b)
                | VarE  VarId
                | ConE  ConId
                | LamE  [Pat b] (RlpExpr b)
@@ -150,14 +150,14 @@ type RlpExprF' = RlpExprF Name
 -- society if derivable Show1
 instance (Show b) => Show1 (RlpExprF b) where
     liftShowsPrec sp _ p m = case m of
-        (LetEF bs e)            -> showsBinaryWith showsPrec sp "LetEF" p bs e
-        (VarEF n)               -> showsUnaryWith showsPrec "VarEF" p n
-        (ConEF n)               -> showsUnaryWith showsPrec "ConEF" p n
-        (LamEF bs e)            -> showsBinaryWith showsPrec sp "LamEF" p bs e
-        (CaseEF e as)           -> showsBinaryWith sp showsPrec "CaseEF" p e as
-        (IfEF a b c)            -> showsTernaryWith sp sp sp "IfEF" p a b c
-        (AppEF f x)             -> showsBinaryWith sp sp "AppEF" p f x
-        (LitEF l)               -> showsUnaryWith showsPrec "LitEF" p l
+        (LetEF r bs e)  -> showsTernaryWith showsPrec showsPrec sp "LetEF" p r bs e
+        (VarEF n)       -> showsUnaryWith showsPrec "VarEF" p n
+        (ConEF n)       -> showsUnaryWith showsPrec "ConEF" p n
+        (LamEF bs e)    -> showsBinaryWith showsPrec sp "LamEF" p bs e
+        (CaseEF e as)   -> showsBinaryWith sp showsPrec "CaseEF" p e as
+        (IfEF a b c)    -> showsTernaryWith sp sp sp "IfEF" p a b c
+        (AppEF f x)     -> showsBinaryWith sp sp "AppEF" p f x
+        (LitEF l)       -> showsUnaryWith showsPrec "LitEF" p l
 
 showsTernaryWith :: (Int -> x -> ShowS)
                  -> (Int -> y -> ShowS)
