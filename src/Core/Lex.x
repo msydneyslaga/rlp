@@ -65,6 +65,8 @@ $white_no_nl = $white # $nl
 
 @decimal = $digit+
 
+@alttag    = "<" $digit+ ">"
+
 rlp :-
 
 <0>
@@ -92,6 +94,8 @@ rlp :-
     "="                     { constTok TokenEquals }
     "->"                    { constTok TokenArrow }
 
+    @alttag                 { lexWith ( TokenAltTag . read @Int . T.unpack
+                                      . T.drop 1 . T.init ) }
     @varname                { lexWith TokenVarName }
     @conname                { lexWith TokenConName }
     @varsym                 { lexWith TokenVarSym }
@@ -135,6 +139,7 @@ data CoreToken = TokenLet
                | TokenConName Name
                | TokenVarSym Name
                | TokenConSym Name
+               | TokenAltTag Tag
                | TokenEquals
                | TokenLParen
                | TokenRParen

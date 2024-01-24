@@ -49,6 +49,7 @@ import Data.HashMap.Strict  qualified as H
       varsym          { Located _ _ _ (TokenVarSym $$) }
       conname         { Located _ _ _ (TokenConName $$) }
       consym          { Located _ _ _ (TokenConSym $$) }
+      alttag          { Located _ _ _ (TokenAltTag $$) }
       word            { Located _ _ _ (TokenWord $$) }
       'λ'             { Located _ _ _ TokenLambda }
       '->'            { Located _ _ _ TokenArrow }
@@ -149,7 +150,7 @@ Alters          : Alter ';' Alters              { $1 : $3 }
                 | Alter                         { [$1] }
 
 Alter           :: { Alter Name }
-Alter           : litint ParList '->' Expr      { Alter (AltData $1) $2 $4 }
+Alter           : alttag ParList '->' Expr      { Alter (AltTag $1) $2 $4 }
 
 Expr1           :: { Expr Name }
 Expr1           : litint                        { Lit $ IntL $1 }

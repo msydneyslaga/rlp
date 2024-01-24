@@ -724,7 +724,7 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
         compileD g as = fmap (compileA g) as
 
         compileA :: Env -> Alter' -> (Tag, Code)
-        compileA g (Alter (AltData t) as e) = (t, [Split n] <> c <> [Slide n])
+        compileA g (Alter (AltTag t) as e) = (t, [Split n] <> c <> [Slide n])
             where
                 n = length as
                 binds = (NameKey <$> as) `zip` [0..]

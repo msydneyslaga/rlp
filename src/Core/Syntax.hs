@@ -42,6 +42,7 @@ import Data.Pretty
 import Data.List                    (intersperse)
 import Data.Function                ((&))
 import Data.String
+import Data.HashMap.Strict          (HashMap)
 import Data.HashMap.Strict          qualified as H
 import Data.Hashable
 import Data.Text                    qualified as T
@@ -105,7 +106,8 @@ data Rec = Rec
          | NonRec
          deriving (Show, Read, Eq, Lift)
 
-data AltCon = AltData Tag
+data AltCon = AltData Name
+            | AltTag Tag
             | AltLit Lit
             | Default
             deriving (Show, Read, Eq, Lift)
@@ -127,7 +129,9 @@ data Module b = Module (Maybe (Name, [Name])) (Program b)
 
 data Program b = Program
     { _programScDefs   :: [ScDef b]
-    , _programTypeSigs :: H.HashMap b Type
+    , _programTypeSigs :: HashMap b Type
+    -- map constructors to their tag and arity
+    , _programDataTags :: HashMap b (Tag, Int)
     }
     deriving (Show, Lift, Generic)
     deriving (Semigroup, Monoid)
@@ -151,13 +155,6 @@ instance IsString Type where
         | isUpper c     = TyCon . fromString $ s
         | otherwise     = TyVar . fromString $ s
         where (c:_) = s
-
--- instance (Hashable b) => Semigroup (Program b) where
---     p <> q = Program
---         { _programScDefs = _programScDefs p <> _programScDefs q }
-
--- instance (Hashable b) => Monoid (Program b) where
---     mempty = Program mempty mempty
 
 ----------------------------------------------------------------------------------
 

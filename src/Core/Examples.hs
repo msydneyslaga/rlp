@@ -147,8 +147,8 @@ simple1 = [coreProg|
 caseBool1 :: Program'
 caseBool1 = [coreProg|
     _if c x y = case c of
-        { 1 -> x
-        ; 0 -> y
+        { <1> -> x
+        ; <0> -> y
         };
 
     false = Pack{0 0};
@@ -160,8 +160,8 @@ caseBool1 = [coreProg|
 fac3 :: Program'
 fac3 = [coreProg|
     fac n = case (==#) n 0 of
-        { 1 -> 1
-        ; 0 -> (*#) n (fac ((-#) n 1))
+        { <1> -> 1
+        ; <0> -> (*#) n (fac ((-#) n 1))
         };
 
     main = fac 3;
@@ -175,8 +175,8 @@ sumList = [coreProg|
         cons x y = Pack{1 2} x y;
         list = cons 1 (cons 2 (cons 3 nil));
         sum l = case l of
-            { 0      -> 0
-            ; 1 x xs -> (+#) x (sum xs)
+            { <0>      -> 0
+            ; <1> x xs -> (+#) x (sum xs)
             };
         main = sum list;
     |]
@@ -192,7 +192,7 @@ idCase = [coreProg|
         id x = x;
 
         main = id (case Pack{1 0} of
-            { 1 -> (+#) 2 3
+            { <1> -> (+#) 2 3
             })
     |]
 
