@@ -158,7 +158,7 @@ gather = \g e -> runStateT (go g e) ([],0) <&> \ (t,(cs,_)) -> (t,cs) where
             g' <- buildLetrecContext g bs
             go g' e
 
-        -- TODO letrec, lambda, case
+        -- TODO lambda, case
 
     buildLetrecContext :: Context' -> [Binding']
                        -> StateT ([Constraint], Int) HMError Context'
@@ -258,6 +258,9 @@ demoContext :: Context'
 demoContext =
     [ ("fix", (TyVar "a" :-> TyVar "a") :-> TyVar "a")
     , ("add", TyInt :-> TyInt :-> TyInt)
+    , ("==", TyInt :-> TyInt :-> TyCon "Bool")
+    , ("True", TyCon "Bool")
+    , ("False", TyCon "Bool")
     ]
 
 pprintType :: Type -> String
