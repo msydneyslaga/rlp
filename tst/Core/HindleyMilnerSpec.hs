@@ -38,6 +38,18 @@ spec = do
         let e = [coreExpr|3|]
         in check' [] (TyCon "Bool") e `shouldSatisfy` isLeft
 
+    it "should infer `fix ((+#) 1)` :: Int" $
+        let g = [ ("fix", ("a" :-> "a") :-> "a")
+                , ("+#", TyInt :-> TyInt :-> TyInt) ]
+            e = [coreExpr|fix ((+#) 1)|]
+        in infer' g e `shouldBe` Right TyInt
+
+    it "should infer mutually recursively defined lists" $
+        let g = [ ("cons", TyInt :-> TyCon "IntList" :-> TyCon "IntList") ]
+            e :: Expr'
+            e = [coreExpr|letrec { as = cons 1 bs; bs = cons 2 as } in as|]
+        in infer' g e `shouldBe` Right (TyCon "IntList")
+
 infer' :: Context' -> Expr' -> Either [TypeError] Type
 infer' g e = case runErrorful $ infer g e of
     (Just t,   _) -> Right t
