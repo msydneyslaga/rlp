@@ -2,15 +2,20 @@ Lexing, Parsing, and Layouts
 ============================
 
 The C-style languages of my previous experiences have all had quite trivial
-lexical analysis stages, peaking in complexity when I streamed tokens lazily in
-C. The task of tokenising a C-style language is very simple in description: you
-ignore all whitespace and point out what you recognise. If you don't recognise
-something, check if it's a literal or an identifier. Should it be neither,
-return an error.
+lexical analysis stages: you ignore all whitespace and point out the symbols you
+recognise. If you don't recognise something, check if it's a literal or an
+identifier. Should it be neither, return an error.
 
-On paper, both lexing and parsing a Haskell-like language seem to pose a few
+In contrast, both lexing and parsing a Haskell-like language poses a number of
 greater challenges. Listed by ascending intimidation factor, some of the
 potential roadblocks on my mind before making an attempt were:
+
+* Context-sensitive keywords; Haskell allows for some words to be used as
+  identifiers in appropriate contexts, such as :code:`family`, :code:`role`,
+  :code:`as`. Reading a note_ found in `GHC's lexer`_, it appears that keywords
+  are only considered in bodies for which their use is relevant, e.g.
+  :code:`family` and :code:`role` in type declarations, :code:`as` after
+  :code:`case`; :code:`if`, :code:`then`, and :code:`else` in expressions, etc.
 
 * Operators; Haskell has not only user-defined infix operators, but user-defined
   precedence levels and associativities. I recall using an algorithm that looked
@@ -19,17 +24,9 @@ potential roadblocks on my mind before making an attempt were:
   stored in the table). I never modified the table at runtime, however this
   could be a very nice solution for Haskell.
 
-* Context-sensitive keywords; Haskell allows for some words to be used as identifiers in
-  appropriate contexts, such as :code:`family`, :code:`role`, :code:`as`.
-  Reading a note_ found in `GHC's lexer`_,
-  it appears that keywords are only considered in bodies for which their use is
-  relevant, e.g. :code:`family` and :code:`role` in type declarations,
-  :code:`as` after :code:`case`; :code:`if`, :code:`then`, and :code:`else` in
-  expressions, etc.
-
 * Whitespace sensitivity; While I was comfortable with the idea of a system
-  similar to Python's INDENT/DEDENT tokens, Haskell seemed to use whitespace to
-  section code in a way that *felt* different.
+  similar to Python's INDENT/DEDENT tokens, Haskell's layout system is based on
+  alignment and is very generous with line-folding.
 
 .. _note: https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/coding-style#2-using-notes
 .. _GHC's lexer: https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Parser/Lexer.x#L1133
@@ -45,9 +42,9 @@ We will compare and contrast with Python's lexical analysis. Much to my dismay,
 Python uses newlines and indentation to separate statements and resolve scope
 instead of the traditional semicolons and braces found in C-style languages (we
 may generally refer to these C-style languages as *explicitly-sectioned*).
-Internally during tokenisation, when the Python lexer begins a new line, they
-compare the indentation of the new line with that of the previous and apply the
-following rules:
+Internally during tokenisation, when the Python lexer encounters a new line, the
+indentation of the new line is compared with that of the previous and the
+following rules are applied:
 
 1. If the new line has greater indentation than the previous, insert an INDENT
    token and push the new line's indentation level onto the indentation stack
@@ -60,44 +57,37 @@ following rules:
 3. If the indentation is equal, insert a NEWLINE token to terminate the previous
    line, and leave it at that!
 
-Parsing Python with the INDENT, DEDENT, and NEWLINE tokens is identical to
-parsing a language with braces and semicolons. This is a solution pretty in line
-with Python's philosophy of the "one correct answer" (TODO: this needs a
-source). In developing our *layout* rules, we will follow in the pattern of
-translating the whitespace-sensitive source language to an explicitly sectioned
-language.
+On the parser's end, the INDENT, DEDENT, and NEWLINE tokens are identical to
+braces and semicolons. In developing our *layout* rules, we will follow in the
+pattern of translating the whitespace-sensitive source language to an explicitly
+sectioned language.
 
 But What About Haskell?
 ***********************
 
-We saw that Python, the most notable example of an implicitly sectioned
-language, is pretty simple to lex. Why then am I so afraid of Haskell's layouts?
-To be frank, I'm far less scared after asking myself this -- however there are
-certainly some new complexities that Python needn't concern. Haskell has
-implicit line *continuation*: forms written over multiple lines; indentation
-styles often seen in Haskell are somewhat esoteric compared to Python's
-"s/[{};]//".
+Parsing Haskell -- and thus rl' -- is only slightly more complex than Python,
+but the design is certainly more sensitive. 
 
 .. code-block:: haskell
 
-   -- line continuation
+   -- line folds
    something = this is a
        single expression
 
    -- an extremely common style found in haskell
-   data Python = Users
-       { are        :: Crying
-       , right      :: About
-       , now        :: Sorry
+   data Some = Data
+       { is    :: Presented
+       , in    :: This
+       , silly :: Style
        }
 
-   -- another formatting oddity
+   -- another style oddity
    -- note that this is not a single
    -- continued line! `look at`,
-   -- `this`, and `alignment` are all
-   -- separate expressions!
+   -- `this odd`, and `alignment` are all
+   -- discrete items!
    anotherThing = do look at
-                     this
+                     this odd
                      alignment
 
 But enough fear, lets actually think about implementation. Firstly, some
@@ -233,3 +223,4 @@ References
 
 * `Haskell syntax reference
   <https://www.haskell.org/onlinereport/haskell2010/haskellch10.html>`_
+

@@ -112,5 +112,3 @@ The way around this is quite simple: simply offset the stack when w
    :end-before: -- << [ref/compileC]
    :caption: src/GM.hs
 
-
-
