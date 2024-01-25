@@ -103,6 +103,7 @@ Listed in order of importance.
     - [ ] Actual compiler errors -- no more unexceptional `error` calls
     - [ ] Better CLI dump flags
     - [ ] Annotate the AST with token positions for errors
+- [ ] More examples
 
 ### March Release Plan
 - [ ] Tests

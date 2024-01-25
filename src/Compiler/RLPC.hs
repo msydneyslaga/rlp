@@ -28,14 +28,12 @@ module Compiler.RLPC
     , evalRLPCIO
     , evalRLPC
     , rlpcLogFile
-    , rlpcDebugOpts
+    , rlpcDFlags  
     , rlpcEvaluator
     , rlpcInputFiles
     , DebugFlag(..)
-    , whenFlag
-    , flagDDumpEval
-    , flagDDumpOpts
-    , flagDDumpAST
+    , whenDFlag
+    , whenFFlag
     , def
     , liftErrorful
     )
@@ -43,6 +41,7 @@ module Compiler.RLPC
 ----------------------------------------------------------------------------------
 import Control.Arrow            ((>>>))
 import Control.Exception
+import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.State      (MonadState(state))
 import Control.Monad.Errorful
@@ -51,19 +50,19 @@ import Data.Functor.Identity
 import Data.Default.Class
 import Data.Foldable
 import GHC.Generics             (Generic)
+import Data.Maybe
 import Data.Hashable            (Hashable)
 import Data.HashSet             (HashSet)
 import Data.HashSet             qualified as S
 import Data.Coerce
-import Lens.Micro
-import Lens.Micro.TH
+import Lens.Micro.Platform
 import System.Exit
 ----------------------------------------------------------------------------------
 
 newtype RLPCT m a = RLPCT {
         runRLPCT :: ReaderT RLPCOptions (ErrorfulT (MsgEnvelope RlpcError) m) a
     }
-    deriving (Functor, Applicative, Monad)
+    deriving (Functor, Applicative, Monad, MonadReader RLPCOptions)
 
 type RLPC = RLPCT Identity
 
@@ -98,7 +97,8 @@ liftErrorful e = RLPCT $ lift (fmap liftRlpcError `mapErrorful` e)
 
 data RLPCOptions = RLPCOptions
     { _rlpcLogFile     :: Maybe FilePath
-    , _rlpcDebugOpts   :: DebugOpts
+    , _rlpcDFlags      :: HashSet DebugFlag
+    , _rlpcFFlags      :: HashSet CompilerFlag
     , _rlpcEvaluator   :: Evaluator
     , _rlpcHeapTrigger :: Int
     , _rlpcInputFiles  :: [FilePath]
@@ -113,38 +113,33 @@ data Evaluator = EvaluatorGM | EvaluatorTI
 instance Default RLPCOptions where
     def = RLPCOptions
         { _rlpcLogFile = Nothing
-        , _rlpcDebugOpts = mempty
+        , _rlpcDFlags = mempty
+        , _rlpcFFlags = mempty
         , _rlpcEvaluator = EvaluatorGM
         , _rlpcHeapTrigger = 200
         , _rlpcInputFiles = []
         }
 
-type DebugOpts = HashSet DebugFlag
+-- debug flags are passed with -dFLAG
+type DebugFlag = String
 
-data DebugFlag = DDumpEval
-               | DDumpOpts
-               | DDumpAST
-               deriving (Show, Eq, Generic)
-
-instance Hashable DebugFlag
+type CompilerFlag = String
 
 makeLenses ''RLPCOptions
 pure []
 
-whenFlag :: (MonadReader s m) => SimpleGetter s Bool -> m () -> m ()
-whenFlag l m = asks (^. l) >>= \a -> if a then m else pure ()
+-- TODO: rewrite this with prisms once microlens-pro drops :3
+whenDFlag :: (Monad m) => DebugFlag -> RLPCT m () -> RLPCT m ()
+whenDFlag f m = do
+    -- mfw no `At` instance for HashSet
+    fs <- view rlpcDFlags
+    let a = S.member f fs
+    when a m
 
--- there's probably a better way to write this. my current knowledge of lenses
--- is too weak.
-flagGetter :: DebugFlag -> SimpleGetter RLPCOptions Bool
-flagGetter d = to $ \s -> s ^. rlpcDebugOpts & S.member d
-
-flagDDumpEval :: SimpleGetter RLPCOptions Bool
-flagDDumpEval = flagGetter DDumpEval
-
-flagDDumpOpts :: SimpleGetter RLPCOptions Bool
-flagDDumpOpts = flagGetter DDumpOpts
-
-flagDDumpAST :: SimpleGetter RLPCOptions Bool
-flagDDumpAST = flagGetter DDumpAST
+whenFFlag :: (Monad m) => CompilerFlag -> RLPCT m () -> RLPCT m ()
+whenFFlag f m = do
+    -- mfw no `At` instance for HashSet
+    fs <- view rlpcFFlags
+    let a = S.member f fs
+    when a m
 

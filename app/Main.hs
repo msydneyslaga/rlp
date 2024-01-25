@@ -63,7 +63,7 @@ options = RLPCOptions
 evaluatorReader :: ReadM Evaluator
 evaluatorReader = maybeReader $ \case
     "gm"  -> Just EvaluatorGM
-    "tim" -> Just EvaluatorTI
+    "ti"  -> Just EvaluatorTI
     _     -> Nothing
 
 mmany :: (Alternative f, Monoid m) => f m -> f m
