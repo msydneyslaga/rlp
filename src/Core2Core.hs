@@ -15,7 +15,7 @@ import Data.Set                 (Set)
 import Data.Set                 qualified as S
 import Data.List
 import Control.Monad.Writer
-import Control.Monad.State
+import Control.Monad.State.Lazy
 import Control.Arrow            ((>>>))
 import Data.Text                qualified as T
 import Numeric                  (showHex)
@@ -28,18 +28,15 @@ core2core :: Program' -> Program'
 core2core p = undefined
 
 gmPrep :: Program' -> Program'
-gmPrep p = p' & programScDefs %~ (<>caseScs)
+gmPrep p = p & traverseOf rhss (floatNonStrictCases globals)
+             & runFloater
+             & \ (me,caseScs) -> me & programScDefs %~ (<>caseScs)
     where
-        rhss :: Applicative f => (Expr z -> f (Expr z)) -> Program z -> f (Program z)
+        rhss :: Traversal' (Program z) (Expr z)
         rhss = programScDefs . each . _rhs
+
         globals = p ^.. programScDefs . each . _lhs . _1
                 & S.fromList
-
-        -- i kinda don't like that we're calling floatNonStrictCases twice tbh
-        p'      = p & rhss %~ fst . runFloater . floatNonStrictCases globals
-        caseScs = (p ^.. rhss)
-              <&> snd . runFloater . floatNonStrictCases globals
-                & mconcat
 
 -- | Auxilary type used in @floatNonSrictCases@
 type Floater = StateT [Name] (Writer [ScDef'])

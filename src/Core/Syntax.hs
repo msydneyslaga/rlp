@@ -25,9 +25,11 @@ module Core.Syntax
     , Module(..)
     , Program(..)
     , Program'
+    , Pragma(..)
     , unliftScDef
     , programScDefs
     , programTypeSigs
+    , programDataTags
     , Expr'
     , ScDef'
     , Alter'
@@ -101,6 +103,8 @@ data Alter b = Alter AltCon [b] (Expr b)
     deriving (Show, Read, Lift)
 
 deriving instance (Eq b) => Eq (Alter b)
+
+newtype Pragma = Pragma [T.Text]
 
 data Rec = Rec
          | NonRec

@@ -3,7 +3,7 @@
 Module : Core.Parse
 Description : Parser for the Core language
 -}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, ViewPatterns #-}
 module Core.Parse
     ( parseCore
     , parseCoreExpr
@@ -23,7 +23,9 @@ import Compiler.RLPC
 import Lens.Micro
 import Data.Default.Class   (def)
 import Data.Hashable        (Hashable)
+import Data.List.Extra
 import Data.Text.IO         qualified as TIO
+import Data.Text            (Text)
 import Data.Text            qualified as T
 import Data.HashMap.Strict  qualified as H
 }
@@ -83,6 +85,15 @@ Program         : ScTypeSig ';' Program         { insTypeSig $1 $3 }
                 | ScTypeSig OptSemi             { singletonTypeSig $1 }
                 | ScDef     ';' Program         { insScDef $1 $3 }
                 | ScDef     OptSemi             { singletonScDef $1 }
+                | TLPragma  ';' Program         {% doTLPragma $1 $3 }
+                | TLPragma  OptSemi             {% doTLPragma $1 mempty }
+
+TLPragma        :: { Pragma }
+                : '{-#' Words '#-}'             { Pragma $2 }
+
+Words           :: { [Text] }
+                : Words word                    { $1 `snoc` $2 }
+                | word                          { [$1] }
 
 OptSemi         :: { () }
 OptSemi         : ';'                           { () }
@@ -150,21 +161,14 @@ Alters          : Alter ';' Alters              { $1 : $3 }
                 | Alter                         { [$1] }
 
 Alter           :: { Alter Name }
-Alter           : alttag ParList '->' Expr      { Alter (AltTag $1) $2 $4 }
+Alter           : alttag ParList '->' Expr      { Alter (AltTag  $1) $2 $4 }
+                | Con    ParList '->' Expr      { Alter (AltData $1) $2 $4 }
 
 Expr1           :: { Expr Name }
 Expr1           : litint                        { Lit $ IntL $1 }
                 | Id                            { Var $1 }
                 | PackCon                       { $1 }
-                | ExprPragma                    { $1 }
                 | '(' Expr ')'                  { $2 }
-
-ExprPragma      :: { Expr Name }
-ExprPragma      : '{-#' Words '#-}'      {% exprPragma $2 }
-
-Words           :: { [String] }
-Words           : word Words                    { T.unpack $1 : $2 }
-                | word                          { [T.unpack $1] }
 
 PackCon         :: { Expr Name }
 PackCon         : pack '{' litint litint '}'    { Con $3 $4 }
@@ -229,6 +233,18 @@ happyBind m k = m >>= k
 
 happyPure :: a -> RLPC a
 happyPure a = pure a
+
+doTLPragma :: Pragma -> Program' -> RLPC Program'
+-- TODO: warn unrecognised pragma
+doTLPragma (Pragma []) p = pure p
+
+doTLPragma (Pragma pr) p = case pr of
+    -- TODO: warn on overwrite
+    ["PackData", n, readt -> t, readt -> a] ->
+        pure $ p & programDataTags . at n ?~ (t,a)
+
+readt :: (Read a) => Text -> a
+readt = read . T.unpack
 
 }
 

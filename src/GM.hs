@@ -661,7 +661,8 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
         compileC _ (Con t n) = [PushConstr t n]
 
         compileC _ (Case _ _) =
-            error "case expressions may not appear in non-strict contexts :/"
+            error "GM compiler found a non-strict case expression, which should\
+                  \ have been floated by Core2Core.gmPrep. This is bad!"
 
         compileC _ _ = error "yet to be implemented!"
 
