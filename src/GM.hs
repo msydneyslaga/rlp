@@ -662,7 +662,7 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
 
         compileC _ (Case _ _) =
             error "GM compiler found a non-strict case expression, which should\
-                  \ have been floated by Core2Core.gmPrep. This is bad!"
+                  \ have been floated by Core2Core.gmPrep. This is a bug!"
 
         compileC _ _ = error "yet to be implemented!"
 
@@ -731,6 +731,10 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
                 binds = (NameKey <$> as) `zip` [0..]
                 g' = binds ++ argOffset n g
                 c = compileE g' e
+        compileA _ (Alter _ as e) = error "GM.compileA found an untagged\
+                                          \ constructor, which should have\
+                                          \ been handled by Core2Core.gmPrep.\
+                                          \ This is a bug!"
 
         inlineOp1 :: Env -> Instr -> Expr' -> Code
         inlineOp1 g i a = compileE g a <> [i]

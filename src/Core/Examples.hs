@@ -4,12 +4,7 @@ Description : Core examples (may eventually be unit tests)
 -}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Core.Examples
-    ( fac3
-    , sumList
-    , constDivZero
-    , idCase
-    ) where
+module Core.Examples where
 ----------------------------------------------------------------------------------
 import Core.Syntax
 import Core.TH
@@ -194,6 +189,32 @@ idCase = [coreProg|
         main = id (case Pack{1 0} of
             { <1> -> (+#) 2 3
             })
+    |]
+
+-- NOTE: the GM primitive (==#) returns an untyped constructor with tag 1 for
+-- true, and 0 for false. See: GM.boxBool
+namedBoolCase :: Program'
+namedBoolCase = [coreProg|
+        {-# PackData True 1 0 #-}
+        {-# PackData False 0 0 #-}
+        main = case (==#) 1 1 of
+            { True -> 123
+            ; False -> 456
+            }
+    |]
+
+namedConsCase :: Program'
+namedConsCase = [coreProg|
+        {-# PackData Nil  0 0 #-}
+        {-# PackData Cons 1 2 #-}
+        Nil = Pack{0 0};
+        Cons = Pack{1 2};
+        foldr f z l = case l of
+            { Nil       -> z
+            ; Cons x xs -> f x (foldr f z xs)
+            };
+        list = Cons 1 (Cons 2 (Cons 3 Nil));
+        main = foldr (+#) 0 list
     |]
 
 -- corePrelude :: Module Name
