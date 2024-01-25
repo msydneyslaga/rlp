@@ -30,12 +30,12 @@ $ rlpc -ddump-opts t.hs
 
 ### Potential Features
 Listed in order of importance.
-- [ ] ADTs
-- [ ] First-class functions
+- [x] ADTs
+- [x] First-class functions
 - [ ] Higher-kinded types
 - [ ] Typeclasses
-- [ ] Parametric polymorphism
-- [ ] Hindley-Milner type inference
+- [x] Parametric polymorphism
+- [x] Hindley-Milner type inference
 - [ ] Newtype coercion
 - [ ] Parallelism
 
@@ -66,32 +66,59 @@ Listed in order of importance.
         - [ ] TCO
         - [ ] DCE
 - [ ] Frontend
-    - [ ] High-level language
-        - [ ] AST
-        - [ ] Lexer
-        - [ ] Parser
+    - [x] High-level language
+        - [x] AST
+        - [x] Lexer
+        - [x] Parser
     - [ ] Translation to the core language
         - [ ] Constraint solver
         - [ ] `do`-notation
     - [x] CLI
 - [ ] Documentation
-    - [ ] State transition rules
+    - [x] State transition rules
     - [ ] How does the evaluation model work?
+    - [ ] The Hindley-Milner type system
     - [ ] CLI usage
     - [ ] Tail call optimisation
-    - [x] Parsing rlp
+    - [ ] Parsing rlp
 - [ ] Tests
     - [x] Generic example programs
     - [ ] Parser
 
-### December Release Plan
-- [ ] Tests
+### ~~December Release Plan~~
+- [x] Tests
     - [ ] Core lexer
     - [ ] Core parser
-    - [ ] Evaluation model
+    - [x] Evaluation model
 - [ ] Benchmarks
-- [ ] Stable Core lexer
-- [ ] Stable Core parser
-- [ ] Stable evaluation model
-    - [ ] Garbage Collection
+- [x] Stable Core lexer
+- [x] Stable Core parser
+- [x] Stable evaluation model
+    - [x] Garbage Collection
 - [ ] Stable documentation for the evaluation model
+
+### January Release Plan
+- [ ] Beta rl' to Core
+- [ ] UX improvements
+    - [ ] Actual compiler errors -- no more unexceptional `error` calls
+    - [ ] Better CLI dump flags
+    - [ ] Annotate the AST with token positions for errors
+
+### March Release Plan
+- [ ] Tests
+    - [ ] rl' parser
+    - [ ] rl' lexer
+
+### Indefinite Release Plan
+
+This list is more concrete than the milestones, but likely further in the future
+than the other release plans.
+
+- [ ] Stable rl' to Core
+- [ ] Core polish
+    - [ ] Better, stable parser
+    - [ ] Better, stable lexer
+    - [ ] Less hacky handling of named data
+    - [ ] Less hacky pragmas
+- [ ] GM to LLVM
+
