@@ -85,8 +85,8 @@ Program         : ScTypeSig ';' Program         { insTypeSig $1 $3 }
                 | ScTypeSig OptSemi             { singletonTypeSig $1 }
                 | ScDef     ';' Program         { insScDef $1 $3 }
                 | ScDef     OptSemi             { singletonScDef $1 }
-                | TLPragma  ';' Program         {% doTLPragma $1 $3 }
-                | TLPragma  OptSemi             {% doTLPragma $1 mempty }
+                | TLPragma  Program             {% doTLPragma $1 $2 }
+                | TLPragma                      {% doTLPragma $1 mempty }
 
 TLPragma        :: { Pragma }
                 : '{-#' Words '#-}'             { Pragma $2 }
@@ -106,7 +106,6 @@ ScDefs          :: { [ScDef Name] }
 ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
                 | ScDef ';'                     { [$1] }
                 | ScDef                         { [$1] }
-                | {- epsilon -}                 { [] }
 
 ScDef           :: { ScDef Name }
 ScDef           : Var ParList '=' Expr          { ScDef $1 $2 $4 }

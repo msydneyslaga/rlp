@@ -6,8 +6,13 @@ Description : Core ASTs and the like
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DerivingStrategies, DerivingVia #-}
+-- for recursion-schemes
+{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable
+  , TemplateHaskell, TypeFamilies #-}
 module Core.Syntax
     ( Expr(..)
+    , ExprF(..)
+    , ExprF'(..)
     , Type(..)
     , pattern TyInt
     , Lit(..)
@@ -43,6 +48,8 @@ import Data.Coerce
 import Data.Pretty
 import Data.List                    (intersperse)
 import Data.Function                ((&))
+import Data.Functor.Foldable
+import Data.Functor.Foldable.TH     (makeBaseFunctor)
 import Data.String
 import Data.HashMap.Strict          (HashMap)
 import Data.HashMap.Strict          qualified as H
@@ -142,7 +149,10 @@ data Program b = Program
         via Generically (Program b)
 
 makeLenses ''Program
+makeBaseFunctor ''Expr
 pure []
+
+type ExprF' = ExprF Name
 
 type Program' = Program Name
 type Expr' = Expr Name
@@ -192,4 +202,9 @@ instance HasLHS (ScDef b) (ScDef b) (b, [b]) (b, [b]) where
     _lhs = lens
         (\ (ScDef n as _) -> (n,as))
         (\ (ScDef _ _ e) (n',as') -> (ScDef n' as' e))
+
+instance HasLHS (Binding b) (Binding b) b b where
+    _lhs = lens
+        (\ (k := _) -> k)
+        (\ (_ := e) k' -> k' := e)
 
