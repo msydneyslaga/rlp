@@ -75,6 +75,8 @@ library
 
     default-extensions:
         OverloadedStrings
+        TypeFamilies
+        LambdaCase
 
 executable rlpc
     import:           warnings

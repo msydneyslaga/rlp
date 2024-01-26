@@ -193,13 +193,13 @@ readInt = T.foldr f 0 where
 constToken :: RlpToken -> LexerAction (Located RlpToken)
 constToken t inp l = do
     pos <- use (psInput . aiPos)
-    pure (Located (pos,l) t)
+    pure (Located (spanFromPos pos l) t)
 
 tokenWith :: (Text -> RlpToken) -> LexerAction (Located RlpToken)
 tokenWith tf inp l = do
     pos <- getPos
     let t = tf (T.take l $ inp ^. aiSource)
-    pure (Located (pos,l) t)
+    pure (Located (spanFromPos pos l) t)
 
 getPos :: P Position
 getPos = use (psInput . aiPos)
@@ -207,7 +207,8 @@ getPos = use (psInput . aiPos)
 alexEOF :: P (Located RlpToken)
 alexEOF = do
     inp <- getInput
-    pure (Located undefined TokenEOF)
+    pos <- getPos
+    pure (Located (spanFromPos pos 0) TokenEOF)
 
 initParseState :: Text -> ParseState
 initParseState s = ParseState
@@ -238,7 +239,7 @@ lexToken = do
     st <- use id
     -- traceM $ "st: " <> show st
     case alexScan inp c of
-        AlexEOF -> pure $ Located (inp ^. aiPos, 0) TokenEOF
+        AlexEOF -> pure $ Located (spanFromPos (inp^.aiPos) 0) TokenEOF
         AlexSkip inp' l -> do
             psInput .= inp'
             lexToken
@@ -274,7 +275,7 @@ indentLevel = do
 insertToken :: RlpToken -> P (Located RlpToken)
 insertToken t = do
     pos <- use (psInput . aiPos)
-    pure (Located (pos, 0) t)
+    pure (Located (spanFromPos pos 0) t)
 
 popLayout :: P Layout
 popLayout = do

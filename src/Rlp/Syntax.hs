@@ -1,40 +1,28 @@
 -- recursion-schemes
-{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
--- recursion-schemes
-{-# LANGUAGE TemplateHaskell, TypeFamilies #-}
+{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable
+  , TemplateHaskell, TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings, PatternSynonyms #-}
+{-# LANGUAGE TypeFamilies, TypeFamilyDependencies #-}
 module Rlp.Syntax
-    ( RlpModule(..)
-    , RlpProgram(..)
-    , RlpProgram'
-    , rlpmodName
-    , rlpmodProgram
-    , RlpExpr(..)
-    , RlpExpr'
-    , RlpExprF(..)
-    , RlpExprF'
-    , Decl(..)
-    , Decl'
-    , Bind(..)
-    , Where
-    , Where'
-    , ConAlt(..)
-    , Type(..)
-    , pattern (:->)
+    (
+    -- * AST
+      RlpProgram(..)
+    , Decl(..), Decl', RlpExpr(..), RlpExpr'
+    , Pat(..), Pat'
     , Assoc(..)
-    , VarId(..)
-    , ConId(..)
-    , Pat(..)
-    , Pat'
-    , Lit(..)
-    , Lit'
-    , Name
+    , Lit(..), Lit'
+    , Type(..)
+    , ConAlt(..)
 
-    -- TODO: ugh move this somewhere else later
-    , showsTernaryWith
+    -- * Pattern synonyms for unused extensions
+    , pattern InfixD'
 
-    -- * Convenience re-exports
-    , Text
+    -- * Trees That Grow extensions
+    , XRec, IdP
+    -- ** RlpExpr
+    , XLetE, XVarE, XConE, XLamE, XCaseE, XIfE, XAppE, XLitE, XXRlpExpr
+    -- ** Decl
+    , XFunD, XTySigD, XDataD, XInfixD, XXDecl
     )
     where
 ----------------------------------------------------------------------------------
@@ -49,87 +37,91 @@ import Core.Syntax                  hiding (Lit)
 import Core                         (HasRHS(..), HasLHS(..))
 ----------------------------------------------------------------------------------
 
-data RlpModule b = RlpModule
+data RlpModule p = RlpModule
     { _rlpmodName       :: Text
-    , _rlpmodProgram    :: RlpProgram b
+    , _rlpmodProgram    :: RlpProgram p
     }
 
-newtype RlpProgram b = RlpProgram [Decl RlpExpr b]
-    deriving Show
+newtype RlpProgram p = RlpProgram [Decl p]
 
-type RlpProgram' = RlpProgram Name
+data Decl p = FunD   (XFunD p)   (IdP p) [Pat p] (RlpExpr p) (Maybe (Where p))
+            | TySigD (XTySigD p) [IdP p] Type
+            | DataD  (XDataD p)  (IdP p) [IdP p] [ConAlt p]
+            | InfixD (XInfixD p) Assoc Int (IdP p)
+            | XDecl  !(XXDecl p)
 
--- | The @e@ parameter is used for partial results. When parsing an input, we
--- first parse all top-level declarations in order to extract infix[lr]
--- declarations. This process yields a @[Decl (Const Text) Name]@, where @Const
--- Text@ stores the remaining unparsed function bodies. Once infixities are
--- accounted for, we may complete the parsing task and get a proper @[Decl
--- RlpExpr Name]@.
+type family XFunD p
+type family XTySigD p
+type family XDataD p
+type family XInfixD p
+type family XXDecl p
 
-data Decl e b = FunD    VarId [Pat b] (e b) (Maybe (Where b))
-              | TySigD  [VarId] Type
-              | DataD   ConId [Name] [ConAlt]
-              | InfixD  Assoc Int Name
-              deriving Show
+pattern InfixD' :: (XInfixD p ~ ()) => Assoc -> Int -> (IdP p) -> Decl p
+pattern InfixD' a p n = InfixD () a p n
 
-type Decl' e = Decl e Name
+type Decl' p = XRec p Decl
 
 data Assoc = InfixL
            | InfixR
            | Infix
-           deriving Show
+           deriving (Show)
 
-data ConAlt = ConAlt ConId [Type]
-            deriving Show
+data ConAlt p = ConAlt (IdP p) [Type]
 
-data RlpExpr b = LetE  [Bind b] (RlpExpr b)
-               | VarE  VarId
-               | ConE  ConId
-               | LamE  [Pat b] (RlpExpr b)
-               | CaseE (RlpExpr b) [(Alt b, Where b)]
-               | IfE   (RlpExpr b) (RlpExpr b) (RlpExpr b)
-               | AppE  (RlpExpr b) (RlpExpr b)
-               | LitE  (Lit b)
-               deriving Show
+data RlpExpr p = LetE  (XLetE p)   [Bind p] (RlpExpr' p)
+               | VarE  (XVarE p)   (IdP p)
+               | LamE  (XLamE p)   [Pat p] (RlpExpr' p)
+               | CaseE (XCaseE p)  (RlpExpr' p) [(Alt p, Where p)]
+               | IfE   (XIfE p)    (RlpExpr' p) (RlpExpr' p) (RlpExpr' p)
+               | AppE  (XAppE p)   (RlpExpr' p) (RlpExpr' p)
+               | LitE  (XLitE p)   (Lit p)
+               | ParE  (XParE p)   (RlpExpr' p)
+               | OAppE (XOAppE p)  (IdP p) (RlpExpr' p) (RlpExpr' p)
+               | XRlpExpr !(XXRlpExpr p)
 
-type RlpExpr' = RlpExpr Name
+type RlpExpr' p = XRec p RlpExpr
 
-type Where b = [Bind b]
-type Where' = [Bind Name]
+class UnXRec p where
+    unXRec :: XRec p f -> f p
+
+class MapXRec p where
+    mapXRec :: (f p -> f p) -> XRec p f -> XRec p f
+
+type family XRec p (f :: * -> *) = (r :: *) | r -> p f
+
+type family XLetE p
+type family XVarE p
+type family XConE p
+type family XLamE p
+type family XCaseE p
+type family XIfE p
+type family XAppE p
+type family XLitE p
+type family XParE p
+type family XOAppE p
+type family XXRlpExpr p
+
+type family IdP p
+
+type Where p = [Bind p]
 
 -- do we want guards?
-data Alt b = AltA (Pat b) (RlpExpr b)
-           deriving Show
+data Alt p = AltA (Pat' p) (RlpExpr' p)
 
-data Bind b = PatB (Pat b) (RlpExpr b)
-            | FunB VarId [Pat b] (RlpExpr b)
-            deriving Show
+data Bind p = PatB (Pat' p) (RlpExpr' p)
+            | FunB (IdP p) [Pat' p] (RlpExpr' p)
 
-data VarId = NameVar Text
-           | SymVar Text
-           deriving Show
+data Pat p = VarP (IdP p)
+           | LitP (Lit' p)
+           | ConP (IdP p) [Pat' p]
 
-instance IsString VarId where
-    -- TODO: use symvar if it's an operator
-    fromString = NameVar . T.pack
+type Pat' p = XRec p Pat
 
-data ConId = NameCon Text
-           | SymCon Text
-           deriving Show
-
-data Pat b = VarP VarId
-           | LitP (Lit b)
-           | ConP ConId [Pat b]
-           deriving Show
-
-type Pat' = Pat Name
-
-data Lit b = IntL Int
+data Lit p = IntL Int
            | CharL Char
-           | ListL [RlpExpr b]
-           deriving Show
+           | ListL [RlpExpr' p]
 
-type Lit' = Lit Name
+type Lit' p = XRec p Lit
 
 -- instance HasLHS Alt Alt Pat Pat where
 --     _lhs = lens
@@ -143,33 +135,17 @@ type Lit' = Lit Name
 
 makeBaseFunctor ''RlpExpr
 
-deriving instance (Show b, Show a) => Show (RlpExprF b a)
-
-type RlpExprF' = RlpExprF Name
-
--- society if derivable Show1
-instance (Show b) => Show1 (RlpExprF b) where
-    liftShowsPrec sp _ p m = case m of
-        (LetEF bs e)            -> showsBinaryWith showsPrec sp "LetEF" p bs e
-        (VarEF n)               -> showsUnaryWith showsPrec "VarEF" p n
-        (ConEF n)               -> showsUnaryWith showsPrec "ConEF" p n
-        (LamEF bs e)            -> showsBinaryWith showsPrec sp "LamEF" p bs e
-        (CaseEF e as)           -> showsBinaryWith sp showsPrec "CaseEF" p e as
-        (IfEF a b c)            -> showsTernaryWith sp sp sp "IfEF" p a b c
-        (AppEF f x)             -> showsBinaryWith sp sp "AppEF" p f x
-        (LitEF l)               -> showsUnaryWith showsPrec "LitEF" p l
-
-showsTernaryWith :: (Int -> x -> ShowS)
-                 -> (Int -> y -> ShowS)
-                 -> (Int -> z -> ShowS)
-                 -> String -> Int
-                 -> x -> y -> z
-                 -> ShowS
-showsTernaryWith sa sb sc name p a b c = showParen (p > 10)
-    $ showString name
-    . showChar ' ' . sa 11 a 
-    . showChar ' ' . sb 11 b
-    . showChar ' ' . sc 11 c
+-- showsTernaryWith :: (Int -> x -> ShowS)
+--                  -> (Int -> y -> ShowS)
+--                  -> (Int -> z -> ShowS)
+--                  -> String -> Int
+--                  -> x -> y -> z
+--                  -> ShowS
+-- showsTernaryWith sa sb sc name p a b c = showParen (p > 10)
+--     $ showString name
+--     . showChar ' ' . sa 11 a 
+--     . showChar ' ' . sb 11 b
+--     . showChar ' ' . sc 11 c
 
 --------------------------------------------------------------------------------
 

@@ -81,6 +81,7 @@ Listed in order of importance.
     - [ ] CLI usage
     - [ ] Tail call optimisation
     - [ ] Parsing rlp
+    - [ ] Trees That Grow
 - [ ] Tests
     - [x] Generic example programs
     - [ ] Parser
