@@ -55,6 +55,7 @@ type instance IdP RlpcPs = PsName
 type instance XInfixD RlpcPs = ()
 type instance XVarE RlpcPs = ()
 type instance XLitE RlpcPs = ()
+type instance XFunD RlpcPs = ()
 
 type PsName = Text
 

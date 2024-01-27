@@ -12,16 +12,17 @@ module Rlp.Syntax
     , Assoc(..)
     , Lit(..), Lit'
     , Type(..)
+    , pattern (:->)
     , ConAlt(..)
 
     -- * Pattern synonyms for unused extensions
     -- ** Decl
-    , pattern InfixD'
+    , pattern InfixD', pattern FunD'
     -- ** RlpExpr
     , pattern ParE', pattern VarE', pattern LitE'
 
     -- * Trees That Grow extensions
-    , XRec, IdP
+    , UnXRec(..), MapXRec(..), XRec, IdP
     -- ** RlpExpr
     , XLetE, XVarE, XConE, XLamE, XCaseE, XIfE, XAppE, XLitE, XXRlpExpr
     -- ** Decl
@@ -47,7 +48,7 @@ data RlpModule p = RlpModule
 
 newtype RlpProgram p = RlpProgram [Decl p]
 
-data Decl p = FunD   (XFunD p)   (IdP p) [Pat p] (RlpExpr p) (Maybe (Where p))
+data Decl p = FunD   (XFunD p)   (IdP p) [Pat' p] (RlpExpr' p) (Maybe (Where p))
             | TySigD (XTySigD p) [IdP p] Type
             | DataD  (XDataD p)  (IdP p) [IdP p] [ConAlt p]
             | InfixD (XInfixD p) Assoc Int (IdP p)
@@ -58,6 +59,11 @@ type family XTySigD p
 type family XDataD p
 type family XInfixD p
 type family XXDecl p
+
+pattern FunD' :: (XFunD p ~ ())
+              => IdP p -> [Pat' p] -> RlpExpr' p -> (Maybe (Where p))
+              -> Decl p
+pattern FunD' n as e wh = FunD () n as e wh
 
 pattern InfixD' :: (XInfixD p ~ ()) => Assoc -> Int -> (IdP p) -> Decl p
 pattern InfixD' a p n = InfixD () a p n

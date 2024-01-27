@@ -17,6 +17,7 @@ import Data.Functor.Apply
 import Data.Functor.Bind
 import Control.Comonad
 import Data.Functor
+import Data.Semigroup.Traversable
 import Data.Text                    qualified as T
 import Data.Void
 }
@@ -104,23 +105,24 @@ DataCons    :: { [ConAlt RlpcPs] }
             | DataCon                   { [$1] }
 
 DataCon     :: { ConAlt RlpcPs }
-            : Con Type1s                { ConAlt $1 $2 }
+            : Con Type1s                { undefined }
 
 Type1s      :: { [Type] }
             : {- epsilon -}             { [] }
             | Type1s Type1              { $1 `snoc` $2 }
 
 Type1       :: { Type }
-            : '(' Type ')'              { $2 }
-            | conname                   { TyCon $1 }
-            | varname                   { TyVar $1 }
+            : '(' Type ')'              { undefined }
+            | conname                   { undefined }
+            | varname                   { undefined }
 
 Type        :: { Type }
             : Type '->' Type            { $1 :-> $3 }
             | Type1                     { $1 }
 
 FunDecl     :: { Decl' RlpcPs }
-FunDecl     : Var Params '=' Expr       { FunD undefined $2 $4 Nothing }
+FunDecl     : Var Params '=' Expr       { $4 =>> \e ->
+                                          FunD' (extract $1) $2 e Nothing }
 
 Params      :: { [Pat' RlpcPs] }
 Params      : {- epsilon -}             { [] }
