@@ -13,6 +13,9 @@ import Lens.Micro.Platform
 import Data.List.Extra
 import Data.Fix
 import Data.Functor.Const
+import Data.Functor.Apply
+import Data.Functor.Bind
+import Control.Comonad
 import Data.Functor
 import Data.Text                    qualified as T
 import Data.Void
@@ -125,14 +128,14 @@ Params      : {- epsilon -}             { [] }
 
 Pat1        :: { Pat' RlpcPs }
             : Var                       { undefined }
-            | Lit                       { LitP <$> $1 }
+            | Lit                       { LitP <<= $1 }
 
 Expr        :: { RlpExpr' RlpcPs }
             : Expr1 varsym Expr         { undefined }
             | Expr1                     { $1 }
 
 Expr1       :: { RlpExpr' RlpcPs }
-            : '(' Expr ')'              { fmap ParE' $2 }
+            : '(' Expr ')'              { $1 .> $2 <. $3 }
             | Lit                       { fmap LitE' $1 }
             | Var                       { fmap VarE' $1 }
 

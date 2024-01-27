@@ -27,6 +27,7 @@ import Core.Syntax                  (Name)
 import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Errorful
+import Control.Comonad
 import Compiler.RlpcError
 import Data.Text                    (Text)
 import Data.Maybe
@@ -35,6 +36,7 @@ import Data.Functor.Foldable
 import Data.Functor.Const
 import Data.Functor.Classes
 import Data.Functor.Apply
+import Data.Functor.Bind
 import Data.HashMap.Strict          qualified as H
 import Data.Void
 import Data.Word                    (Word8)
@@ -176,6 +178,28 @@ instance Apply Located where
                 EQ -> max sa sb
                 LT -> max sa (ab + sb)
                 GT -> max sb (aa + sa)
+
+instance Bind Located where
+    Located sa a >>- k = Located (sa `spanAcross` sb) b
+        where
+            Located sb b = k a
+
+spanAcross :: (Int, Int, Int, Int)
+           -> (Int, Int, Int, Int)
+           -> (Int, Int, Int, Int)
+spanAcross (la,ca,aa,sa) (lb,cb,ab,sb) = (l,c,a,s)
+        where
+            l = min la lb
+            c = min ca cb
+            a = min aa ab
+            s = case aa `compare` ab of
+                EQ -> max sa sb
+                LT -> max sa (ab + sb)
+                GT -> max sb (aa + sa)
+
+instance Comonad Located where
+    extract (Located _ a) = a
+    extend ck w@(Located p _) = Located p (ck w)
 
 spanFromPos :: Position -> Int -> (Int, Int, Int, Int)
 spanFromPos (l,c,a) s = (l,c,a,s)
