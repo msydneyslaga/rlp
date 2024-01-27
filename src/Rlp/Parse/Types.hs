@@ -34,6 +34,7 @@ import Data.Fix
 import Data.Functor.Foldable
 import Data.Functor.Const
 import Data.Functor.Classes
+import Data.Functor.Apply
 import Data.HashMap.Strict          qualified as H
 import Data.Void
 import Data.Word                    (Word8)
@@ -50,6 +51,8 @@ type instance XRec RlpcPs f = Located (f RlpcPs)
 type instance IdP RlpcPs = PsName
 
 type instance XInfixD RlpcPs = ()
+type instance XVarE RlpcPs = ()
+type instance XLitE RlpcPs = ()
 
 type PsName = Text
 
@@ -66,8 +69,9 @@ data AlexInput = AlexInput
     deriving Show
 
 type Position =
-    ( Int -- line
-    , Int -- column
+    ( Int -- ^ line
+    , Int -- ^ column
+    , Int -- ^ Absolutely
     )
 
 posLine :: Lens' Position Int
@@ -75,6 +79,9 @@ posLine = _1
 
 posColumn :: Lens' Position Int
 posColumn = _2
+
+posAbsolute :: Lens' Position Int
+posAbsolute = _3
 
 data RlpToken
     -- literals
@@ -154,12 +161,24 @@ data Layout = Explicit
             | Implicit Int
             deriving (Show, Eq)
 
--- | Token wrapped with a span (line, column, length)
-data Located a = Located !(Int, Int, Int) a
+-- | Token wrapped with a span (line, column, absolute, length)
+data Located a = Located !(Int, Int, Int, Int) a
     deriving (Show, Functor)
 
-spanFromPos :: Position -> Int -> (Int, Int, Int)
-spanFromPos (l,c) s = (l,c,s)
+instance Apply Located where
+    liftF2 f (Located (la,ca,aa,sa) p) (Located (lb,cb,ab,sb) q)
+            = Located (l,c,a,s) (p `f` q)
+        where
+            l = min la lb
+            c = min ca cb
+            a = min aa ab
+            s = case aa `compare` ab of
+                EQ -> max sa sb
+                LT -> max sa (ab + sb)
+                GT -> max sb (aa + sa)
+
+spanFromPos :: Position -> Int -> (Int, Int, Int, Int)
+spanFromPos (l,c,a) s = (l,c,a,s)
 
 {-# INLINE spanFromPos #-}
 
@@ -186,8 +205,9 @@ addWoundHere l e = P $ \st ->
     let e' = MsgEnvelope
             { _msgSpan = let pos = psInput . aiPos
                          in SrcSpan (st ^. pos . posLine)
-                                   (st ^. pos . posColumn)
-                                   l
+                                    (st ^. pos . posColumn)
+                                    (st ^. pos . posAbsolute)
+                                    l
             , _msgDiagnostic = e
             , _msgSeverity = SevError
             }
@@ -199,6 +219,7 @@ addFatalHere l e = P $ \st ->
             { _msgSpan = let pos = psInput . aiPos
                          in SrcSpan (st ^. pos . posLine)
                                     (st ^. pos . posColumn)
+                                    (st ^. pos . posAbsolute)
                                     l
             , _msgDiagnostic = e
             , _msgSeverity = SevError

@@ -69,6 +69,7 @@ library
                     , data-fix >= 0.3.2 && < 0.4
                     , utf8-string >= 1.0.2 && < 1.1
                     , extra >= 1.7.0 && < 2
+                    , semigroupoids
 
     hs-source-dirs:   src
     default-language: GHC2021

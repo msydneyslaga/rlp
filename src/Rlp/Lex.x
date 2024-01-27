@@ -164,10 +164,10 @@ alexGetByte inp = case inp ^. aiBytes of
                        -- report the previous char
                        & aiPrevChar .~ c
                        -- update the position
-                       & aiPos %~ \ (ln,col) ->
+                       & aiPos %~ \ (ln,col,a) ->
                                    if c == '\n'
-                                   then (ln+1,1)
-                                   else (ln,col+1)
+                                   then (ln+1, 1, a+1)
+                                   else (ln, col+1, a+1)
         pure (b, inp')
     
     _ -> Just (head bs, inp')
@@ -225,7 +225,7 @@ initAlexInput s = AlexInput
     { _aiPrevChar   = '\0'
     , _aiSource     = s
     , _aiBytes      = []
-    , _aiPos        = (1,1)
+    , _aiPos        = (1,1,0)
     }
 
 runP' :: P a -> Text -> (ParseState, [MsgEnvelope RlpParseError], Maybe a)

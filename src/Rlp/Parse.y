@@ -117,34 +117,34 @@ Type        :: { Type }
             | Type1                     { $1 }
 
 FunDecl     :: { Decl' RlpcPs }
-FunDecl     : Var Params '=' Expr       { FunD $1 $2 $4 Nothing }
+FunDecl     : Var Params '=' Expr       { FunD undefined $2 $4 Nothing }
 
 Params      :: { [Pat' RlpcPs] }
 Params      : {- epsilon -}             { [] }
             | Params Pat1               { $1 `snoc` $2 }
 
 Pat1        :: { Pat' RlpcPs }
-            : Var                       { VarP $1 }
-            | Lit                       { LitP $1 }
+            : Var                       { undefined }
+            | Lit                       { LitP <$> $1 }
 
 Expr        :: { RlpExpr' RlpcPs }
-            : Expr1 varsym Expr         { Fix $ B $2 (unFix $1) (unFix $3) }
+            : Expr1 varsym Expr         { undefined }
             | Expr1                     { $1 }
 
 Expr1       :: { RlpExpr' RlpcPs }
-            : '(' Expr ')'              { wrapFix . Par . unwrapFix $ $2 }
-            | Lit                       { Fix . E $ LitEF $1 }
-            | Var                       { Fix . E $ VarEF $1 }
+            : '(' Expr ')'              { fmap ParE' $2 }
+            | Lit                       { fmap LitE' $1 }
+            | Var                       { fmap VarE' $1 }
 
 -- TODO: happy prefers left-associativity. doing such would require adjusting
 -- the code in Rlp.Parse.Associate to expect left-associative input rather than
 -- right.
 InfixExpr   :: { RlpExpr' RlpcPs }
-            : Expr1 varsym Expr         { Fix $ B $2 (unFix $1) (unFix $3) }
+            : Expr1 varsym Expr         { undefined }
 
 InfixOp     :: { PsName }
-            : consym                    { $1 }
-            | varsym                    { $1 }
+            : consym                    { undefined }
+            | varsym                    { undefined }
 
 -- TODO: microlens-pro save me microlens-pro (rewrite this with prisms)
 Lit         :: { Lit' RlpcPs }
@@ -172,8 +172,8 @@ mkProgram ds = do
     pure $ RlpProgram (associate pt <$> ds)
 
 parseError :: Located RlpToken -> P a
-parseError (Located (l,c,s) t) = addFatal $
-    errorMsg (SrcSpan l c s) RlpParErrUnexpectedToken
+parseError (Located (l,c,a,s) t) = addFatal $
+    errorMsg (SrcSpan l c a s) RlpParErrUnexpectedToken
 
 mkInfixD :: Assoc -> Int -> PsName -> P (Decl' RlpcPs)
 mkInfixD a p n = do

@@ -48,6 +48,7 @@ data Severity = SevWarning
 data SrcSpan = SrcSpan
     !Int -- ^ Line
     !Int -- ^ Column
+    !Int -- ^ Absolute
     !Int -- ^ Length
     deriving Show
 

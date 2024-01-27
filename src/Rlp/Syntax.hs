@@ -15,7 +15,10 @@ module Rlp.Syntax
     , ConAlt(..)
 
     -- * Pattern synonyms for unused extensions
+    -- ** Decl
     , pattern InfixD'
+    -- ** RlpExpr
+    , pattern ParE', pattern VarE', pattern LitE'
 
     -- * Trees That Grow extensions
     , XRec, IdP
@@ -102,6 +105,15 @@ type family XOAppE p
 type family XXRlpExpr p
 
 type family IdP p
+
+pattern ParE' :: (XParE p ~ ()) => RlpExpr' p -> RlpExpr p
+pattern ParE' e = ParE () e
+
+pattern LitE' :: (XLitE p ~ ()) => Lit p -> RlpExpr p
+pattern LitE' e = LitE () e
+
+pattern VarE' :: (XVarE p ~ ()) => IdP p -> RlpExpr p
+pattern VarE' e = VarE () e
 
 type Where p = [Bind p]
 
