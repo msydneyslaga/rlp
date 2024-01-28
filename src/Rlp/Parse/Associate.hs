@@ -14,6 +14,6 @@ import Rlp.Parse.Types
 import Rlp.Syntax
 --------------------------------------------------------------------------------
 
-associate = undefined
+associate x y = y
 {-# WARNING associate "temporarily undefined" #-}
 

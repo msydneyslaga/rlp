@@ -53,9 +53,22 @@ type instance XRec RlpcPs f = Located (f RlpcPs)
 type instance IdP RlpcPs = PsName
 
 type instance XInfixD RlpcPs = ()
-type instance XVarE RlpcPs = ()
-type instance XLitE RlpcPs = ()
 type instance XFunD RlpcPs = ()
+type instance XDataD RlpcPs = ()
+type instance XTySigD RlpcPs = ()
+type instance XXDecl RlpcPs = ()
+
+type instance XLetE RlpcPs = ()
+type instance XVarE RlpcPs = ()
+type instance XLamE RlpcPs = ()
+type instance XCaseE RlpcPs = ()
+type instance XIfE RlpcPs = ()
+type instance XAppE RlpcPs = ()
+type instance XLitE RlpcPs = ()
+type instance XParE RlpcPs = ()
+type instance XOAppE RlpcPs = ()
+type instance XXRlpExpr RlpcPs = ()
+type instance XLitE RlpcPs = ()
 
 type PsName = Text
 
@@ -197,6 +210,28 @@ spanAcross (la,ca,aa,sa) (lb,cb,ab,sb) = (l,c,a,s)
                 EQ -> max sa sb
                 LT -> max sa (ab + sb)
                 GT -> max sb (aa + sa)
+
+-- | A synonym for '(<<=)' with a different precedence for use with '(<~>)' in a
+-- sort of, comonadic pseudo-applicative style.
+
+(<<~) :: (Comonad w) => (w a -> b) -> w a -> w b
+(<<~) = (<<=)
+
+infixl 4 <<~
+
+-- | Similar to '(<*>)', but with a cokleisli arrow.
+
+(<~>) :: (Comonad w, Bind w) => w (w a -> b) -> w a -> w b
+mc <~> ma = mc >>- \f -> ma =>> f
+
+infixl 4 <~>
+
+-- f :: (w a -> w b -> c)
+-- a :: w a
+-- b :: w b
+
+-- result :: w c
+-- result = f >~~ a <~> b
 
 instance Comonad Located where
     extract (Located _ a) = a

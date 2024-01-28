@@ -3,6 +3,7 @@
   , TemplateHaskell, TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings, PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies, TypeFamilyDependencies #-}
+{-# LANGUAGE UndecidableInstances, ImpredicativeTypes #-}
 module Rlp.Syntax
     (
     -- * AST
@@ -17,14 +18,15 @@ module Rlp.Syntax
 
     -- * Pattern synonyms for unused extensions
     -- ** Decl
-    , pattern InfixD', pattern FunD'
+    , pattern InfixD', pattern FunD', pattern DataD'
     -- ** RlpExpr
     , pattern ParE', pattern VarE', pattern LitE'
 
     -- * Trees That Grow extensions
     , UnXRec(..), MapXRec(..), XRec, IdP
     -- ** RlpExpr
-    , XLetE, XVarE, XConE, XLamE, XCaseE, XIfE, XAppE, XLitE, XXRlpExpr
+    , XLetE, XVarE, XConE, XLamE, XCaseE, XIfE, XAppE, XLitE, XParE, XOAppE
+    , XXRlpExpr
     -- ** Decl
     , XFunD, XTySigD, XDataD, XInfixD, XXDecl
     )
@@ -37,7 +39,7 @@ import Data.Functor.Foldable.TH     (makeBaseFunctor)
 import Data.Functor.Classes
 import Lens.Micro
 import Lens.Micro.TH
-import Core.Syntax                  hiding (Lit)
+import Core.Syntax                  hiding (Lit, Binding)
 import Core                         (HasRHS(..), HasLHS(..))
 ----------------------------------------------------------------------------------
 
@@ -46,13 +48,27 @@ data RlpModule p = RlpModule
     , _rlpmodProgram    :: RlpProgram p
     }
 
-newtype RlpProgram p = RlpProgram [Decl p]
+-- | dear god.
+type PhaseShow p =
+    ( Show (XRec p Pat), Show (XRec p RlpExpr)
+    , Show (XRec p Lit), Show (IdP p)
+    )
+
+newtype RlpProgram p = RlpProgram [Decl' p]
+
+deriving instance (PhaseShow p, Show (XRec p Decl)) => Show (RlpProgram p)
 
 data Decl p = FunD   (XFunD p)   (IdP p) [Pat' p] (RlpExpr' p) (Maybe (Where p))
             | TySigD (XTySigD p) [IdP p] Type
             | DataD  (XDataD p)  (IdP p) [IdP p] [ConAlt p]
             | InfixD (XInfixD p) Assoc Int (IdP p)
             | XDecl  !(XXDecl p)
+
+deriving instance ( Show (XFunD p), Show (XTySigD p)
+                  , Show (XDataD p), Show (XInfixD p)
+                  , Show (XXDecl p), Show (IdP p)
+                  , PhaseShow p
+                  ) => Show (Decl p)
 
 type family XFunD p
 type family XTySigD p
@@ -68,6 +84,9 @@ pattern FunD' n as e wh = FunD () n as e wh
 pattern InfixD' :: (XInfixD p ~ ()) => Assoc -> Int -> (IdP p) -> Decl p
 pattern InfixD' a p n = InfixD () a p n
 
+pattern DataD' :: (XDataD p ~ ()) => IdP p -> [IdP p] -> [ConAlt p] -> Decl p
+pattern DataD' n as ds = DataD () n as ds
+
 type Decl' p = XRec p Decl
 
 data Assoc = InfixL
@@ -77,7 +96,9 @@ data Assoc = InfixL
 
 data ConAlt p = ConAlt (IdP p) [Type]
 
-data RlpExpr p = LetE  (XLetE p)   [Bind p] (RlpExpr' p)
+deriving instance (Show (IdP p)) => Show (ConAlt p)
+
+data RlpExpr p = LetE  (XLetE p)   [Binding p] (RlpExpr' p)
                | VarE  (XVarE p)   (IdP p)
                | LamE  (XLamE p)   [Pat p] (RlpExpr' p)
                | CaseE (XCaseE p)  (RlpExpr' p) [(Alt p, Where p)]
@@ -87,6 +108,12 @@ data RlpExpr p = LetE  (XLetE p)   [Bind p] (RlpExpr' p)
                | ParE  (XParE p)   (RlpExpr' p)
                | OAppE (XOAppE p)  (IdP p) (RlpExpr' p) (RlpExpr' p)
                | XRlpExpr !(XXRlpExpr p)
+
+deriving instance
+    ( Show (XLetE p), Show (XVarE p), Show (XLamE p), Show (XCaseE p)
+    , Show (XIfE p), Show (XAppE p), Show (XLitE p), Show (XParE p)
+    , Show (XOAppE p), Show (XXRlpExpr p), PhaseShow p)
+    => Show (RlpExpr p)
 
 type RlpExpr' p = XRec p RlpExpr
 
@@ -121,23 +148,32 @@ pattern LitE' e = LitE () e
 pattern VarE' :: (XVarE p ~ ()) => IdP p -> RlpExpr p
 pattern VarE' e = VarE () e
 
-type Where p = [Bind p]
+type Where p = [Binding p]
 
 -- do we want guards?
 data Alt p = AltA (Pat' p) (RlpExpr' p)
 
-data Bind p = PatB (Pat' p) (RlpExpr' p)
-            | FunB (IdP p) [Pat' p] (RlpExpr' p)
+deriving instance (PhaseShow p) => Show (Alt p)
+
+data Binding p = PatB (Pat' p) (RlpExpr' p)
+               | FunB (IdP p) [Pat' p] (RlpExpr' p)
+
+deriving instance (Show (XRec p Pat), Show (XRec p RlpExpr), Show (IdP p)
+                  ) => Show (Binding p)
 
 data Pat p = VarP (IdP p)
            | LitP (Lit' p)
            | ConP (IdP p) [Pat' p]
+
+deriving instance (PhaseShow p) => Show (Pat p)
 
 type Pat' p = XRec p Pat
 
 data Lit p = IntL Int
            | CharL Char
            | ListL [RlpExpr' p]
+
+deriving instance (PhaseShow p) => Show (Lit p)
 
 type Lit' p = XRec p Lit
 

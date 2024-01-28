@@ -48,7 +48,7 @@ library
     build-tool-depends: happy:happy, alex:alex
 
     -- other-extensions:
-    build-depends:    base ^>=4.18.0.0
+    build-depends:    base >=4.17 && <4.20
                     -- required for happy
                     , array >= 0.5.5 && < 0.6
                     , containers >= 0.6.7 && < 0.7
@@ -85,7 +85,7 @@ executable rlpc
     main-is:          Main.hs
     -- other-modules:
     -- other-extensions:
-    build-depends: base ^>=4.18.0.0
+    build-depends: base >=4.17.0.0 && <4.20.0.0
                  , rlp
                  , optparse-applicative >= 0.18.1 && < 0.19
                  , microlens >= 0.4.13 && < 0.5

@@ -1,5 +1,5 @@
 {
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, ViewPatterns #-}
 module Rlp.Parse
     ( parseRlpProg
     )
@@ -86,7 +86,7 @@ Decl        :: { Decl' RlpcPs }
             | InfixDecl                 { $1 }
 
 InfixDecl   :: { Decl' RlpcPs }
-            : InfixWord litint InfixOp  {% mkInfixD $1 $2 $3 }
+            : InfixWord litint InfixOp  {% mkInfixD $1 (intOfToken $2) $3 }
 
 InfixWord   :: { Assoc }
             : infixl                    { InfixL }
@@ -94,11 +94,11 @@ InfixWord   :: { Assoc }
             | infix                     { Infix  }
 
 DataDecl    :: { Decl' RlpcPs }
-            : data Con TyParams '=' DataCons    { DataD $2 $3 $5 }
+            : data Con TyParams '=' DataCons    { $1 =>> \_ -> DataD' (extract $2) $3 $5 }
 
 TyParams    :: { [PsName] }
             : {- epsilon -}             { [] }
-            | TyParams varname          { $1 `snoc` $2 }
+            | TyParams varname          { $1 `snoc` extract (mkPsName $2) }
 
 DataCons    :: { [ConAlt RlpcPs] }
             : DataCons '|' DataCon      { $1 `snoc` $3 }
@@ -192,5 +192,8 @@ mkInfixD a p n = do
         )
     pos <- use (psInput . aiPos)
     pure $ Located (spanFromPos pos 0) (InfixD' a p n)
+
+intOfToken :: Located RlpToken -> Int
+intOfToken (Located _ (TokenLitInt n)) = n
 
 }
