@@ -38,6 +38,7 @@ import Data.Void
     litint          { Located _ (TokenLitInt _) }
     '='             { Located _ TokenEquals }
     '|'             { Located _ TokenPipe }
+    '::'            { Located _ TokenHasType }
     ';'             { Located _ TokenSemicolon }
     '('             { Located _ TokenLParen }
     ')'             { Located _ TokenRParen }
@@ -82,74 +83,75 @@ VS                  : ';'                   { $1 }
 
 Decl        :: { Decl' RlpcPs }
             : FunDecl                   { $1 }
+            | TySigDecl                 { $1 }
             | DataDecl                  { $1 }
             | InfixDecl                 { $1 }
 
-InfixDecl   :: { Decl' RlpcPs }
-            : InfixWord litint InfixOp  {% mkInfixD $1 (intOfToken $2) $3 }
+TySigDecl   :: { Decl' RlpcPs }
+            : Var '::' Type             { (\e -> TySigD [extract e]) <<~ $1 <~> $3 }
 
-InfixWord   :: { Assoc }
-            : infixl                    { InfixL }
-            | infixr                    { InfixR }
-            | infix                     { Infix  }
+InfixDecl   :: { Decl' RlpcPs }
+            : InfixWord litint InfixOp  { $1 =>> \w ->
+                                          InfixD (extract $1) (extractInt $ extract $2)
+                                          (extract $3) }
+
+InfixWord   :: { Located Assoc }
+            : infixl                    { $1 \$> InfixL }
+            | infixr                    { $1 \$> InfixR }
+            | infix                     { $1 \$> Infix  }
 
 DataDecl    :: { Decl' RlpcPs }
-            : data Con TyParams '=' DataCons    { $1 =>> \_ -> DataD' (extract $2) $3 $5 }
+            : data Con TyParams '=' DataCons    { $1 \$> DataD (extract $2) $3 $5 }
 
 TyParams    :: { [PsName] }
             : {- epsilon -}             { [] }
-            | TyParams varname          { $1 `snoc` extract (mkPsName $2) }
+            | TyParams varname          { $1 `snoc` (extractName . extract $ $2) }
 
 DataCons    :: { [ConAlt RlpcPs] }
             : DataCons '|' DataCon      { $1 `snoc` $3 }
             | DataCon                   { [$1] }
 
 DataCon     :: { ConAlt RlpcPs }
-            : Con Type1s                { undefined }
+            : Con Type1s                { ConAlt (extract $1) $2 }
 
-Type1s      :: { [RlpType RlpcPs] }
+Type1s      :: { [RlpType' RlpcPs] }
             : {- epsilon -}             { [] }
             | Type1s Type1              { $1 `snoc` $2 }
 
 Type1       :: { RlpType' RlpcPs }
             : '(' Type ')'              { $2 }
-            | conname                   { undefined }
-            | varname                   { undefined }
+            | conname                   { fmap ConT (mkPsName $1) }
+            | varname                   { fmap VarT (mkPsName $1) }
 
 Type        :: { RlpType' RlpcPs }
-            : Type '->' Type            { undefined }
+            : Type '->' Type            { FunT <<~ $1 <~> $3 }
             | Type1                     { $1 }
 
 FunDecl     :: { Decl' RlpcPs }
 FunDecl     : Var Params '=' Expr       { $4 =>> \e ->
-                                          FunD' (extract $1) $2 e Nothing }
+                                          FunD (extract $1) $2 e Nothing }
 
 Params      :: { [Pat' RlpcPs] }
 Params      : {- epsilon -}             { [] }
             | Params Pat1               { $1 `snoc` $2 }
 
 Pat1        :: { Pat' RlpcPs }
-            : Var                       { undefined }
+            : Var                       { fmap VarP $1 }
             | Lit                       { LitP <<= $1 }
 
 Expr        :: { RlpExpr' RlpcPs }
-            : Expr1 varsym Expr         { undefined }
+            : Expr1 InfixOp Expr        { $2 =>> \o ->
+                                          OAppE (extract o) $1 $3 }
             | Expr1                     { $1 }
 
 Expr1       :: { RlpExpr' RlpcPs }
             : '(' Expr ')'              { $1 .> $2 <. $3 }
-            | Lit                       { fmap LitE' $1 }
-            | Var                       { fmap VarE' $1 }
-
--- TODO: happy prefers left-associativity. doing such would require adjusting
--- the code in Rlp.Parse.Associate to expect left-associative input rather than
--- right.
-InfixExpr   :: { RlpExpr' RlpcPs }
-            : Expr1 varsym Expr         { undefined }
+            | Lit                       { fmap LitE $1 }
+            | Var                       { fmap VarE $1 }
 
 InfixOp     :: { Located PsName }
-            : consym                    { undefined }
-            | varsym                    { undefined }
+            : consym                    { mkPsName $1 }
+            | varsym                    { mkPsName $1 }
 
 -- TODO: microlens-pro save me microlens-pro (rewrite this with prisms)
 Lit         :: { Lit' RlpcPs }
@@ -164,12 +166,19 @@ Con         :: { Located PsName }
 {
 
 mkPsName :: Located RlpToken -> Located PsName
-mkPsName = fmap $ \case
+mkPsName = fmap extractName
+
+extractName :: RlpToken -> PsName
+extractName = \case
     TokenVarName n -> n
     TokenConName n -> n
     TokenConSym  n -> n
     TokenVarSym  n -> n
     _              -> error "mkPsName: not an identifier"
+
+extractInt :: RlpToken -> Int
+extractInt (TokenLitInt n) = n
+extractInt _ = error "extractInt: ugh"
 
 mkProgram :: [Decl' RlpcPs] -> P (RlpProgram RlpcPs)
 mkProgram ds = do
@@ -191,7 +200,7 @@ mkInfixD a p n = do
         Nothing -> pure (Just (a,p))
         )
     pos <- use (psInput . aiPos)
-    pure $ Located (spanFromPos pos 0) (InfixD' a p n)
+    pure $ Located (spanFromPos pos 0) (InfixD a p n)
 
 intOfToken :: Located RlpToken -> Int
 intOfToken (Located _ (TokenLitInt n)) = n

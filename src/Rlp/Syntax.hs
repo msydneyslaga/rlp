@@ -15,21 +15,8 @@ module Rlp.Syntax
     , RlpType(..), RlpType'
     , ConAlt(..)
 
-    -- * Pattern synonyms for unused extensions
-    -- ** Decl
-    , pattern InfixD', pattern FunD', pattern DataD'
-    -- ** RlpExpr
-    , pattern ParE', pattern VarE', pattern LitE'
-    -- ** RlpType
-    , pattern FunT', pattern AppT'
-
     -- * Trees That Grow extensions
     , UnXRec(..), MapXRec(..), XRec, IdP
-    -- ** RlpExpr
-    , XLetE, XVarE, XConE, XLamE, XCaseE, XIfE, XAppE, XLitE, XParE, XOAppE
-    , XXRlpExpr
-    -- ** Decl
-    , XFunD, XTySigD, XDataD, XInfixD, XXDecl
     )
     where
 ----------------------------------------------------------------------------------
@@ -38,9 +25,10 @@ import Data.Text                    qualified as T
 import Data.String                  (IsString(..))
 import Data.Functor.Foldable.TH     (makeBaseFunctor)
 import Data.Functor.Classes
+import Data.Kind                    (Type)
 import Lens.Micro
 import Lens.Micro.TH
-import Core.Syntax                  hiding (Lit, Binding)
+import Core.Syntax                  hiding (Lit, Type, Binding)
 import Core                         (HasRHS(..), HasLHS(..))
 ----------------------------------------------------------------------------------
 
@@ -60,56 +48,23 @@ newtype RlpProgram p = RlpProgram [Decl' p]
 
 deriving instance (PhaseShow p, Show (XRec p Decl)) => Show (RlpProgram p)
 
-data RlpType p = FunT (XFunT p)
-               | AppT (XAppT p) (RlpType' p) (RlpType' p)
-               | VarT (XVarT p) (IdP p)
-               | ConT (XConT p) (IdP p)
+data RlpType p = FunConT
+               | FunT (RlpType' p) (RlpType' p)
+               | AppT (RlpType' p) (RlpType' p)
+               | VarT (IdP p)
+               | ConT (IdP p)
 
 type RlpType' p = XRec p RlpType
 
-deriving instance (PhaseShow p, Show (XFunT p), Show (XAppT p), Show (XVarT p)
-                  ,Show (XConT p))
+deriving instance (PhaseShow p)
                   => Show (RlpType p)
 
-type family XFunT p
-type family XAppT p
-type family XVarT p
-type family XConT p
+data Decl p = FunD   (IdP p) [Pat' p] (RlpExpr' p) (Maybe (Where p))
+            | TySigD [IdP p] (RlpType' p)
+            | DataD  (IdP p) [IdP p] [ConAlt p]
+            | InfixD Assoc Int (IdP p)
 
-pattern FunT' :: (XFunT p ~ ()) => RlpType p
-pattern FunT' = FunT ()
-
-pattern AppT' :: (XAppT p ~ ()) => RlpType' p -> RlpType' p -> RlpType p
-pattern AppT' s t = AppT () s t
-
-data Decl p = FunD   (XFunD p)   (IdP p) [Pat' p] (RlpExpr' p) (Maybe (Where p))
-            | TySigD (XTySigD p) [IdP p] (RlpType' p)
-            | DataD  (XDataD p)  (IdP p) [IdP p] [ConAlt p]
-            | InfixD (XInfixD p) Assoc Int (IdP p)
-            | XDecl  !(XXDecl p)
-
-deriving instance ( Show (XFunD p), Show (XTySigD p)
-                  , Show (XDataD p), Show (XInfixD p)
-                  , Show (XXDecl p), Show (IdP p)
-                  , PhaseShow p
-                  ) => Show (Decl p)
-
-type family XFunD p
-type family XTySigD p
-type family XDataD p
-type family XInfixD p
-type family XXDecl p
-
-pattern FunD' :: (XFunD p ~ ())
-              => IdP p -> [Pat' p] -> RlpExpr' p -> (Maybe (Where p))
-              -> Decl p
-pattern FunD' n as e wh = FunD () n as e wh
-
-pattern InfixD' :: (XInfixD p ~ ()) => Assoc -> Int -> (IdP p) -> Decl p
-pattern InfixD' a p n = InfixD () a p n
-
-pattern DataD' :: (XDataD p ~ ()) => IdP p -> [IdP p] -> [ConAlt p] -> Decl p
-pattern DataD' n as ds = DataD () n as ds
+deriving instance (Show (IdP p), PhaseShow p) => Show (Decl p)
 
 type Decl' p = XRec p Decl
 
@@ -122,22 +77,17 @@ data ConAlt p = ConAlt (IdP p) [RlpType' p]
 
 deriving instance (Show (IdP p), Show (XRec p RlpType)) => Show (ConAlt p)
 
-data RlpExpr p = LetE  (XLetE p)   [Binding p] (RlpExpr' p)
-               | VarE  (XVarE p)   (IdP p)
-               | LamE  (XLamE p)   [Pat p] (RlpExpr' p)
-               | CaseE (XCaseE p)  (RlpExpr' p) [(Alt p, Where p)]
-               | IfE   (XIfE p)    (RlpExpr' p) (RlpExpr' p) (RlpExpr' p)
-               | AppE  (XAppE p)   (RlpExpr' p) (RlpExpr' p)
-               | LitE  (XLitE p)   (Lit p)
-               | ParE  (XParE p)   (RlpExpr' p)
-               | OAppE (XOAppE p)  (IdP p) (RlpExpr' p) (RlpExpr' p)
-               | XRlpExpr !(XXRlpExpr p)
+data RlpExpr p = LetE  [Binding p] (RlpExpr' p)
+               | VarE  (IdP p)
+               | LamE  [Pat p] (RlpExpr' p)
+               | CaseE (RlpExpr' p) [(Alt p, Where p)]
+               | IfE   (RlpExpr' p) (RlpExpr' p) (RlpExpr' p)
+               | AppE  (RlpExpr' p) (RlpExpr' p)
+               | LitE  (Lit p)
+               | ParE  (RlpExpr' p)
+               | OAppE (IdP p) (RlpExpr' p) (RlpExpr' p)
 
-deriving instance
-    ( Show (XLetE p), Show (XVarE p), Show (XLamE p), Show (XCaseE p)
-    , Show (XIfE p), Show (XAppE p), Show (XLitE p), Show (XParE p)
-    , Show (XOAppE p), Show (XXRlpExpr p), PhaseShow p)
-    => Show (RlpExpr p)
+deriving instance (PhaseShow p) => Show (RlpExpr p)
 
 type RlpExpr' p = XRec p RlpExpr
 
@@ -145,32 +95,11 @@ class UnXRec p where
     unXRec :: XRec p f -> f p
 
 class MapXRec p where
-    mapXRec :: (f p -> f p) -> XRec p f -> XRec p f
+    mapXRec :: (f p -> f' p') -> XRec p f -> XRec p' f'
 
-type family XRec p (f :: * -> *) = (r :: *) | r -> p f
-
-type family XLetE p
-type family XVarE p
-type family XConE p
-type family XLamE p
-type family XCaseE p
-type family XIfE p
-type family XAppE p
-type family XLitE p
-type family XParE p
-type family XOAppE p
-type family XXRlpExpr p
+type family XRec p (f :: Type -> Type) = (r :: Type) | r -> p f
 
 type family IdP p
-
-pattern ParE' :: (XParE p ~ ()) => RlpExpr' p -> RlpExpr p
-pattern ParE' e = ParE () e
-
-pattern LitE' :: (XLitE p ~ ()) => Lit p -> RlpExpr p
-pattern LitE' e = LitE () e
-
-pattern VarE' :: (XVarE p ~ ()) => IdP p -> RlpExpr p
-pattern VarE' e = VarE () e
 
 type Where p = [Binding p]
 

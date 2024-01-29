@@ -57,7 +57,7 @@ $asciisym       = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~\:]
     |infixr|infixl|infix
 
 @reservedop =
-    "=" | \\ | "->" | "|"
+    "=" | \\ | "->" | "|" | "::"
 
 rlp :-
     
@@ -187,8 +187,8 @@ pushLexState :: Int -> P ()
 pushLexState n = psLexState %= (n:)
 
 readInt :: Text -> Int
-readInt = T.foldr f 0 where
-    f c n = digitToInt c + 10*n
+readInt = T.foldl f 0 where
+    f n c = 10*n + digitToInt c
 
 constToken :: RlpToken -> LexerAction (Located RlpToken)
 constToken t inp l = do

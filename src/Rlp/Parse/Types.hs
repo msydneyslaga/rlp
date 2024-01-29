@@ -54,24 +54,6 @@ data RlpcPs
 type instance XRec RlpcPs f = Located (f RlpcPs)
 type instance IdP RlpcPs = PsName
 
-type instance XInfixD RlpcPs = ()
-type instance XFunD RlpcPs = ()
-type instance XDataD RlpcPs = ()
-type instance XTySigD RlpcPs = ()
-type instance XXDecl RlpcPs = ()
-
-type instance XLetE RlpcPs = ()
-type instance XVarE RlpcPs = ()
-type instance XLamE RlpcPs = ()
-type instance XCaseE RlpcPs = ()
-type instance XIfE RlpcPs = ()
-type instance XAppE RlpcPs = ()
-type instance XLitE RlpcPs = ()
-type instance XParE RlpcPs = ()
-type instance XOAppE RlpcPs = ()
-type instance XXRlpExpr RlpcPs = ()
-type instance XLitE RlpcPs = ()
-
 type PsName = Text
 
 --------------------------------------------------------------------------------
