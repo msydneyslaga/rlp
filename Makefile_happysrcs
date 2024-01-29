@@ -1,5 +1,5 @@
 HAPPY = happy
-HAPPY_OPTS = -a -g -c
+HAPPY_OPTS = -a -g -c -i/tmp/t.info
 ALEX = alex
 ALEX_OPTS = -g
 

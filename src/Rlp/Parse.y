@@ -160,8 +160,7 @@ LetExpr     :: { RlpExpr' RlpcPs }
 layout1(p)  : '{' layout_list1(';',p) '}'   { $2 }
             | VL  layout_list1(VS,p) VR     { $2 }
 
-layout_list1(sep,p) : p sep                      { [$1] }
-                    | p                          { [$1] }
+layout_list1(sep,p) : p                          { [$1] }
                     | layout_list1(sep,p) sep p  { $1 `snoc` $3 }
 
 Binding     :: { Binding' RlpcPs }
