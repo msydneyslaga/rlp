@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase, ViewPatterns #-}
 module Rlp.Parse
     ( parseRlpProg
+    , parseRlpExpr
     )
     where
 import Compiler.RlpcError
@@ -23,6 +24,7 @@ import Data.Void
 }
 
 %name parseRlpProg StandaloneProgram
+%name parseRlpExpr StandaloneExpr
 
 %monad { P }
 %lexer { lexCont } { Located _ TokenEOF }
@@ -51,14 +53,21 @@ import Data.Void
     infixl          { Located _ TokenInfixL }
     infixr          { Located _ TokenInfixR }
     infix           { Located _ TokenInfix }
+    let             { Located _ TokenLet }
+    in              { Located _ TokenIn }
 
+%nonassoc '='
 %right '->'
+%right in
 
 %%
 
 StandaloneProgram   :: { RlpProgram RlpcPs }
 StandaloneProgram   : '{' Decls  '}'        {% mkProgram $2 }
                     | VL  DeclsV VR         {% mkProgram $2 }
+
+StandaloneExpr      :: { RlpExpr RlpcPs }
+                    : VL Expr VR            { extract $2 }
 
 VL  :: { () }
 VL  : vlbrace       { () }
@@ -143,6 +152,20 @@ Expr        :: { RlpExpr' RlpcPs }
             : Expr1 InfixOp Expr        { $2 =>> \o ->
                                           OAppE (extract o) $1 $3 }
             | Expr1                     { $1 }
+            | LetExpr                   { $1 }
+
+LetExpr     :: { RlpExpr' RlpcPs }
+            : let layout1(Binding) in Expr { $1 \$> LetE $2 $4 }
+
+layout1(p)  : '{' layout_list1(';',p) '}'   { $2 }
+            | VL  layout_list1(VS,p) VR     { $2 }
+
+layout_list1(sep,p) : p sep                      { [$1] }
+                    | p                          { [$1] }
+                    | layout_list1(sep,p) sep p  { $1 `snoc` $3 }
+
+Binding     :: { Binding' RlpcPs }
+            : Pat1 '=' Expr              { PatB <<~ $1 <~> $3 }
 
 Expr1       :: { RlpExpr' RlpcPs }
             : '(' Expr ')'              { $1 .> $2 <. $3 }

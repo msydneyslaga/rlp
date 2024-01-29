@@ -14,6 +14,7 @@ module Rlp.Syntax
     , Lit(..), Lit'
     , RlpType(..), RlpType'
     , ConAlt(..)
+    , Binding(..), Binding'
 
     -- * Trees That Grow extensions
     , UnXRec(..), MapXRec(..), XRec, IdP
@@ -28,7 +29,7 @@ import Data.Functor.Classes
 import Data.Kind                    (Type)
 import Lens.Micro
 import Lens.Micro.TH
-import Core.Syntax                  hiding (Lit, Type, Binding)
+import Core.Syntax                  hiding (Lit, Type, Binding, Binding')
 import Core                         (HasRHS(..), HasLHS(..))
 ----------------------------------------------------------------------------------
 
@@ -42,6 +43,7 @@ type PhaseShow p =
     ( Show (XRec p Pat), Show (XRec p RlpExpr)
     , Show (XRec p Lit), Show (IdP p)
     , Show (XRec p RlpType)
+    , Show (XRec p Binding)
     )
 
 newtype RlpProgram p = RlpProgram [Decl' p]
@@ -77,7 +79,7 @@ data ConAlt p = ConAlt (IdP p) [RlpType' p]
 
 deriving instance (Show (IdP p), Show (XRec p RlpType)) => Show (ConAlt p)
 
-data RlpExpr p = LetE  [Binding p] (RlpExpr' p)
+data RlpExpr p = LetE  [Binding' p] (RlpExpr' p)
                | VarE  (IdP p)
                | LamE  [Pat p] (RlpExpr' p)
                | CaseE (RlpExpr' p) [(Alt p, Where p)]
@@ -110,6 +112,8 @@ deriving instance (PhaseShow p) => Show (Alt p)
 
 data Binding p = PatB (Pat' p) (RlpExpr' p)
                | FunB (IdP p) [Pat' p] (RlpExpr' p)
+
+type Binding' p = XRec p Binding
 
 deriving instance (Show (XRec p Pat), Show (XRec p RlpExpr), Show (IdP p)
                   ) => Show (Binding p)

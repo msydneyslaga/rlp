@@ -10,6 +10,7 @@ module Rlp.Lex
     , lexStream
     , lexDebug
     , lexCont
+    , popLexState
     )
     where
 import Codec.Binary.UTF8.String (encodeChar)
@@ -73,6 +74,17 @@ $white_no_nl+       ;
 -- for the definition of `doBol`
 <0> \n                  { beginPush bol }
 
+<layout>
+{
+    
+}
+
+-- layout keywords
+<0>
+{
+    "let"               { constToken TokenLet `thenBeginPush` layout_let }
+}
+
 -- scan various identifiers and reserved words. order is important here!
 <0>
 {
@@ -110,6 +122,14 @@ $white_no_nl+       ;
     ()                  { doBol }
 }
 
+<layout_let>
+{
+    \n                  { beginPush bol }
+    "{"                 { explicitLBrace }
+    "in"                { constToken TokenIn `thenDo` (popLexState *> popLayout) }
+    ()                  { doLayout }
+}
+
 <layout_top>
 {
     \n                  ;
@@ -142,6 +162,12 @@ thenBegin :: LexerAction a -> Int -> LexerAction a
 thenBegin act c inp l = do
     a <- act inp l
     psLexState . _head .= c
+    pure a
+
+thenBeginPush :: LexerAction a -> Int -> LexerAction a
+thenBeginPush act c inp l = do
+    a <- act inp l
+    pushLexState c
     pure a
 
 andBegin :: LexerAction a -> Int -> LexerAction a
@@ -342,6 +368,7 @@ explicitRBrace inp l = do
 doLayout :: LexerAction (Located RlpToken)
 doLayout _ _ = do
     i <- indentLevel
+    traceM $ "doLayout: i: " <> show i
     pushLayout (Implicit i)
     popLexState
     insertLBrace
