@@ -107,17 +107,17 @@ DataCons    :: { [ConAlt RlpcPs] }
 DataCon     :: { ConAlt RlpcPs }
             : Con Type1s                { undefined }
 
-Type1s      :: { [Type] }
+Type1s      :: { [RlpType RlpcPs] }
             : {- epsilon -}             { [] }
             | Type1s Type1              { $1 `snoc` $2 }
 
-Type1       :: { Type }
-            : '(' Type ')'              { undefined }
+Type1       :: { RlpType' RlpcPs }
+            : '(' Type ')'              { $2 }
             | conname                   { undefined }
             | varname                   { undefined }
 
-Type        :: { Type }
-            : Type '->' Type            { $1 :-> $3 }
+Type        :: { RlpType' RlpcPs }
+            : Type '->' Type            { undefined }
             | Type1                     { $1 }
 
 FunDecl     :: { Decl' RlpcPs }
@@ -147,7 +147,7 @@ Expr1       :: { RlpExpr' RlpcPs }
 InfixExpr   :: { RlpExpr' RlpcPs }
             : Expr1 varsym Expr         { undefined }
 
-InfixOp     :: { PsName }
+InfixOp     :: { Located PsName }
             : consym                    { undefined }
             | varsym                    { undefined }
 

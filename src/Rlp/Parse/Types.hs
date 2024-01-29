@@ -17,6 +17,8 @@ module Rlp.Parse.Types
     -- ** Lenses
     , aiPrevChar, aiSource, aiBytes, aiPos, posLine, posColumn
 
+    , (<<~), (<~>)
+
     -- * Error handling
     , MsgEnvelope(..), RlpcError(..), RlpParseError(..)
     , addFatal, addWound, addFatalHere, addWoundHere

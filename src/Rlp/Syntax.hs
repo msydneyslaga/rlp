@@ -12,8 +12,7 @@ module Rlp.Syntax
     , Pat(..), Pat'
     , Assoc(..)
     , Lit(..), Lit'
-    , Type(..)
-    , pattern (:->)
+    , RlpType(..), RlpType'
     , ConAlt(..)
 
     -- * Pattern synonyms for unused extensions
@@ -21,6 +20,8 @@ module Rlp.Syntax
     , pattern InfixD', pattern FunD', pattern DataD'
     -- ** RlpExpr
     , pattern ParE', pattern VarE', pattern LitE'
+    -- ** RlpType
+    , pattern FunT', pattern AppT'
 
     -- * Trees That Grow extensions
     , UnXRec(..), MapXRec(..), XRec, IdP
@@ -52,14 +53,37 @@ data RlpModule p = RlpModule
 type PhaseShow p =
     ( Show (XRec p Pat), Show (XRec p RlpExpr)
     , Show (XRec p Lit), Show (IdP p)
+    , Show (XRec p RlpType)
     )
 
 newtype RlpProgram p = RlpProgram [Decl' p]
 
 deriving instance (PhaseShow p, Show (XRec p Decl)) => Show (RlpProgram p)
 
+data RlpType p = FunT (XFunT p)
+               | AppT (XAppT p) (RlpType' p) (RlpType' p)
+               | VarT (XVarT p) (IdP p)
+               | ConT (XConT p) (IdP p)
+
+type RlpType' p = XRec p RlpType
+
+deriving instance (PhaseShow p, Show (XFunT p), Show (XAppT p), Show (XVarT p)
+                  ,Show (XConT p))
+                  => Show (RlpType p)
+
+type family XFunT p
+type family XAppT p
+type family XVarT p
+type family XConT p
+
+pattern FunT' :: (XFunT p ~ ()) => RlpType p
+pattern FunT' = FunT ()
+
+pattern AppT' :: (XAppT p ~ ()) => RlpType' p -> RlpType' p -> RlpType p
+pattern AppT' s t = AppT () s t
+
 data Decl p = FunD   (XFunD p)   (IdP p) [Pat' p] (RlpExpr' p) (Maybe (Where p))
-            | TySigD (XTySigD p) [IdP p] Type
+            | TySigD (XTySigD p) [IdP p] (RlpType' p)
             | DataD  (XDataD p)  (IdP p) [IdP p] [ConAlt p]
             | InfixD (XInfixD p) Assoc Int (IdP p)
             | XDecl  !(XXDecl p)
@@ -94,9 +118,9 @@ data Assoc = InfixL
            | Infix
            deriving (Show)
 
-data ConAlt p = ConAlt (IdP p) [Type]
+data ConAlt p = ConAlt (IdP p) [RlpType' p]
 
-deriving instance (Show (IdP p)) => Show (ConAlt p)
+deriving instance (Show (IdP p), Show (XRec p RlpType)) => Show (ConAlt p)
 
 data RlpExpr p = LetE  (XLetE p)   [Binding p] (RlpExpr' p)
                | VarE  (XVarE p)   (IdP p)
