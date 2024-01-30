@@ -29,7 +29,6 @@ import Core.Syntax                  (Name)
 import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Errorful
-import Control.Comonad
 import Compiler.RlpcError
 import Data.Text                    (Text)
 import Data.Maybe
@@ -37,14 +36,13 @@ import Data.Fix
 import Data.Functor.Foldable
 import Data.Functor.Const
 import Data.Functor.Classes
-import Data.Functor.Apply
-import Data.Functor.Bind
 import Data.HashMap.Strict          qualified as H
 import Data.Void
 import Data.Word                    (Word8)
 import Lens.Micro.TH
 import Lens.Micro
 import Rlp.Syntax
+import Compiler.Types
 --------------------------------------------------------------------------------
 
 -- | Phantom type identifying rlpc's parser phase
@@ -73,6 +71,11 @@ type instance XOAppE RlpcPs = ()
 type PsName = Text
 
 --------------------------------------------------------------------------------
+
+spanFromPos :: Position -> Int -> SrcSpan
+spanFromPos (l,c,a) s = SrcSpan l c a s
+
+{-# INLINE spanFromPos #-}
 
 type LexerAction a = AlexInput -> Int -> P a
 
@@ -176,71 +179,6 @@ data ParseState = ParseState
 data Layout = Explicit
             | Implicit Int
             deriving (Show, Eq)
-
--- | Token wrapped with a span (line, column, absolute, length)
-data Located a = Located !(Int, Int, Int, Int) a
-    deriving (Show, Functor)
-
-instance Apply Located where
-    liftF2 f (Located (la,ca,aa,sa) p) (Located (lb,cb,ab,sb) q)
-            = Located (l,c,a,s) (p `f` q)
-        where
-            l = min la lb
-            c = min ca cb
-            a = min aa ab
-            s = case aa `compare` ab of
-                EQ -> max sa sb
-                LT -> max sa (ab + sb)
-                GT -> max sb (aa + sa)
-
-instance Bind Located where
-    Located sa a >>- k = Located (sa `spanAcross` sb) b
-        where
-            Located sb b = k a
-
-spanAcross :: (Int, Int, Int, Int)
-           -> (Int, Int, Int, Int)
-           -> (Int, Int, Int, Int)
-spanAcross (la,ca,aa,sa) (lb,cb,ab,sb) = (l,c,a,s)
-        where
-            l = min la lb
-            c = min ca cb
-            a = min aa ab
-            s = case aa `compare` ab of
-                EQ -> max sa sb
-                LT -> max sa (ab + sb)
-                GT -> max sb (aa + sa)
-
--- | A synonym for '(<<=)' with a different precedence for use with '(<~>)' in a
--- sort of, comonadic pseudo-applicative style.
-
-(<<~) :: (Comonad w) => (w a -> b) -> w a -> w b
-(<<~) = (<<=)
-
-infixl 4 <<~
-
--- | Similar to '(<*>)', but with a cokleisli arrow.
-
-(<~>) :: (Comonad w, Bind w) => w (w a -> b) -> w a -> w b
-mc <~> ma = mc >>- \f -> ma =>> f
-
-infixl 4 <~>
-
--- f :: (w a -> w b -> c)
--- a :: w a
--- b :: w b
-
--- result :: w c
--- result = f >~~ a <~> b
-
-instance Comonad Located where
-    extract (Located _ a) = a
-    extend ck w@(Located p _) = Located p (ck w)
-
-spanFromPos :: Position -> Int -> (Int, Int, Int, Int)
-spanFromPos (l,c,a) s = (l,c,a,s)
-
-{-# INLINE spanFromPos #-}
 
 type OpTable = H.HashMap Name OpInfo
 type OpInfo = (Assoc, Int)

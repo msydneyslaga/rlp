@@ -22,7 +22,8 @@ import Data.Text            qualified as T
 import Data.String          (IsString(..))
 import Core.Syntax
 import Compiler.RLPC
-import Compiler.RlpcError
+-- TODO: unify Located definitions
+import Compiler.RlpcError   hiding (Located(..))
 import Lens.Micro
 import Lens.Micro.TH
 }

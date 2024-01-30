@@ -5,12 +5,14 @@ module Compiler.RlpcError
     , MsgEnvelope(..)
     , Severity(..)
     , RlpcError(..)
-    , SrcSpan(..)
     , msgSpan
     , msgDiagnostic
     , msgSeverity
     , liftRlpcErrors
     , errorMsg
+    -- * Located Comonad
+    , Located(..)
+    , SrcSpan(..)
     )
     where
 ----------------------------------------------------------------------------------
@@ -20,6 +22,7 @@ import Data.Text                qualified as T
 import GHC.Exts                 (IsString(..))
 import Lens.Micro.Platform
 import Lens.Micro.Platform.Internal
+import Compiler.Types
 ----------------------------------------------------------------------------------
 
 data MsgEnvelope e = MsgEnvelope
@@ -44,13 +47,6 @@ instance IsRlpcError RlpcError where
 data Severity = SevWarning
               | SevError
               deriving Show
-
-data SrcSpan = SrcSpan
-    !Int -- ^ Line
-    !Int -- ^ Column
-    !Int -- ^ Absolute
-    !Int -- ^ Length
-    deriving Show
 
 makeLenses ''MsgEnvelope
 
