@@ -55,10 +55,21 @@ options = RLPCOptions
                 \triggering the garbage collector"
         <> value 50
         )
+    <*> option languageReader
+        (  long "language"
+        )
     <*> some (argument str $ metavar "FILES...")
     where
         infixr 9 #
         f # x = f x
+
+languageReader :: ReadM Language
+languageReader = maybeReader $ \case
+    "rlp"   -> Just LanguageRlp
+    "core"  -> Just LanguageCore
+
+debugFlagReader :: ReadM DebugFlag
+debugFlagReader = maybeReader $ Just
 
 evaluatorReader :: ReadM Evaluator
 evaluatorReader = maybeReader $ \case
@@ -69,80 +80,66 @@ evaluatorReader = maybeReader $ \case
 mmany :: (Alternative f, Monoid m) => f m -> f m
 mmany v = liftA2 (<>) v (mmany v)
 
-debugFlagReader :: ReadM DebugFlag
-debugFlagReader = maybeReader $ \case
-    "dump-eval"  -> Just DDumpEval
-    "dump-opts"  -> Just DDumpOpts
-    "dump-ast"   -> Just DDumpAST
-    _            -> Nothing
-
 ----------------------------------------------------------------------------------
-
--- temp
-data CompilerError = CompilerError String
-    deriving Show
-
-instance Exception CompilerError
 
 main :: IO ()
 main = do
     opts <- execParser optParser
-    (_, es) <- evalRLPCIO opts driver
-    forM_ es $ \ (CompilerError e) -> print $ "warning: " <> e
-    pure ()
+    void $ evalRLPCIO opts driver
 
-driver :: RLPCIO CompilerError ()
+driver :: RLPCIO ()
 driver = sequence_
     [ dshowFlags
     , ddumpAST
     , ddumpEval
     ]
 
-dshowFlags :: RLPCIO CompilerError ()
-dshowFlags = whenFlag flagDDumpOpts do
+dshowFlags :: RLPCIO ()
+dshowFlags = whenDFlag "dump-flags" do
     ask >>= liftIO . print
 
-ddumpAST :: RLPCIO CompilerError ()
-ddumpAST = whenFlag flagDDumpAST $ forFiles_ \o f -> do
+ddumpAST :: RLPCIO ()
+ddumpAST = whenDFlag "dump-ast" $ forFiles_ \o f -> do
     liftIO $ withFile f ReadMode $ \h -> do
         s <- TIO.hGetContents h
         case parseProg o s of
             Right (a,_) -> hPutStrLn stderr $ show a
             Left e -> error "todo errors lol"
 
-ddumpEval :: RLPCIO CompilerError ()
-ddumpEval = whenFlag flagDDumpEval do
+ddumpEval :: RLPCIO ()
+ddumpEval = whenDFlag "dump-eval" do
     fs <- view rlpcInputFiles
     forM_ fs $ \f -> liftIO (TIO.readFile f) >>= doProg
 
     where
-        doProg :: Text -> RLPCIO CompilerError ()
-        doProg s = ask >>= \o -> case parseProg o s of
-            -- TODO: error handling
-            Left e -> addFatal . CompilerError $ show e
-            Right (a,_) -> do
-                log <- view rlpcLogFile
-                dumpEval <- chooseEval
-                case log of
-                    Just f  -> liftIO $ withFile f WriteMode $ dumpEval a
-                    Nothing -> liftIO $ dumpEval a stderr
+        doProg :: Text -> RLPCIO ()
+        doProg = undefined
+        -- doProg s = ask >>= \o -> case parseProg o s of
+        --     -- TODO: error handling
+        --     Left e -> addFatal . CompilerError $ show e
+        --     Right (a,_) -> do
+        --         log <- view rlpcLogFile
+        --         dumpEval <- chooseEval
+        --         case log of
+        --             Just f  -> liftIO $ withFile f WriteMode $ dumpEval a
+        --             Nothing -> liftIO $ dumpEval a stderr
 
         -- choose the appropriate model based on the compiler opts
-        chooseEval = do
-            ev <- view rlpcEvaluator
-            pure $ case ev of
-                EvaluatorGM  -> v GM.hdbgProg
-                EvaluatorTI -> v TI.hdbgProg
-            where v f p h = f p h *> pure ()
+        -- chooseEval = do
+        --     ev <- view rlpcEvaluator
+        --     pure $ case ev of
+        --         EvaluatorGM  -> v GM.hdbgProg
+        --         EvaluatorTI -> v TI.hdbgProg
+        --     where v f p h = f p h *> pure ()
 
 parseProg :: RLPCOptions
           -> Text
-          -> Either SrcError (Program', [SrcError])
+          -> (Maybe Program', [MsgEnvelope RlpcError])
 parseProg o = evalRLPC o . (lexCore >=> parseCoreProg)
 
 forFiles_ :: (Monad m)
-          => (RLPCOptions -> FilePath -> RLPCT e m a)
-          -> RLPCT e m ()
+          => (RLPCOptions -> FilePath -> RLPCT m a)
+          -> RLPCT m ()
 forFiles_ k = do
     fs <- view rlpcInputFiles
     o <- ask

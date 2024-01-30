@@ -23,6 +23,7 @@ module Compiler.RLPC
     , addWound
     , MonadErrorful
     , Severity(..)
+    , Language(..)
     , Evaluator(..)
     , evalRLPCT
     , evalRLPCIO
@@ -45,6 +46,7 @@ import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.State      (MonadState(state))
 import Control.Monad.Errorful
+import Control.Monad.IO.Class
 import Compiler.RlpcError
 import Compiler.Types
 import Data.Functor.Identity
@@ -72,6 +74,8 @@ newtype RLPCT m a = RLPCT {
 type RLPC = RLPCT Identity
 
 type RLPCIO = RLPCT IO
+
+instance (MonadIO m) => MonadIO (RLPCT m) where
 
 evalRLPC :: RLPCOptions
          -> RLPC a
@@ -134,11 +138,15 @@ data RLPCOptions = RLPCOptions
     , _rlpcFFlags      :: HashSet CompilerFlag
     , _rlpcEvaluator   :: Evaluator
     , _rlpcHeapTrigger :: Int
+    , _rlpcLanguage    :: Language
     , _rlpcInputFiles  :: [FilePath]
     }
     deriving Show
 
 data Evaluator = EvaluatorGM | EvaluatorTI
+    deriving Show
+
+data Language = LanguageRlp | LanguageCore
     deriving Show
 
 ----------------------------------------------------------------------------------
@@ -151,6 +159,7 @@ instance Default RLPCOptions where
         , _rlpcEvaluator = EvaluatorGM
         , _rlpcHeapTrigger = 200
         , _rlpcInputFiles = []
+        , _rlpcLanguage = LanguageRlp
         }
 
 -- debug flags are passed with -dFLAG
