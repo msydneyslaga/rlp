@@ -23,13 +23,14 @@ module Rlp.Syntax
     , XFunD, XTySigD, XInfixD, XDataD, XXDeclD
     -- *** RlpExpr
     , XLetE, XVarE, XLamE, XCaseE, XIfE, XAppE, XLitE
-    , XParE, XOAppE
+    , XParE, XOAppE, XXRlpExprE
     -- ** Pattern synonyms
     -- *** Decl
     , pattern FunD, pattern TySigD, pattern InfixD, pattern DataD
     -- *** RlpExpr
     , pattern LetE, pattern VarE, pattern LamE, pattern CaseE, pattern IfE
     , pattern AppE, pattern LitE, pattern ParE, pattern OAppE
+    , pattern XRlpExprE
     )
     where
 ----------------------------------------------------------------------------------
