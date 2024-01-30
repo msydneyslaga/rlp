@@ -46,6 +46,7 @@ import Control.Monad.Reader
 import Control.Monad.State      (MonadState(state))
 import Control.Monad.Errorful
 import Compiler.RlpcError
+import Compiler.Types
 import Data.Functor.Identity
 import Data.Default.Class
 import Data.Foldable
@@ -55,6 +56,10 @@ import Data.Hashable            (Hashable)
 import Data.HashSet             (HashSet)
 import Data.HashSet             qualified as S
 import Data.Coerce
+import Data.Text                (Text)
+import Data.Text                qualified as T
+import Text.ANSI                qualified as Ansi
+import Text.PrettyPrint         hiding ((<>))
 import Lens.Micro.Platform
 import System.Exit
 ----------------------------------------------------------------------------------
@@ -79,7 +84,9 @@ evalRLPCT :: (Monad m)
           => RLPCOptions
           -> RLPCT m a
           -> m (Maybe a, [MsgEnvelope RlpcError])
-evalRLPCT = undefined
+evalRLPCT opt r = runRLPCT r
+                & flip runReaderT opt
+                & runErrorfulT
 
 evalRLPCIO :: RLPCOptions -> RLPCIO a -> IO a
 evalRLPCIO opt r = do
@@ -90,7 +97,33 @@ evalRLPCIO opt r = do
         Nothing -> die "Failed, no code compiled."
 
 putRlpcErrs :: [MsgEnvelope RlpcError] -> IO ()
-putRlpcErrs = traverse_ print
+putRlpcErrs = traverse_ (putStrLn . ('\n':) . render . prettyRlpcErr)
+
+prettyRlpcErr :: MsgEnvelope RlpcError -> Doc
+prettyRlpcErr msg = header
+                 $$ nest 2 bullets
+                 $$ source
+    where
+        source = vcat $ zipWith (<+>) rule srclines
+            where
+                rule = repeat (ttext . Ansi.blue . Ansi.bold $ "|")
+                srclines = ["", "<problematic source code>", ""]
+        filename = msgColour "<input>"
+        pos = msgColour $ tshow (msg ^. msgSpan . srcspanLine)
+                       <> ":"
+                       <> tshow (msg ^. msgSpan . srcspanColumn)
+
+        header = ttext $ filename <> msgColour ":" <> pos <> msgColour ": "
+                        <> errorColour "error" <> msgColour ":"
+
+        bullets = let Text ts = msg ^. msgDiagnostic
+                  in vcat $ hang "•" 2 . ttext . msgColour <$> ts
+
+        msgColour = Ansi.white . Ansi.bold
+        errorColour = Ansi.red . Ansi.bold
+        ttext = text . T.unpack
+        tshow :: (Show a) => a -> Text
+        tshow = T.pack . show
 
 liftErrorful :: (Monad m, IsRlpcError e) => ErrorfulT (MsgEnvelope e) m a -> RLPCT m a
 liftErrorful e = RLPCT $ lift (fmap liftRlpcError `mapErrorful` e)

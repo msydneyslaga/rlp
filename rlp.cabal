@@ -73,6 +73,7 @@ library
                     , semigroupoids
                     , comonad
                     , lens
+                    , text-ansi
 
     hs-source-dirs:   src
     default-language: GHC2021

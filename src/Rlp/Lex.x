@@ -11,6 +11,8 @@ module Rlp.Lex
     , lexDebug
     , lexCont
     , popLexState
+    , programInitState
+    , runP'
     )
     where
 import Codec.Binary.UTF8.String (encodeChar)
@@ -236,27 +238,9 @@ alexEOF = do
     pos <- getPos
     pure (Located (spanFromPos pos 0) TokenEOF)
 
-initParseState :: Text -> ParseState
-initParseState s = ParseState
-    { _psLayoutStack = []
-    -- IMPORTANT: the initial state is `bol` to begin the top-level layout,
-    -- which then returns to state 0 which continues the normal lexing process.
-    , _psLexState = [layout_top,0]
-    , _psInput = initAlexInput s
-    , _psOpTable = mempty
-    }
-
-initAlexInput :: Text -> AlexInput
-initAlexInput s = AlexInput
-    { _aiPrevChar   = '\0'
-    , _aiSource     = s
-    , _aiBytes      = []
-    , _aiPos        = (1,1,0)
-    }
-
 runP' :: P a -> Text -> (ParseState, [MsgEnvelope RlpParseError], Maybe a)
 runP' p s = runP p st where
-    st = initParseState s
+    st = initParseState [layout_top,0] s
 
 lexToken :: P (Located RlpToken)
 lexToken = do
@@ -310,7 +294,7 @@ popLayout = do
     psLayoutStack %= (drop 1)
     case ctx of
         Just l      -> pure l
-        Nothing     -> error "uhh"
+        Nothing     -> error "popLayout: layout stack empty! this is a bug."
 
 pushLayout :: Layout -> P ()
 pushLayout l = do
@@ -368,10 +352,13 @@ explicitRBrace inp l = do
 doLayout :: LexerAction (Located RlpToken)
 doLayout _ _ = do
     i <- indentLevel
-    traceM $ "doLayout: i: " <> show i
+    -- traceM $ "doLayout: i: " <> show i
     pushLayout (Implicit i)
     popLexState
     insertLBrace
+
+programInitState :: Text -> ParseState
+programInitState = initParseState [layout_top,0]
 
 }
 

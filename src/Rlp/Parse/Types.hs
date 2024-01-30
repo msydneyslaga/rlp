@@ -8,6 +8,8 @@ module Rlp.Parse.Types
 
     -- * Parser monad and state
     , P(..), ParseState(..), Layout(..), OpTable, OpInfo
+    , initParseState, initAlexInput
+    , pToErrorful
     -- ** Lenses
     , psLayoutStack, psLexState, psInput, psOpTable
 
@@ -39,6 +41,7 @@ import Data.Functor.Classes
 import Data.HashMap.Strict          qualified as H
 import Data.Void
 import Data.Word                    (Word8)
+import Data.Text                    qualified as T
 import Lens.Micro.TH
 import Lens.Micro
 import Rlp.Syntax
@@ -145,6 +148,11 @@ newtype P a = P {
     }
     deriving (Functor)
 
+pToErrorful :: (Applicative m)
+            => P a -> ParseState -> ErrorfulT (MsgEnvelope RlpParseError) m a
+pToErrorful p st = ErrorfulT $ pure (ma,es) where
+    (_,es,ma) = runP p st
+
 instance Applicative P where
     pure a = P $ \st -> (st, [], pure a)
     liftA2 = liftM2
@@ -188,10 +196,28 @@ type OpInfo = (Assoc, Int)
 data RlpParseError = RlpParErrOutOfBoundsPrecedence Int
                    | RlpParErrDuplicateInfixD Name
                    | RlpParErrLexical
-                   | RlpParErrUnexpectedToken
-                   deriving (Eq, Ord, Show)
+                   | RlpParErrUnexpectedToken RlpToken [String]
+                   deriving (Show)
 
 instance IsRlpcError RlpParseError where
+    liftRlpcError = \case
+        RlpParErrOutOfBoundsPrecedence n ->
+            Text [ "Illegal precedence in infixity declaration"
+                 , "rl' currently only allows precedences between 0 and 9."
+                 ]
+        RlpParErrDuplicateInfixD s ->
+            Text [ "Conflicting infixity declarations for operator "
+                    <> tshow s
+                 ]
+        RlpParErrLexical ->
+            Text [ "Unknown lexical error :(" ]
+        RlpParErrUnexpectedToken t exp ->
+            Text [ "Unexpected token " <> tshow t
+                 , "Expected: " <> tshow exp
+                 ]
+        where
+            tshow :: (Show a) => a -> T.Text
+            tshow = T.pack . show
 
 ----------------------------------------------------------------------------------
 
@@ -223,4 +249,22 @@ addFatalHere l e = P $ \st ->
             , _msgSeverity = SevError
             }
     in (st, [e'], Nothing)
+
+initParseState :: [Int] -> Text -> ParseState
+initParseState ls s = ParseState
+    { _psLayoutStack = []
+    -- IMPORTANT: the initial state is `bol` to begin the top-level layout,
+    -- which then returns to state 0 which continues the normal lexing process.
+    , _psLexState = ls
+    , _psInput = initAlexInput s
+    , _psOpTable = mempty
+    }
+
+initAlexInput :: Text -> AlexInput
+initAlexInput s = AlexInput
+    { _aiPrevChar   = '\0'
+    , _aiSource     = s
+    , _aiBytes      = []
+    , _aiPos        = (1,1,0)
+    }
 

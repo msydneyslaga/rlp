@@ -2,10 +2,13 @@
 {-# LANGUAGE LambdaCase, ViewPatterns #-}
 module Rlp.Parse
     ( parseRlpProg
+    , parseRlpProgR
     , parseRlpExpr
+    , parseRlpExprR
     )
     where
 import Compiler.RlpcError
+import Compiler.RLPC
 import Rlp.Lex
 import Rlp.Syntax
 import Rlp.Parse.Types
@@ -19,6 +22,7 @@ import Data.Functor.Bind
 import Control.Comonad
 import Data.Functor
 import Data.Semigroup.Traversable
+import Data.Text                    (Text)
 import Data.Text                    qualified as T
 import Data.Void
 }
@@ -29,6 +33,7 @@ import Data.Void
 %monad { P }
 %lexer { lexCont } { Located _ TokenEOF }
 %error { parseError }
+%errorhandlertype explist
 %tokentype { Located RlpToken }
 
 %token
@@ -85,6 +90,7 @@ DeclsV              :: { [Decl' RlpcPs] }
 DeclsV              : Decl VS Decls         { $1 : $3 }
                     | Decl VS               { [$1] }
                     | Decl                  { [$1] }
+                    | {- epsilon -}         { [] }
 
 VS                  :: { Located RlpToken }
 VS                  : ';'                   { $1 }
@@ -187,6 +193,13 @@ Con         :: { Located PsName }
 
 {
 
+parseRlpExprR = undefined
+
+parseRlpProgR :: (Monad m) => Text -> RLPCT m (RlpProgram RlpcPs)
+parseRlpProgR s = liftErrorful $ pToErrorful parseRlpProg st
+    where
+        st = programInitState s
+
 mkPsName :: Located RlpToken -> Located PsName
 mkPsName = fmap extractName
 
@@ -207,9 +220,9 @@ mkProgram ds = do
     pt <- use psOpTable
     pure $ RlpProgram (associate pt <$> ds)
 
-parseError :: Located RlpToken -> P a
-parseError (Located ss t) = addFatal $
-    errorMsg ss RlpParErrUnexpectedToken
+parseError :: (Located RlpToken, [String]) -> P a
+parseError ((Located ss t), exp) = addFatal $
+    errorMsg ss (RlpParErrUnexpectedToken t exp)
 
 mkInfixD :: Assoc -> Int -> PsName -> P (Decl' RlpcPs)
 mkInfixD a p n = do
@@ -228,3 +241,4 @@ intOfToken :: Located RlpToken -> Int
 intOfToken (Located _ (TokenLitInt n)) = n
 
 }
+

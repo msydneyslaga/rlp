@@ -3,9 +3,9 @@
 {-# LANGUAGE TupleSections, PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Errorful
-    ( ErrorfulT
-    , runErrorfulT
+    ( ErrorfulT(..)
     , Errorful
+    , pattern Errorful
     , runErrorful
     , mapErrorful
     , MonadErrorful(..)
@@ -67,7 +67,7 @@ mapErrorful f (ErrorfulT m) = ErrorfulT $
     m & mapped . _2 . mapped %~ f
 
 -- when microlens-pro drops we can write this as
---    mapErrorful f = coerced . mapped . _2 . mappd %~ f
+--    mapErrorful f = coerced . mapped . _2 . mapped %~ f
 -- lol
 
 --------------------------------------------------------------------------------

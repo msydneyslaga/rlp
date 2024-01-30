@@ -1,5 +1,6 @@
 module Compiler.Types
     ( SrcSpan(..)
+    , srcspanLine, srcspanColumn, srcspanAbs, srcspanLen
     , Located(..)
     , (<<~), (<~>)
 
@@ -13,6 +14,7 @@ module Compiler.Types
 import Control.Comonad
 import Data.Functor.Apply
 import Data.Functor.Bind
+import Control.Lens             hiding ((<<~))
 --------------------------------------------------------------------------------
 
 -- | Token wrapped with a span (line, column, absolute, length)
@@ -38,6 +40,16 @@ data SrcSpan = SrcSpan
     !Int -- ^ Absolute
     !Int -- ^ Length
     deriving Show
+
+tupling :: Iso' SrcSpan (Int, Int, Int, Int)
+tupling = iso (\ (SrcSpan a b c d) -> (a,b,c,d))
+              (\ (a,b,c,d) -> SrcSpan a b c d)
+
+srcspanLine, srcspanColumn, srcspanAbs, srcspanLen :: Lens' SrcSpan Int
+srcspanLine = tupling . _1
+srcspanColumn = tupling . _2
+srcspanAbs = tupling . _3
+srcspanLen = tupling . _4
 
 instance Semigroup SrcSpan where
     SrcSpan la ca aa sa <> SrcSpan lb cb ab sb = SrcSpan l c a s where
