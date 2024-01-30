@@ -127,7 +127,7 @@ data RlpExpr p = LetE'  (XLetE p) [Binding' p] (RlpExpr' p)
                | LitE'  (XLitE p) (Lit p)
                | ParE'  (XParE p) (RlpExpr' p)
                | OAppE' (XOAppE p) (IdP p) (RlpExpr' p) (RlpExpr' p)
-               | XRlpExprE' (XXRlpExprE p)
+               | XRlpExprE' !(XXRlpExprE p)
 
 type family XLetE p
 type family XVarE p
