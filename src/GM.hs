@@ -8,6 +8,7 @@ Description : The G-Machine
 module GM
     ( hdbgProg
     , evalProg
+    , evalProgR
     , Node(..)
     , gmEvalProg
     , finalStateOf
@@ -34,6 +35,7 @@ import System.IO                    (Handle, hPutStrLn)
 import Data.String                  (IsString)
 import Data.Heap
 import Debug.Trace
+import Compiler.RLPC
 import Core2Core
 import Core
 ----------------------------------------------------------------------------------
@@ -155,6 +157,21 @@ hdbgProg p hio = do
         -- the address of the result should be the one and only stack entry
         [resAddr] = final ^. gmStack
         res = hLookupUnsafe resAddr h
+
+evalProgR :: (Monad m) => Program' -> RLPCT m (Node, Stats)
+evalProgR p = do
+    (renderOut . showState) `traverse_` states
+    renderOut . showStats $ sts
+    pure (res, sts)
+    where
+        renderOut r = addDebugMsg "dump-eval" $ render r ++ "\n"
+        states = eval . compile $ p
+        final = last states
+
+        sts = final ^. gmStats
+        -- the address of the result should be the one and only stack entry
+        [resAddr] = final ^. gmStack
+        res = hLookupUnsafe resAddr (final ^. gmHeap)
 
 eval :: GmState -> [GmState]
 eval st = st : rest

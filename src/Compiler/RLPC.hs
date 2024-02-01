@@ -187,9 +187,9 @@ prettyRlpcMsg m                                  = render $ docRlpcErr m
 
 prettyRlpcDebugMsg :: MsgEnvelope RlpcError -> String
 prettyRlpcDebugMsg msg =
-        T.unpack . foldMap mkLine $ ts
+        T.unpack . foldMap mkLine $ [ t' | t <- ts, t' <- T.lines t ]
     where
-        mkLine s = tag <> ": " <> s <> "\n"
+        mkLine s = "-d" <> tag <> ": " <> s <> "\n"
         Text ts = msg ^. msgDiagnostic
         SevDebug tag = msg ^. msgSeverity
 
