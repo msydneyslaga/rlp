@@ -38,8 +38,7 @@ library
                     , Rlp.Lex
                     , Rlp.Parse.Types
                     , Compiler.Types
-
-    other-modules:    Data.Heap
+                    , Data.Heap
                     , Data.Pretty
                     , Core.Parse
                     , Core.Lex
@@ -86,8 +85,9 @@ library
 executable rlpc
     import:           warnings
     main-is:          Main.hs
-    -- other-modules:
-    -- other-extensions:
+    other-modules:    RlpDriver
+                    , CoreDriver
+
     build-depends: base >=4.17.0.0 && <4.20.0.0
                  , rlp
                  , optparse-applicative >= 0.18.1 && < 0.19

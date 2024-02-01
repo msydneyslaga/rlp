@@ -107,11 +107,3 @@ driver = view rlpcLanguage >>= \case
     LanguageCore -> CoreDriver.driver
     LanguageRlp  -> RlpDriver.driver
 
-forFiles_ :: (Monad m)
-          => (RLPCOptions -> FilePath -> RLPCT m a)
-          -> RLPCT m ()
-forFiles_ k = do
-    fs <- view rlpcInputFiles
-    o <- ask
-    forM_ fs (k o)
-

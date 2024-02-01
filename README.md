@@ -23,7 +23,7 @@ $ cabal test --test-show-details=direct
 $ rlpc -ddump-eval examples/factorial.hs
 # Compile and evaluate t.hs, with evaluation info dumped to t.log
 $ rlpc -ddump-eval -l t.log t.hs
-# Print the raw structure describing the compiler options and die
+# Print the raw structure describing the compiler options
 # (option parsing still must succeed in order to print)
 $ rlpc -ddump-opts t.hs
 ```

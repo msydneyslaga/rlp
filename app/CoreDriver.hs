@@ -3,12 +3,15 @@ module CoreDriver
     )
     where
 --------------------------------------------------------------------------------
+import Compiler.RLPC
+import Control.Monad
+
+import Core.Lex
+import Core.Parse
+import GM
+--------------------------------------------------------------------------------
 
 driver :: RLPCIO ()
-driver = undefined
-
-parseProg :: RLPCOptions
-          -> Text
-          -> (Maybe Program', [MsgEnvelope RlpcError])
-parseProg o = lexCoreR >=> parseCoreProgR
+driver = forFiles_ $ \f ->
+    withSource f (lexCoreR >=> parseCoreProgR >=> evalProgR)
 

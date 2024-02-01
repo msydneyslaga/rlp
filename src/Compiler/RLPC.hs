@@ -33,6 +33,8 @@ module Compiler.RLPC
     , MsgEnvelope(..), Severity(..)
     , addDebugMsg
     , whenDFlag, whenFFlag
+    -- * Misc. Utilities
+    , forFiles_, withSource
     -- * Convenient re-exports
     , addFatal, addWound, def
     )
@@ -58,6 +60,7 @@ import Data.HashSet             qualified as S
 import Data.Coerce
 import Data.Text                (Text)
 import Data.Text                qualified as T
+import Data.Text.IO             qualified as T
 import Text.ANSI                qualified as Ansi
 import Text.PrettyPrint         hiding ((<>))
 import Lens.Micro.Platform
@@ -218,4 +221,18 @@ docRlpcErr msg = header
         ttext = text . T.unpack
         tshow :: (Show a) => a -> Text
         tshow = T.pack . show
+
+--------------------------------------------------------------------------------
+
+forFiles_ :: (Monad m)
+          => (FilePath -> RLPCT m a)
+          -> RLPCT m ()
+forFiles_ k = do
+    fs <- view rlpcInputFiles
+    forM_ fs k
+
+-- TODO: catch any exceptions, i.e. non-existent files should be handled by the
+-- compiler
+withSource :: (MonadIO m) => FilePath -> (Text -> RLPCT m a) -> RLPCT m a
+withSource f k = liftIO (T.readFile f) >>= k
 
