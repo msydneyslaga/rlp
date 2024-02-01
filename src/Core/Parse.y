@@ -21,6 +21,7 @@ import Data.Functor.Identity
 import Core.Syntax
 import Core.Lex
 import Compiler.RLPC
+import Control.Monad
 import Lens.Micro
 import Data.Default.Class   (def)
 import Data.Hashable        (Hashable)
@@ -225,11 +226,16 @@ insScDef sc = programScDefs %~ (sc:)
 singletonScDef :: (Hashable b) => ScDef b -> Program b
 singletonScDef sc = insScDef sc mempty
 
-parseCoreProgR :: forall m. (Applicative m) => [Located CoreToken] -> RLPCT m Program'
-parseCoreProgR = hoistRlpcT generalise . parseCoreProg
+parseCoreProgR :: forall m. (Monad m) => [Located CoreToken] -> RLPCT m Program'
+parseCoreProgR = ddumpast <=< (hoistRlpcT generalise . parseCoreProg)
     where
         generalise :: forall a. Identity a -> m a
         generalise (Identity a) = pure a
+
+        ddumpast :: Program' -> RLPCT m Program'
+        ddumpast p = do
+            whenDFlag "dump-ast" $ (addDebugMsg . show $ p)
+            pure p
 
 happyBind :: RLPC a -> (a -> RLPC b) -> RLPC b
 happyBind m k = m >>= k

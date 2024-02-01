@@ -10,6 +10,7 @@ module Compiler.RlpcError
     , msgSeverity
     , liftRlpcErrors
     , errorMsg
+    , debugMsg
     -- * Located Comonad
     , Located(..)
     , SrcSpan(..)
@@ -46,6 +47,7 @@ instance IsRlpcError RlpcError where
 
 data Severity = SevWarning
               | SevError
+              | SevDebug
               deriving Show
 
 makeLenses ''MsgEnvelope
@@ -63,5 +65,13 @@ errorMsg s e = MsgEnvelope
     { _msgSpan = s
     , _msgDiagnostic = e
     , _msgSeverity = SevError
+    }
+
+debugMsg :: e -> MsgEnvelope e
+debugMsg e = MsgEnvelope
+    -- TODO: not pretty, but it is a debug message after all
+    { _msgSpan = SrcSpan 0 0 0 0
+    , _msgDiagnostic = e
+    , _msgSeverity = SevDebug
     }
 

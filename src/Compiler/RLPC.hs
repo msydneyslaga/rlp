@@ -11,7 +11,7 @@ errors and the family of RLPC monads.
 -- only used for mtl instances
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DeriveGeneric, DerivingStrategies, DerivingVia #-}
-{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE BlockArguments, ViewPatterns #-}
 module Compiler.RLPC
     (
     -- * Rlpc Monad transformer
@@ -31,6 +31,7 @@ module Compiler.RLPC
     -- * Misc. Rlpc Monad -related types
     , RLPCOptions(RLPCOptions), IsRlpcError(..), RlpcError(..)
     , MsgEnvelope(..), Severity(..)
+    , addDebugMsg
     , whenDFlag, whenFFlag
     -- * Convenient re-exports
     , addFatal, addWound, def
@@ -60,13 +61,15 @@ import Data.Text                qualified as T
 import Text.ANSI                qualified as Ansi
 import Text.PrettyPrint         hiding ((<>))
 import Lens.Micro.Platform
+import Lens.Micro.Platform.Internal
 import System.Exit
 ----------------------------------------------------------------------------------
 
 newtype RLPCT m a = RLPCT {
         runRLPCT :: ReaderT RLPCOptions (ErrorfulT (MsgEnvelope RlpcError) m) a
     }
-    deriving (Functor, Applicative, Monad, MonadReader RLPCOptions)
+    deriving ( Functor, Applicative, Monad
+             , MonadReader RLPCOptions, MonadErrorful (MsgEnvelope RlpcError))
 
 rlpc :: (IsRlpcError e, Monad m)
      => (RLPCOptions -> (Maybe a, [MsgEnvelope e]))
@@ -103,10 +106,18 @@ evalRLPCIO opt r = do
         Nothing -> die "Failed, no code compiled."
 
 putRlpcErrs :: [MsgEnvelope RlpcError] -> IO ()
-putRlpcErrs = traverse_ (putStrLn . ('\n':) . render . prettyRlpcErr)
+putRlpcErrs = traverse_ (putStrLn . ('\n':) . prettyRlpcMsg)
 
-prettyRlpcErr :: MsgEnvelope RlpcError -> Doc
-prettyRlpcErr msg = header
+prettyRlpcMsg :: MsgEnvelope RlpcError -> String
+prettyRlpcMsg m@(view msgSeverity -> SevDebug) = prettyRlpcDebugMsg m
+prettyRlpcMsg m                                = render $ docRlpcErr m
+
+prettyRlpcDebugMsg :: MsgEnvelope RlpcError -> String
+prettyRlpcDebugMsg (view msgDiagnostic -> Text ts) =
+    T.unpack . foldMap (`T.snoc` '\n') $ ts
+
+docRlpcErr :: MsgEnvelope RlpcError -> Doc
+docRlpcErr msg = header
                  $$ nest 2 bullets
                  $$ source
     where
@@ -176,6 +187,9 @@ type CompilerFlag = String
 
 makeLenses ''RLPCOptions
 pure []
+
+addDebugMsg :: (Monad m, IsText e) => e -> RLPCT m ()
+addDebugMsg e = addWound . debugMsg $ Text [e ^. unpacked . packed]
 
 -- TODO: rewrite this with prisms once microlens-pro drops :3
 whenDFlag :: (Monad m) => DebugFlag -> RLPCT m () -> RLPCT m ()

@@ -13,6 +13,7 @@ module Control.Monad.Errorful
     where
 ----------------------------------------------------------------------------------
 import Control.Monad.State.Strict
+import Control.Monad.Reader
 import Control.Monad.Trans
 import Data.Functor.Identity
 import Data.Coerce
@@ -76,7 +77,7 @@ mapErrorful f (ErrorfulT m) = ErrorfulT $
 --------------------------------------------------------------------------------
 -- daily dose of n^2 instances
 
-instance (Monad m, MonadErrorful e m) => MonadErrorful e (StateT s m) where
-    addWound = undefined
-    addFatal = undefined
+instance (Monad m, MonadErrorful e m) => MonadErrorful e (ReaderT r m) where
+    addWound = lift . addWound
+    addFatal = lift . addFatal
 
