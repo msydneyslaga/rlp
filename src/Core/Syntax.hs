@@ -103,7 +103,7 @@ data Binding b = Binding b (Expr b)
 deriving instance (Eq b) => Eq (Binding b)
 
 infixl 1 :=
-pattern (:=) :: b -> (Expr b) -> (Binding b)
+pattern (:=) :: b -> Expr b -> Binding b
 pattern k := v = Binding k v
 
 data Alter b = Alter AltCon [b] (Expr b)
@@ -123,7 +123,7 @@ data AltCon = AltData Name
             | Default
             deriving (Show, Read, Eq, Lift)
 
-data Lit = IntL Int
+newtype Lit = IntL Int
     deriving (Show, Read, Eq, Lift)
 
 type Name = T.Text
@@ -201,7 +201,7 @@ instance HasLHS (Alter b) (Alter b) (AltCon, [b]) (AltCon, [b]) where
 instance HasLHS (ScDef b) (ScDef b) (b, [b]) (b, [b]) where
     _lhs = lens
         (\ (ScDef n as _) -> (n,as))
-        (\ (ScDef _ _ e) (n',as') -> (ScDef n' as' e))
+        (\ (ScDef _ _ e) (n',as') -> ScDef n' as' e)
 
 instance HasLHS (Binding b) (Binding b) b b where
     _lhs = lens
