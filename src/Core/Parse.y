@@ -234,7 +234,7 @@ parseCoreProgR = ddumpast <=< (hoistRlpcT generalise . parseCoreProg)
 
         ddumpast :: Program' -> RLPCT m Program'
         ddumpast p = do
-            whenDFlag "dump-ast" $ (addDebugMsg . show $ p)
+            addDebugMsg "dump-ast" . show $ p
             pure p
 
 happyBind :: RLPC a -> (a -> RLPC b) -> RLPC b

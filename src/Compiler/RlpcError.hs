@@ -47,7 +47,7 @@ instance IsRlpcError RlpcError where
 
 data Severity = SevWarning
               | SevError
-              | SevDebug
+              | SevDebug Text
               deriving Show
 
 makeLenses ''MsgEnvelope
@@ -67,11 +67,11 @@ errorMsg s e = MsgEnvelope
     , _msgSeverity = SevError
     }
 
-debugMsg :: e -> MsgEnvelope e
-debugMsg e = MsgEnvelope
+debugMsg :: Text -> e -> MsgEnvelope e
+debugMsg tag e = MsgEnvelope
     -- TODO: not pretty, but it is a debug message after all
     { _msgSpan = SrcSpan 0 0 0 0
     , _msgDiagnostic = e
-    , _msgSeverity = SevDebug
+    , _msgSeverity = SevDebug tag
     }
 

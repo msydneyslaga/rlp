@@ -97,51 +97,6 @@ evalRLPCT opt r = runRLPCT r
                 & flip runReaderT opt
                 & runErrorfulT
 
-evalRLPCIO :: RLPCOptions -> RLPCIO a -> IO a
-evalRLPCIO opt r = do
-    (ma,es) <- evalRLPCT opt r
-    putRlpcErrs es
-    case ma of
-        Just x  -> pure x
-        Nothing -> die "Failed, no code compiled."
-
-putRlpcErrs :: [MsgEnvelope RlpcError] -> IO ()
-putRlpcErrs = traverse_ (putStrLn . ('\n':) . prettyRlpcMsg)
-
-prettyRlpcMsg :: MsgEnvelope RlpcError -> String
-prettyRlpcMsg m@(view msgSeverity -> SevDebug) = prettyRlpcDebugMsg m
-prettyRlpcMsg m                                = render $ docRlpcErr m
-
-prettyRlpcDebugMsg :: MsgEnvelope RlpcError -> String
-prettyRlpcDebugMsg (view msgDiagnostic -> Text ts) =
-    T.unpack . foldMap (`T.snoc` '\n') $ ts
-
-docRlpcErr :: MsgEnvelope RlpcError -> Doc
-docRlpcErr msg = header
-                 $$ nest 2 bullets
-                 $$ source
-    where
-        source = vcat $ zipWith (<+>) rule srclines
-            where
-                rule = repeat (ttext . Ansi.blue . Ansi.bold $ "|")
-                srclines = ["", "<problematic source code>", ""]
-        filename = msgColour "<input>"
-        pos = msgColour $ tshow (msg ^. msgSpan . srcspanLine)
-                       <> ":"
-                       <> tshow (msg ^. msgSpan . srcspanColumn)
-
-        header = ttext $ filename <> msgColour ":" <> pos <> msgColour ": "
-                        <> errorColour "error" <> msgColour ":"
-
-        bullets = let Text ts = msg ^. msgDiagnostic
-                  in vcat $ hang "•" 2 . ttext . msgColour <$> ts
-
-        msgColour = Ansi.white . Ansi.bold
-        errorColour = Ansi.red . Ansi.bold
-        ttext = text . T.unpack
-        tshow :: (Show a) => a -> Text
-        tshow = T.pack . show
-
 liftErrorful :: (Monad m, IsRlpcError e) => ErrorfulT (MsgEnvelope e) m a -> RLPCT m a
 liftErrorful e = RLPCT $ lift (fmap liftRlpcError `mapErrorful` e)
 
@@ -181,15 +136,15 @@ instance Default RLPCOptions where
         }
 
 -- debug flags are passed with -dFLAG
-type DebugFlag = String
+type DebugFlag = Text
 
-type CompilerFlag = String
+type CompilerFlag = Text
 
 makeLenses ''RLPCOptions
 pure []
 
-addDebugMsg :: (Monad m, IsText e) => e -> RLPCT m ()
-addDebugMsg e = addWound . debugMsg $ Text [e ^. unpacked . packed]
+addDebugMsg :: (Monad m, IsText e) => Text -> e -> RLPCT m ()
+addDebugMsg tag e = addWound . debugMsg tag $ Text [e ^. unpacked . packed]
 
 -- TODO: rewrite this with prisms once microlens-pro drops :3
 whenDFlag :: (Monad m) => DebugFlag -> RLPCT m () -> RLPCT m ()
@@ -205,4 +160,62 @@ whenFFlag f m = do
     fs <- view rlpcFFlags
     let a = S.member f fs
     when a m
+
+--------------------------------------------------------------------------------
+
+evalRLPCIO :: RLPCOptions -> RLPCIO a -> IO a
+evalRLPCIO opt r = do
+    (ma,es) <- evalRLPCT opt r
+    putRlpcErrs opt es
+    case ma of
+        Just x  -> pure x
+        Nothing -> die "Failed, no code compiled."
+
+putRlpcErrs :: RLPCOptions -> [MsgEnvelope RlpcError] -> IO ()
+putRlpcErrs opts = filter byTag
+               >>> traverse_ (putStrLn . ('\n':) . prettyRlpcMsg)
+    where
+        dflags = opts ^. rlpcDFlags
+
+        byTag :: MsgEnvelope RlpcError -> Bool
+        byTag (view msgSeverity -> SevDebug t) =
+            t `S.member` dflags
+
+prettyRlpcMsg :: MsgEnvelope RlpcError -> String
+prettyRlpcMsg m@(view msgSeverity -> SevDebug _) = prettyRlpcDebugMsg m
+prettyRlpcMsg m                                  = render $ docRlpcErr m
+
+prettyRlpcDebugMsg :: MsgEnvelope RlpcError -> String
+prettyRlpcDebugMsg msg =
+        T.unpack . foldMap mkLine $ ts
+    where
+        mkLine s = tag <> ": " <> s <> "\n"
+        Text ts = msg ^. msgDiagnostic
+        SevDebug tag = msg ^. msgSeverity
+
+docRlpcErr :: MsgEnvelope RlpcError -> Doc
+docRlpcErr msg = header
+                 $$ nest 2 bullets
+                 $$ source
+    where
+        source = vcat $ zipWith (<+>) rule srclines
+            where
+                rule = repeat (ttext . Ansi.blue . Ansi.bold $ "|")
+                srclines = ["", "<problematic source code>", ""]
+        filename = msgColour "<input>"
+        pos = msgColour $ tshow (msg ^. msgSpan . srcspanLine)
+                       <> ":"
+                       <> tshow (msg ^. msgSpan . srcspanColumn)
+
+        header = ttext $ filename <> msgColour ":" <> pos <> msgColour ": "
+                        <> errorColour "error" <> msgColour ":"
+
+        bullets = let Text ts = msg ^. msgDiagnostic
+                  in vcat $ hang "•" 2 . ttext . msgColour <$> ts
+
+        msgColour = Ansi.white . Ansi.bold
+        errorColour = Ansi.red . Ansi.bold
+        ttext = text . T.unpack
+        tshow :: (Show a) => a -> Text
+        tshow = T.pack . show
 
