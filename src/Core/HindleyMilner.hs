@@ -105,7 +105,7 @@ checkCoreProg p = scDefs
              where scname = sc ^. _lhs._1
 
 -- | @checkCoreProgR p@ returns @p@ if @p@ successfully typechecks.
-checkCoreProgR :: Program' -> RLPC Program'
+checkCoreProgR :: (Applicative m) => Program' -> RLPCT m Program'
 checkCoreProgR p = undefined
 
 {-# WARNING checkCoreProgR "unimpl" #-}

@@ -17,6 +17,7 @@ module Core.Parse
 
 import Control.Monad        ((>=>))
 import Data.Foldable        (foldl')
+import Data.Functor.Identity
 import Core.Syntax
 import Core.Lex
 import Compiler.RLPC
@@ -224,8 +225,11 @@ insScDef sc = programScDefs %~ (sc:)
 singletonScDef :: (Hashable b) => ScDef b -> Program b
 singletonScDef sc = insScDef sc mempty
 
-parseCoreProgR :: [Located CoreToken] -> RLPC Program'
-parseCoreProgR = parseCoreProg
+parseCoreProgR :: forall m. (Applicative m) => [Located CoreToken] -> RLPCT m Program'
+parseCoreProgR = hoistRlpcT generalise . parseCoreProg
+    where
+        generalise :: forall a. Identity a -> m a
+        generalise (Identity a) = pure a
 
 happyBind :: RLPC a -> (a -> RLPC b) -> RLPC b
 happyBind m k = m >>= k

@@ -20,6 +20,7 @@ import Debug.Trace
 import Data.Text            (Text)
 import Data.Text            qualified as T
 import Data.String          (IsString(..))
+import Data.Functor.Identity
 import Core.Syntax
 import Compiler.RLPC
 -- TODO: unify Located definitions
@@ -180,8 +181,11 @@ lexCore s = case m of
     where
         m = runAlex s lexStream
 
-lexCoreR :: Text -> RLPC [Located CoreToken]
-lexCoreR = lexCore
+lexCoreR :: forall m. (Applicative m) => Text -> RLPCT m [Located CoreToken]
+lexCoreR = hoistRlpcT generalise . lexCore
+    where
+        generalise :: forall a. Identity a -> m a
+        generalise (Identity a) = pure a
 
 -- | @lexCore@, but the tokens are stripped of location info. Useful for
 -- debugging

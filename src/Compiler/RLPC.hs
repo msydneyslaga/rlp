@@ -11,32 +11,29 @@ errors and the family of RLPC monads.
 -- only used for mtl instances
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DeriveGeneric, DerivingStrategies, DerivingVia #-}
+{-# LANGUAGE BlockArguments #-}
 module Compiler.RLPC
-    ( RLPC
-    , RLPCT(..)
-    , RLPCIO
-    , RLPCOptions(RLPCOptions)
-    , IsRlpcError(..)
-    , RlpcError(..)
-    , MsgEnvelope(..)
-    , addFatal
-    , addWound
-    , MonadErrorful
-    , Severity(..)
-    , Language(..)
-    , Evaluator(..)
-    , evalRLPCT
-    , evalRLPCIO
-    , evalRLPC
-    , rlpcLogFile
-    , rlpcDFlags  
-    , rlpcEvaluator
-    , rlpcInputFiles
-    , DebugFlag(..)
-    , whenDFlag
-    , whenFFlag
-    , def
-    , liftErrorful
+    (
+    -- * Rlpc Monad transformer
+      RLPCT(RLPCT),
+    -- ** Special cases
+      RLPC, RLPCIO
+    -- ** Running
+    , runRLPCT
+    , evalRLPCT, evalRLPCIO, evalRLPC
+    -- * Rlpc options
+    , Language(..), Evaluator(..)
+    , DebugFlag(..), CompilerFlag(..)
+    -- ** Lenses
+    , rlpcLogFile, rlpcDFlags, rlpcEvaluator, rlpcInputFiles, rlpcLanguage
+    -- * Misc. MTL-style functions
+    , liftErrorful, hoistRlpcT
+    -- * Misc. Rlpc Monad -related types
+    , RLPCOptions(RLPCOptions), IsRlpcError(..), RlpcError(..)
+    , MsgEnvelope(..), Severity(..)
+    , whenDFlag, whenFFlag
+    -- * Convenient re-exports
+    , addFatal, addWound, def
     )
     where
 ----------------------------------------------------------------------------------
@@ -71,6 +68,12 @@ newtype RLPCT m a = RLPCT {
     }
     deriving (Functor, Applicative, Monad, MonadReader RLPCOptions)
 
+rlpc :: (IsRlpcError e, Monad m)
+     => (RLPCOptions -> (Maybe a, [MsgEnvelope e]))
+     -> RLPCT m a
+rlpc f = RLPCT . ReaderT $ \opt ->
+    ErrorfulT . pure $ f opt & _2 . each . mapped %~ liftRlpcError
+
 type RLPC = RLPCT Identity
 
 type RLPCIO = RLPCT IO
@@ -84,8 +87,7 @@ evalRLPC opt r = runRLPCT r
                & flip runReaderT opt
                & runErrorful
 
-evalRLPCT :: (Monad m)
-          => RLPCOptions
+evalRLPCT :: RLPCOptions
           -> RLPCT m a
           -> m (Maybe a, [MsgEnvelope RlpcError])
 evalRLPCT opt r = runRLPCT r
@@ -131,6 +133,11 @@ prettyRlpcErr msg = header
 
 liftErrorful :: (Monad m, IsRlpcError e) => ErrorfulT (MsgEnvelope e) m a -> RLPCT m a
 liftErrorful e = RLPCT $ lift (fmap liftRlpcError `mapErrorful` e)
+
+hoistRlpcT :: (forall a. m a -> n a)
+         -> RLPCT m a -> RLPCT n a
+hoistRlpcT f rma = RLPCT $ ReaderT $ \opt ->
+    ErrorfulT $ f $ evalRLPCT opt rma
 
 data RLPCOptions = RLPCOptions
     { _rlpcLogFile     :: Maybe FilePath

@@ -1,11 +1,11 @@
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE TupleSections, PatternSynonyms #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Errorful
     ( ErrorfulT(..)
     , Errorful
     , pattern Errorful
+    , errorful
     , runErrorful
     , mapErrorful
     , MonadErrorful(..)
@@ -27,6 +27,9 @@ type Errorful e = ErrorfulT e Identity
 
 pattern Errorful :: (Maybe a, [e]) -> Errorful e a
 pattern Errorful a = ErrorfulT (Identity a)
+
+errorful :: (Applicative m) => (Maybe a, [e]) -> ErrorfulT e m a
+errorful = ErrorfulT . pure
 
 runErrorful :: Errorful e a -> (Maybe a, [e])
 runErrorful m = coerce (runErrorfulT m)
