@@ -57,9 +57,8 @@ Listed in order of importance.
         - [x] Garbage Collection
     - [ ] Emitter
         - [ ] Code-gen (target yet to be decided)
-        - [ ] Core language emitter
-    - [ ] Core linter (Type-checker)
-    - [ ] Core2Core pass
+    - [x] Core linter (Type-checker)
+    - [ ] Core2Core pass (optimisations and misc. preprocessing)
         - [x] GM prep
             - [x] Non-strict case-floating
         - [ ] Let-floating
@@ -101,9 +100,10 @@ Listed in order of importance.
 ### January Release Plan
 - [ ] Beta rl' to Core
 - [ ] UX improvements
-    - [ ] Actual compiler errors -- no more unexceptional `error` calls
-    - [ ] Better CLI dump flags
-    - [ ] Annotate the AST with token positions for errors
+    - [x] Actual compiler errors -- no more unexceptional `error` calls
+    - [x] Better CLI dump flags
+    - [ ] Annotate the AST with token positions for errors (NOTE: As of Feb. 1,
+      this has been done, but the locational info is not yet used in error messages)
 - [ ] More examples
 
 ### March Release Plan

@@ -43,6 +43,7 @@ library
                     , Core.Parse
                     , Core.Lex
                     , Core2Core
+                    , Rlp2Core
                     , Control.Monad.Utils
 
     build-tool-depends: happy:happy, alex:alex

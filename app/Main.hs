@@ -68,6 +68,8 @@ options = RLPCOptions
     <*> option languageReader
         (  long "language"
         <> short 'x'
+        <> metavar "rlp|core"
+        <> help "the language to be compiled -- see README"
         )
     <*> some (argument str $ metavar "FILES...")
     where

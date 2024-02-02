@@ -52,7 +52,7 @@ import Compiler.Types
 
 data RlpcPs
 
-type instance XRec RlpcPs f = Located (f RlpcPs)
+type instance XRec RlpcPs a = Located a
 type instance IdP RlpcPs = PsName
 
 type instance XFunD RlpcPs = ()

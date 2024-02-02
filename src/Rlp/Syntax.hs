@@ -8,6 +8,7 @@ module Rlp.Syntax
     (
     -- * AST
       RlpProgram(..)
+    , progDecls
     , Decl(..), Decl', RlpExpr(..), RlpExpr'
     , Pat(..), Pat'
     , Assoc(..)
@@ -53,15 +54,20 @@ data RlpModule p = RlpModule
 
 -- | dear god.
 type PhaseShow p =
-    ( Show (XRec p Pat), Show (XRec p RlpExpr)
-    , Show (XRec p Lit), Show (IdP p)
-    , Show (XRec p RlpType)
-    , Show (XRec p Binding)
+    ( Show (XRec p (Pat p)), Show (XRec p (RlpExpr p))
+    , Show (XRec p (Lit p)), Show (IdP p)
+    , Show (XRec p (RlpType p))
+    , Show (XRec p (Binding p))
     )
 
 newtype RlpProgram p = RlpProgram [Decl' p]
 
-deriving instance (PhaseShow p, Show (XRec p Decl)) => Show (RlpProgram p)
+progDecls :: Lens' (RlpProgram p) [Decl' p]
+progDecls = lens
+    (\ (RlpProgram ds) -> ds)
+    (const RlpProgram)
+
+deriving instance (PhaseShow p, Show (XRec p (Decl p))) => Show (RlpProgram p)
 
 data RlpType p = FunConT
                | FunT (RlpType' p) (RlpType' p)
@@ -69,7 +75,7 @@ data RlpType p = FunConT
                | VarT (IdP p)
                | ConT (IdP p)
 
-type RlpType' p = XRec p RlpType
+type RlpType' p = XRec p (RlpType p)
 
 deriving instance (PhaseShow p)
                   => Show (RlpType p)
@@ -95,11 +101,11 @@ type family XInfixD p
 type family XXDeclD p
 
 pattern FunD   :: (XFunD p ~ ())
-               => (IdP p) -> [Pat' p] -> (RlpExpr' p) -> (Maybe (Where p))
+               => IdP p -> [Pat' p] -> RlpExpr' p -> Maybe (Where p)
                -> Decl p
-pattern TySigD :: (XTySigD p ~ ()) => [IdP p] -> (RlpType' p) -> Decl p
-pattern DataD  :: (XDataD p ~ ()) => (IdP p) -> [IdP p] -> [ConAlt p] -> Decl p
-pattern InfixD :: (XInfixD p ~ ()) => Assoc -> Int -> (IdP p) -> Decl p
+pattern TySigD :: (XTySigD p ~ ()) => [IdP p] -> RlpType' p -> Decl p
+pattern DataD  :: (XDataD p ~ ()) => IdP p -> [IdP p] -> [ConAlt p] -> Decl p
+pattern InfixD :: (XInfixD p ~ ()) => Assoc -> Int -> IdP p -> Decl p
 pattern XDeclD :: (XXDeclD p ~ ()) => Decl p
 
 pattern FunD n as e wh = FunD' () n as e wh
@@ -108,7 +114,7 @@ pattern DataD n as cs = DataD' () n as cs
 pattern InfixD a p n = InfixD' () a p n
 pattern XDeclD = XDeclD' ()
 
-type Decl' p = XRec p Decl
+type Decl' p = XRec p (Decl p)
 
 data Assoc = InfixL
            | InfixR
@@ -117,7 +123,7 @@ data Assoc = InfixL
 
 data ConAlt p = ConAlt (IdP p) [RlpType' p]
 
-deriving instance (Show (IdP p), Show (XRec p RlpType)) => Show (ConAlt p)
+deriving instance (Show (IdP p), Show (XRec p (RlpType p))) => Show (ConAlt p)
 
 data RlpExpr p = LetE'  (XLetE p) [Binding' p] (RlpExpr' p)
                | VarE'  (XVarE p) (IdP p)
@@ -171,15 +177,15 @@ deriving instance
     , PhaseShow p
     ) => Show (RlpExpr p)
 
-type RlpExpr' p = XRec p RlpExpr
+type RlpExpr' p = XRec p (RlpExpr p)
 
 class UnXRec p where
-    unXRec :: XRec p f -> f p
+    unXRec :: XRec p a -> a
 
 class MapXRec p where
-    mapXRec :: (f p -> f' p') -> XRec p f -> XRec p' f'
+    mapXRec :: (a -> b) -> XRec p a -> XRec p b
 
-type family XRec p (f :: Type -> Type) = (r :: Type) | r -> p f
+type family XRec p a = (r :: Type) | r -> p a
 
 type family IdP p
 
@@ -193,9 +199,9 @@ deriving instance (PhaseShow p) => Show (Alt p)
 data Binding p = PatB (Pat' p) (RlpExpr' p)
                | FunB (IdP p) [Pat' p] (RlpExpr' p)
 
-type Binding' p = XRec p Binding
+type Binding' p = XRec p (Binding p)
 
-deriving instance (Show (XRec p Pat), Show (XRec p RlpExpr), Show (IdP p)
+deriving instance (Show (XRec p (Pat p)), Show (XRec p (RlpExpr p)), Show (IdP p)
                   ) => Show (Binding p)
 
 data Pat p = VarP (IdP p)
@@ -204,7 +210,7 @@ data Pat p = VarP (IdP p)
 
 deriving instance (PhaseShow p) => Show (Pat p)
 
-type Pat' p = XRec p Pat
+type Pat' p = XRec p (Pat p)
 
 data Lit p = IntL Int
            | CharL Char
@@ -212,7 +218,7 @@ data Lit p = IntL Int
 
 deriving instance (PhaseShow p) => Show (Lit p)
 
-type Lit' p = XRec p Lit
+type Lit' p = XRec p (Lit p)
 
 -- instance HasLHS Alt Alt Pat Pat where
 --     _lhs = lens
@@ -224,7 +230,7 @@ type Lit' p = XRec p Lit
 --         (\ (AltA _ e) -> e)
 --         (\ (AltA p _) e' -> AltA p e')
 
-makeBaseFunctor ''RlpExpr
+-- makeBaseFunctor ''RlpExpr
 
 -- showsTernaryWith :: (Int -> x -> ShowS)
 --                  -> (Int -> y -> ShowS)
