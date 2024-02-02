@@ -21,18 +21,15 @@ rlpProgToCore = foldMapOf (progDecls . each) declToCore
 
 declToCore :: Decl' RlpcPs -> Program'
 
-declToCore = undefined
+declToCore (TySigD'' ns t) =
+    mempty & programTypeSigs .~ H.fromList [ (n, typeToCore t) | n <- ns ]
 
--- declToCore (TySigD ns t) =
---     mempty & programTypeSigs .~ H.fromList [ (n, typeToCore t) | n <- ns ]
-
-typeToCore :: RlpType RlpcPs -> Type
-typeToCore = undefined
--- typeToCore FunConT = TyFun
--- typeToCore (FunT s t) = typeToCore s :-> typeToCore t
--- typeToCore (AppT s t) = TyApp (typeToCore s) (typeToCore t)
--- typeToCore (ConT n) = TyCon (dsNameToName n)
--- typeToCore (VarT x) = TyVar (dsNameToName x)
+typeToCore :: RlpType' RlpcPs -> Type
+typeToCore FunConT''    = TyFun
+typeToCore (FunT'' s t) = typeToCore s :-> typeToCore t
+typeToCore (AppT'' s t) = TyApp (typeToCore s) (typeToCore t)
+typeToCore (ConT'' n)   = TyCon (dsNameToName n)
+typeToCore (VarT'' x)   = TyVar (dsNameToName x)
 
 -- | Forwards-compatiblity if IdP RlpDs is changed
 dsNameToName :: IdP RlpcPs -> Name

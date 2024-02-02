@@ -1,7 +1,7 @@
 -- recursion-schemes
 {-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable
   , TemplateHaskell, TypeFamilies #-}
-{-# LANGUAGE OverloadedStrings, PatternSynonyms #-}
+{-# LANGUAGE OverloadedStrings, PatternSynonyms, ViewPatterns #-}
 {-# LANGUAGE TypeFamilies, TypeFamilyDependencies #-}
 {-# LANGUAGE UndecidableInstances, ImpredicativeTypes #-}
 module Rlp.Syntax
@@ -28,10 +28,14 @@ module Rlp.Syntax
     -- ** Pattern synonyms
     -- *** Decl
     , pattern FunD, pattern TySigD, pattern InfixD, pattern DataD
+    , pattern FunD'', pattern TySigD'', pattern InfixD'', pattern DataD''
     -- *** RlpExpr
     , pattern LetE, pattern VarE, pattern LamE, pattern CaseE, pattern IfE
     , pattern AppE, pattern LitE, pattern ParE, pattern OAppE
     , pattern XRlpExprE
+    -- *** RlpType
+    , pattern FunConT'', pattern FunT'', pattern AppT'', pattern VarT''
+    , pattern ConT''
     )
     where
 ----------------------------------------------------------------------------------
@@ -40,6 +44,7 @@ import Data.Text                    qualified as T
 import Data.String                  (IsString(..))
 import Data.Functor.Foldable.TH     (makeBaseFunctor)
 import Data.Functor.Classes
+import Data.Functor.Identity
 import Data.Kind                    (Type)
 import Lens.Micro
 import Lens.Micro.TH
@@ -77,6 +82,18 @@ data RlpType p = FunConT
 
 type RlpType' p = XRec p (RlpType p)
 
+pattern FunConT'' :: (UnXRec p) => RlpType' p
+pattern FunT''    :: (UnXRec p) => RlpType' p -> RlpType' p -> RlpType' p
+pattern AppT''    :: (UnXRec p) => RlpType' p -> RlpType' p -> RlpType' p
+pattern VarT''    :: (UnXRec p) => IdP p -> RlpType' p
+pattern ConT''    :: (UnXRec p) => IdP p -> RlpType' p
+
+pattern FunConT''     <- (unXRec -> FunConT)
+pattern FunT''    s t <- (unXRec -> FunT s t)
+pattern AppT''    s t <- (unXRec -> AppT s t)
+pattern VarT''    n   <- (unXRec -> VarT n)
+pattern ConT''    n   <- (unXRec -> ConT n)
+
 deriving instance (PhaseShow p)
                   => Show (RlpType p)
 
@@ -109,10 +126,25 @@ pattern InfixD :: (XInfixD p ~ ()) => Assoc -> Int -> IdP p -> Decl p
 pattern XDeclD :: (XXDeclD p ~ ()) => Decl p
 
 pattern FunD n as e wh = FunD' () n as e wh
-pattern TySigD ns t = TySigD' () ns t
-pattern DataD n as cs = DataD' () n as cs
-pattern InfixD a p n = InfixD' () a p n
-pattern XDeclD = XDeclD' ()
+pattern TySigD ns t    = TySigD' () ns t
+pattern DataD n as cs  = DataD' () n as cs
+pattern InfixD a p n   = InfixD' () a p n
+pattern XDeclD         = XDeclD' ()
+
+pattern FunD''   :: (UnXRec p)
+                 => IdP p -> [Pat' p] -> RlpExpr' p -> Maybe (Where p)
+                 -> Decl' p
+pattern TySigD'' :: (UnXRec p)
+                 => [IdP p] -> RlpType' p -> Decl' p
+pattern DataD''  :: (UnXRec p)
+                 => IdP p -> [IdP p] -> [ConAlt p] -> Decl' p
+pattern InfixD'' :: (UnXRec p)
+                 => Assoc -> Int -> IdP p -> Decl' p
+
+pattern FunD''   n as e wh <- (unXRec -> FunD' _ n as e wh)
+pattern TySigD'' ns t      <- (unXRec -> TySigD' _ ns t)
+pattern DataD''  n as ds   <- (unXRec -> DataD' _ n as ds)
+pattern InfixD'' a p n     <- (unXRec -> InfixD' _ a p n)
 
 type Decl' p = XRec p (Decl p)
 
@@ -185,6 +217,8 @@ class UnXRec p where
 class MapXRec p where
     mapXRec :: (a -> b) -> XRec p a -> XRec p b
 
+-- old definition:
+-- type family XRec p (f :: Type -> Type) = (r :: Type) | r -> p f
 type family XRec p a = (r :: Type) | r -> p a
 
 type family IdP p
@@ -247,4 +281,9 @@ type Lit' p = XRec p (Lit p)
 --------------------------------------------------------------------------------
 
 makeLenses ''RlpModule
+
+--------------------------------------------------------------------------------
+
+-- stripLocation :: (UnXRec p) => XRec p a -> f NoLocated
+-- stripLocation p = undefined
 

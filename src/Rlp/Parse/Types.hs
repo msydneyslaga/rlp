@@ -31,6 +31,7 @@ import Core.Syntax                  (Name)
 import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Errorful
+import Control.Comonad              (extract)
 import Compiler.RlpcError
 import Data.Text                    (Text)
 import Data.Maybe
@@ -72,6 +73,12 @@ type instance XParE RlpcPs = ()
 type instance XOAppE RlpcPs = ()
 
 type PsName = Text
+
+instance MapXRec RlpcPs where
+    mapXRec = fmap
+
+instance UnXRec RlpcPs where
+    unXRec = extract
 
 --------------------------------------------------------------------------------
 
