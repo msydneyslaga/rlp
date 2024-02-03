@@ -59,8 +59,9 @@ import Data.Char
 import GHC.Generics
 -- Lift instances for the Core quasiquoters
 import Language.Haskell.TH.Syntax   (Lift)
-import Lens.Micro.TH                (makeLenses)
-import Lens.Micro
+-- import Lens.Micro.TH                (makeLenses)
+-- import Lens.Micro
+import Control.Lens
 ----------------------------------------------------------------------------------
 
 data Expr b = Var Name
@@ -151,6 +152,12 @@ data Program b = Program
 makeLenses ''Program
 makeBaseFunctor ''Expr
 pure []
+
+-- this is a weird optic, stronger than Lens and Prism, but weaker than Iso.
+programTypeSigsP :: (Hashable b) => Prism' (Program b) (HashMap b Type)
+programTypeSigsP = prism
+    (\b -> mempty & programTypeSigs .~ b)
+    (Right . view programTypeSigs)
 
 type ExprF' = ExprF Name
 
