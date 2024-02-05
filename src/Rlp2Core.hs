@@ -7,17 +7,20 @@ import Control.Monad
 import Control.Monad.Writer.CPS
 import Control.Arrow
 import Control.Applicative
-import Lens.Micro
-import Lens.Micro.Internal
+import Control.Comonad
+-- import Lens.Micro
+-- import Lens.Micro.Internal
+import Control.Lens
 import Data.Text                        (Text)
 import Data.Text                        qualified as T
 import Data.HashMap.Strict              qualified as H
 import Data.Monoid                      (Endo(..))
 import Data.Foldable
+import Data.Functor.Bind
 
 import Core.Syntax                      as Core
 import Rlp.Syntax                       as Rlp
-import Rlp.Parse.Types                  (RlpcPs)
+import Rlp.Parse.Types                  (RlpcPs, PsName)
 --------------------------------------------------------------------------------
 
 -- the rl' program is desugared by desugaring each declaration as a separate
@@ -38,7 +41,14 @@ declToCore (DataD'' n as ds) = fold . getZipList $
         -- arguments
         t' = foldl TyApp (TyCon n) (TyVar . dsNameToName <$> as)
 
-declToCore (FunD'' n as e wh) = mempty &
+declToCore fd@(FunD'' n as e wh) = undefined
+
+caseify :: IdP' RlpcPs -> RlpExpr' RlpcPs -> Pat' RlpcPs
+        -> (RlpExpr RlpcPs, Pat RlpcPs)
+caseify x e p = (e', p') where
+    p' = VarP (extract x)
+    e' = CaseE (VarE <$> x) [(alt, [])]
+    alt = AltA p e
 
 constructorToCore :: Type -> Tag -> ConAlt RlpcPs -> Program'
 constructorToCore t tag (ConAlt cn as) =

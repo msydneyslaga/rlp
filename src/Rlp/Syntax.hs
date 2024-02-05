@@ -11,6 +11,7 @@ module Rlp.Syntax
     , progDecls
     , Decl(..), Decl', RlpExpr(..), RlpExpr'
     , Pat(..), Pat'
+    , Alt(..)
     , Assoc(..)
     , Lit(..), Lit'
     , RlpType(..), RlpType'
@@ -19,7 +20,7 @@ module Rlp.Syntax
 
     -- * Trees That Grow boilerplate
     -- ** Extension points
-    , IdP, XRec, UnXRec(..), MapXRec(..)
+    , IdP, IdP', XRec, UnXRec(..), MapXRec(..)
     -- *** Decl
     , XFunD, XTySigD, XInfixD, XDataD, XXDeclD
     -- *** RlpExpr
@@ -36,6 +37,10 @@ module Rlp.Syntax
     -- *** RlpType
     , pattern FunConT'', pattern FunT'', pattern AppT'', pattern VarT''
     , pattern ConT''
+    -- *** Pat
+    , pattern VarP'', pattern LitP'', pattern ConP''
+    -- ** NoLocated
+    , NoLocated
     )
     where
 ----------------------------------------------------------------------------------
@@ -223,6 +228,8 @@ type family XRec p a = (r :: Type) | r -> p a
 
 type family IdP p
 
+type IdP' p = XRec p (IdP p)
+
 type Where p = [Binding p]
 
 -- do we want guards?
@@ -241,6 +248,14 @@ deriving instance (Show (XRec p (Pat p)), Show (XRec p (RlpExpr p)), Show (IdP p
 data Pat p = VarP (IdP p)
            | LitP (Lit' p)
            | ConP (IdP p) [Pat' p]
+
+pattern VarP'' :: (UnXRec p) => IdP p -> Pat' p
+pattern LitP'' :: (UnXRec p) => Lit' p -> Pat' p
+pattern ConP'' :: (UnXRec p) => IdP p -> [Pat' p] -> Pat' p
+
+pattern VarP'' n    <- (unXRec -> VarP n)
+pattern LitP'' l    <- (unXRec -> LitP l)
+pattern ConP'' c as <- (unXRec -> ConP c as)
 
 deriving instance (PhaseShow p) => Show (Pat p)
 
@@ -284,6 +299,10 @@ makeLenses ''RlpModule
 
 --------------------------------------------------------------------------------
 
--- stripLocation :: (UnXRec p) => XRec p a -> f NoLocated
--- stripLocation p = undefined
+data NoLocated
+
+type instance XRec NoLocated a = Identity a
+
+stripLocation :: (UnXRec p) => XRec p a -> f NoLocated
+stripLocation p = undefined
 
