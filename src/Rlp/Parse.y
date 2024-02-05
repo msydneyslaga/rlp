@@ -193,7 +193,10 @@ Con         :: { Located PsName }
 
 {
 
-parseRlpExprR = undefined
+parseRlpExprR :: (Monad m) => Text -> RLPCT m (RlpExpr RlpcPs)
+parseRlpExprR s = liftErrorful $ pToErrorful parseRlpExpr st
+    where
+        st = programInitState s
 
 parseRlpProgR :: (Monad m) => Text -> RLPCT m (RlpProgram RlpcPs)
 parseRlpProgR s = liftErrorful $ pToErrorful parseRlpProg st

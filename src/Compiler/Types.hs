@@ -15,11 +15,12 @@ import Control.Comonad
 import Data.Functor.Apply
 import Data.Functor.Bind
 import Control.Lens             hiding ((<<~))
+import Language.Haskell.TH.Syntax   (Lift)
 --------------------------------------------------------------------------------
 
 -- | Token wrapped with a span (line, column, absolute, length)
 data Located a = Located SrcSpan a
-    deriving (Show, Functor)
+    deriving (Show, Lift, Functor)
 
 instance Apply Located where
     liftF2 f (Located sa p) (Located sb q)
@@ -39,7 +40,7 @@ data SrcSpan = SrcSpan
     !Int -- ^ Column
     !Int -- ^ Absolute
     !Int -- ^ Length
-    deriving Show
+    deriving (Show, Lift)
 
 tupling :: Iso' SrcSpan (Int, Int, Int, Int)
 tupling = iso (\ (SrcSpan a b c d) -> (a,b,c,d))

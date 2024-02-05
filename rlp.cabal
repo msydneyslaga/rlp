@@ -37,6 +37,7 @@ library
                     , Rlp.Parse.Associate
                     , Rlp.Lex
                     , Rlp.Parse.Types
+                    , Rlp.TH
                     , Compiler.Types
                     , Data.Heap
                     , Data.Pretty

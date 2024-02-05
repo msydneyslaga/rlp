@@ -51,6 +51,7 @@ import Data.Functor.Foldable.TH     (makeBaseFunctor)
 import Data.Functor.Classes
 import Data.Functor.Identity
 import Data.Kind                    (Type)
+import Language.Haskell.TH.Syntax   (Lift)
 import Lens.Micro
 import Lens.Micro.TH
 import Core.Syntax                  hiding (Lit, Type, Binding, Binding')
@@ -156,7 +157,7 @@ type Decl' p = XRec p (Decl p)
 data Assoc = InfixL
            | InfixR
            | Infix
-           deriving (Show)
+           deriving (Show, Lift)
 
 data ConAlt p = ConAlt (IdP p) [RlpType' p]
 

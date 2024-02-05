@@ -33,6 +33,7 @@ import Control.Monad.State.Strict
 import Control.Monad.Errorful
 import Control.Comonad              (extract)
 import Compiler.RlpcError
+import Language.Haskell.TH.Syntax   (Lift)
 import Data.Text                    (Text)
 import Data.Maybe
 import Data.Fix
@@ -71,6 +72,7 @@ type instance XAppE RlpcPs = ()
 type instance XLitE RlpcPs = ()
 type instance XParE RlpcPs = ()
 type instance XOAppE RlpcPs = ()
+type instance XXRlpExprE RlpcPs = ()
 
 type PsName = Text
 
@@ -274,4 +276,16 @@ initAlexInput s = AlexInput
     , _aiBytes      = []
     , _aiPos        = (1,1,0)
     }
+
+--------------------------------------------------------------------------------
+
+deriving instance Lift (RlpProgram RlpcPs)
+deriving instance Lift (Decl RlpcPs)
+deriving instance Lift (Pat RlpcPs)
+deriving instance Lift (Lit RlpcPs)
+deriving instance Lift (RlpExpr RlpcPs)
+deriving instance Lift (Binding RlpcPs)
+deriving instance Lift (RlpType RlpcPs)
+deriving instance Lift (Alt RlpcPs)
+deriving instance Lift (ConAlt RlpcPs)
 
