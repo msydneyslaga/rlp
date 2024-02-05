@@ -11,6 +11,7 @@ import Control.Comonad
 -- import Lens.Micro
 -- import Lens.Micro.Internal
 import Control.Lens
+import Data.List                        (mapAccumL)
 import Data.Text                        (Text)
 import Data.Text                        qualified as T
 import Data.HashMap.Strict              qualified as H
@@ -19,6 +20,7 @@ import Data.Foldable
 import Data.Functor.Bind
 
 import Core.Syntax                      as Core
+import Compiler.Types
 import Rlp.Syntax                       as Rlp
 import Rlp.Parse.Types                  (RlpcPs, PsName)
 --------------------------------------------------------------------------------
@@ -41,14 +43,26 @@ declToCore (DataD'' n as ds) = fold . getZipList $
         -- arguments
         t' = foldl TyApp (TyCon n) (TyVar . dsNameToName <$> as)
 
-declToCore fd@(FunD'' n as e wh) = undefined
+-- TODO: where-binds
+declToCore fd@(FunD'' n as e _) = mempty & programScDefs .~ [ScDef n' as' e'']
+    where
+        n' = dsNameToName n
+        (e',as') = mapAccumL caseify (extract e) (names `zip` as)
+        e'' = exprToCore e'
+        names = [ nolo $ "$x_" <> tshow n | n <- [0..] ]
+        tshow = T.pack . show
 
-caseify :: IdP' RlpcPs -> RlpExpr' RlpcPs -> Pat' RlpcPs
-        -> (RlpExpr RlpcPs, Pat RlpcPs)
-caseify x e p = (e', p') where
-    p' = VarP (extract x)
+-- mapAccumL :: Traversable t => (s -> a -> (s, b)) -> s -> t a -> (s, t b)
+
+caseify :: RlpExpr RlpcPs -> (IdP' RlpcPs, Pat' RlpcPs)
+        -> (RlpExpr RlpcPs, Name)
+caseify e (x,p) = (e', x') where
+    x' = dsNameToName (extract x)
     e' = CaseE (VarE <$> x) [(alt, [])]
-    alt = AltA p e
+    alt = AltA p (nolo e)
+
+exprToCore :: RlpExpr RlpcPs -> Expr'
+exprToCore = undefined
 
 constructorToCore :: Type -> Tag -> ConAlt RlpcPs -> Program'
 constructorToCore t tag (ConAlt cn as) =

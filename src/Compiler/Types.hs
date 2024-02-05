@@ -2,6 +2,7 @@ module Compiler.Types
     ( SrcSpan(..)
     , srcspanLine, srcspanColumn, srcspanAbs, srcspanLen
     , Located(..)
+    , nolo
     , (<<~), (<~>)
 
     -- * Re-exports
@@ -51,6 +52,10 @@ srcspanLine = tupling . _1
 srcspanColumn = tupling . _2
 srcspanAbs = tupling . _3
 srcspanLen = tupling . _4
+
+-- | debug tool
+nolo :: a -> Located a
+nolo = Located (SrcSpan 0 0 0 0)
 
 instance Semigroup SrcSpan where
     SrcSpan la ca aa sa <> SrcSpan lb cb ab sb = SrcSpan l c a s where
