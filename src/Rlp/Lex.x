@@ -127,7 +127,7 @@ $white_no_nl+       ;
 <layout_let>
 {
     \n                  { beginPush bol }
-    "{"                 { explicitLBrace }
+    "{"                 { explicitLBrace `thenDo` popLexState }
     "in"                { constToken TokenIn `thenDo` (popLexState *> popLayout) }
     ()                  { doLayout }
 }
