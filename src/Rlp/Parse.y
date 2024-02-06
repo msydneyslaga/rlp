@@ -25,6 +25,7 @@ import Data.Semigroup.Traversable
 import Data.Text                    (Text)
 import Data.Text                    qualified as T
 import Data.Void
+import Compiler.Types
 }
 
 %name parseRlpProg StandaloneProgram
@@ -42,6 +43,8 @@ import Data.Void
     consym          { Located _ (TokenConSym _) }
     varsym          { Located _ (TokenVarSym _) }
     data            { Located _ TokenData }
+    case            { Located _ TokenCase }
+    of              { Located _ TokenOf }
     litint          { Located _ (TokenLitInt _) }
     '='             { Located _ TokenEquals }
     '|'             { Located _ TokenPipe }
@@ -150,6 +153,9 @@ Params      :: { [Pat' RlpcPs] }
 Params      : {- epsilon -}             { [] }
             | Params Pat1               { $1 `snoc` $2 }
 
+Pat         :: { Pat' RlpcPs }
+            : Pat1                      { $1 }
+
 Pat1        :: { Pat' RlpcPs }
             : Var                       { fmap VarP $1 }
             | Lit                       { LitP <<= $1 }
@@ -157,20 +163,43 @@ Pat1        :: { Pat' RlpcPs }
 Expr        :: { RlpExpr' RlpcPs }
             : Expr1 InfixOp Expr        { $2 =>> \o ->
                                           OAppE (extract o) $1 $3 }
-            | Expr1                     { $1 }
             | LetExpr                   { $1 }
+            | CaseExpr                  { $1 }
+            | Expr1                     { $1 }
 
 LetExpr     :: { RlpExpr' RlpcPs }
             : let layout1(Binding) in Expr { $1 \$> LetE $2 $4 }
 
+CaseExpr    :: { RlpExpr' RlpcPs }
+            : case Expr of layout0(CaseAlt)
+                { CaseE <<~ $2 <#> $4 }
+
+-- TODO: where-binds
+CaseAlt     :: { (Alt RlpcPs, Where RlpcPs) }
+            : Alt                           { ($1, []) }
+
+Alt         :: { Alt RlpcPs }
+            : Pat '->' Expr                 { AltA $1 $3 }
+
+-- layout0(p : β) :: [β]
+layout0(p)  : '{' layout_list0(';',p) '}'   { $2 }
+            | VL  layout_list0(VS,p)  VR    { $2 }
+
+-- layout_list0(sep : α, p : β) :: [β]
+layout_list0(sep,p) : p                          { [$1] }
+                    | layout_list1(sep,p) sep p  { $1 `snoc` $3 }
+                    | {- epsilon -}              { [] }
+
+-- layout1(p : β) :: [β]
 layout1(p)  : '{' layout_list1(';',p) '}'   { $2 }
             | VL  layout_list1(VS,p) VR     { $2 }
 
+-- layout_list1(sep : α, p : β) :: [β]
 layout_list1(sep,p) : p                          { [$1] }
                     | layout_list1(sep,p) sep p  { $1 `snoc` $3 }
 
 Binding     :: { Binding' RlpcPs }
-            : Pat1 '=' Expr              { PatB <<~ $1 <~> $3 }
+            : Pat '=' Expr              { PatB <<~ $1 <~> $3 }
 
 Expr1       :: { RlpExpr' RlpcPs }
             : '(' Expr ')'              { $1 .> $2 <. $3 }

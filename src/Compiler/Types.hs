@@ -4,7 +4,7 @@ module Compiler.Types
     , Located(..)
     , locating
     , nolo
-    , (<<~), (<~>)
+    , (<<~), (<~>), (<#>)
 
     -- * Re-exports
     , Comonad
@@ -85,4 +85,11 @@ infixl 4 <<~
 mc <~> ma = mc >>- \f -> ma =>> f
 
 infixl 4 <~>
+
+-- this is getting silly
+
+(<#>) :: (Functor f) => f (a -> b) -> a -> f b
+fab <#> a = fmap ($ a) fab
+
+infixl 4 <#>
 

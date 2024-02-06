@@ -85,6 +85,7 @@ $white_no_nl+       ;
 <0>
 {
     "let"               { constToken TokenLet `thenBeginPush` layout_let }
+    "of"                { constToken TokenOf `thenBeginPush` layout_of }
 }
 
 -- scan various identifiers and reserved words. order is important here!
@@ -124,18 +125,19 @@ $white_no_nl+       ;
     ()                  { doBol }
 }
 
-<layout_let>
+<layout, layout_let, layout_of>
 {
     \n                  { beginPush bol }
     "{"                 { explicitLBrace `thenDo` popLexState }
-    "in"                { constToken TokenIn `thenDo` (popLexState *> popLayout) }
-    ()                  { doLayout }
 }
 
-<layout_top>
+<layout_let>
 {
-    \n                  ;
-    "{"                 { explicitLBrace `thenDo` popLexState }
+    "in"                { constToken TokenIn `thenDo` (popLexState *> popLayout) }
+}
+
+<layout, layout_top, layout_let, layout_of>
+{
     ()                  { doLayout }
 }
 
@@ -157,6 +159,7 @@ lexReservedOp = \case
     "="     -> TokenEquals
     "::"    -> TokenHasType
     "|"     -> TokenPipe
+    "->"    -> TokenArrow
 
 -- | @andBegin@, with the subtle difference that the start code is set
 --   /after/ the action
