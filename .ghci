@@ -22,6 +22,3 @@ _reload_and_make _ = do
 
 --------------------------------------------------------------------------------
 
--- import rlpc quasiquoters
-:m + Core.TH Rlp.TH
-

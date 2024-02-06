@@ -84,6 +84,7 @@ library
         OverloadedStrings
         TypeFamilies
         LambdaCase
+        ViewPatterns
 
 executable rlpc
     import:           warnings

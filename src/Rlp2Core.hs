@@ -18,6 +18,7 @@ import Data.HashMap.Strict              qualified as H
 import Data.Monoid                      (Endo(..))
 import Data.Foldable
 import Data.Functor.Bind
+import Debug.Trace
 
 import Core.Syntax                      as Core
 import Compiler.Types
@@ -63,7 +64,23 @@ exprToCore :: RlpExpr RlpcPs -> Expr'
 
 exprToCore (VarE n) = Var (dsNameToName n)
 
-exprToCore (CaseE e as) = undefined
+exprToCore (CaseE (unXRec -> e) as) = Case (exprToCore e) (caseAltToCore <$> as)
+
+-- TODO: where-binds
+caseAltToCore :: (Alt RlpcPs, Where RlpcPs) -> Alter'
+caseAltToCore (AltA (VarP'' x) e, wh) =
+    Alter AltDefault [] (exprToCore $ unXRec e)
+caseAltToCore (AltA rootPat@(ConP'' cn as) e, wh) =
+    case firstNestedPat of
+        -- this case matches a nested pattern, which must be unrolled:
+        Just (c,p) -> undefined
+        -- no nested patterns! direct translation:
+        Nothing    -> Alter (AltData cn) as' e'
+            where
+                as' = (\ (VarP'' x) -> dsNameToName x) <$> traceShowId as
+                e' = exprToCore (unXRec e)
+  where
+    firstNestedPat = expandableAlt "NAME" . unXRec $ rootPat
 
 -- >>> pat1 = nolo $ ConP "C" [nolo $ ConP "P" []]
 -- >>> expandableAlt "name" (AltA pat1 (nolo $ VarE "e"))
@@ -72,10 +89,10 @@ exprToCore (CaseE e as) = undefined
 -- >>> pat2 = nolo $ ConP "C" [nolo $ VarP "p", nolo $ ConP "P" []]
 -- >>> expandableAlt "name" (AltA pat2 (nolo $ VarE "e"))
 -- Just (ConP "C" [Located (SrcSpan 0 0 0 0) (VarP "p"),Located (SrcSpan 0 0 0 0) (VarP "name")],ConP "P" [],VarE' () "e")
-expandableAlt :: IdP RlpcPs -> Alt RlpcPs
-              -> Maybe (Pat RlpcPs, Pat RlpcPs, RlpExpr RlpcPs)
-expandableAlt n (AltA c@(ConP'' cn as) e) =
-    nestedPat <&> (c', , extract e)
+expandableAlt :: IdP RlpcPs -> Pat RlpcPs
+              -> Maybe (Pat RlpcPs, Pat RlpcPs)
+expandableAlt n c@(ConP cn as) =
+    nestedPat <&> (c',)
   where
     l :: Lens' [Pat RlpcPs] (Maybe (Pat RlpcPs))
     l = atFound (has _ConP)
@@ -84,6 +101,7 @@ expandableAlt n (AltA c@(ConP'' cn as) e) =
     nestedPat = (unXRec <$> as) ^. l
     as' = (unXRec <$> as) & l ?~ VarP n
                           & fmap nolo
+expandableAlt _ _ = Nothing
 
 -- this is an illegal lens, and we're using it illegally. it's convenient :3
 -- TODO: adhere to the holy laws of the Lens Herself

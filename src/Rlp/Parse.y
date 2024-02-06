@@ -154,11 +154,19 @@ Params      : {- epsilon -}             { [] }
             | Params Pat1               { $1 `snoc` $2 }
 
 Pat         :: { Pat' RlpcPs }
-            : Pat1                      { $1 }
+            : Con Pat1s                 { $1 =>> \cn ->
+                                          ConP (extract $1) $2 }
+            | Pat1                      { $1 }
+
+Pat1s       :: { [Pat' RlpcPs] }
+            : Pat1s Pat1                { $1 `snoc` $2 }
+            | Pat1                      { [$1] }
 
 Pat1        :: { Pat' RlpcPs }
-            : Var                       { fmap VarP $1 }
+            : Con                       { fmap (`ConP` []) $1 }
+            | Var                       { fmap VarP $1 }
             | Lit                       { LitP <<= $1 }
+            | '(' Pat ')'               { $1 .> $2 <. $3 }
 
 Expr        :: { RlpExpr' RlpcPs }
             : Expr1 InfixOp Expr        { $2 =>> \o ->

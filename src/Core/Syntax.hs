@@ -121,7 +121,7 @@ data Rec = Rec
 data AltCon = AltData Name
             | AltTag Tag
             | AltLit Lit
-            | Default
+            | AltDefault
             deriving (Show, Read, Eq, Lift)
 
 newtype Lit = IntL Int

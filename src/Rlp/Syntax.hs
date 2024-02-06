@@ -11,7 +11,7 @@ module Rlp.Syntax
     , progDecls
     , Decl(..), Decl', RlpExpr(..), RlpExpr'
     , Pat(..), Pat'
-    , Alt(..)
+    , Alt(..), Where
     , Assoc(..)
     , Lit(..), Lit'
     , RlpType(..), RlpType'
