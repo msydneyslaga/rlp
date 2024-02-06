@@ -74,13 +74,13 @@ exprToCore (CaseE e as) = undefined
 -- Just (ConP "C" [Located (SrcSpan 0 0 0 0) (VarP "p"),Located (SrcSpan 0 0 0 0) (VarP "name")],ConP "P" [],VarE' () "e")
 expandableAlt :: IdP RlpcPs -> Alt RlpcPs
               -> Maybe (Pat RlpcPs, Pat RlpcPs, RlpExpr RlpcPs)
-expandableAlt n (AltA c@(ConP'' cn as) e) = do
-    p <- nestedPat
-    let c' = ConP cn as'
-    pure (c', p, extract e)
+expandableAlt n (AltA c@(ConP'' cn as) e) =
+    nestedPat <&> (c', , extract e)
   where
     l :: Lens' [Pat RlpcPs] (Maybe (Pat RlpcPs))
     l = atFound (has _ConP)
+
+    c' = ConP cn as'
     nestedPat = (unXRec <$> as) ^. l
     as' = (unXRec <$> as) & l ?~ VarP n
                           & fmap nolo
