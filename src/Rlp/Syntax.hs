@@ -18,6 +18,8 @@ module Rlp.Syntax
     , ConAlt(..)
     , Binding(..), Binding'
 
+    , _VarP, _LitP, _ConP
+
     -- * Trees That Grow boilerplate
     -- ** Extension points
     , IdP, IdP', XRec, UnXRec(..), MapXRec(..)
@@ -39,8 +41,6 @@ module Rlp.Syntax
     , pattern ConT''
     -- *** Pat
     , pattern VarP'', pattern LitP'', pattern ConP''
-    -- ** NoLocated
-    , NoLocated
     )
     where
 ----------------------------------------------------------------------------------
@@ -52,8 +52,8 @@ import Data.Functor.Classes
 import Data.Functor.Identity
 import Data.Kind                    (Type)
 import Language.Haskell.TH.Syntax   (Lift)
-import Lens.Micro
-import Lens.Micro.TH
+import Lens.Micro.Pro
+import Lens.Micro.Pro.TH
 import Core.Syntax                  hiding (Lit, Type, Binding, Binding')
 import Core                         (HasRHS(..), HasLHS(..))
 ----------------------------------------------------------------------------------
@@ -297,13 +297,5 @@ type Lit' p = XRec p (Lit p)
 --------------------------------------------------------------------------------
 
 makeLenses ''RlpModule
-
---------------------------------------------------------------------------------
-
-data NoLocated
-
-type instance XRec NoLocated a = Identity a
-
-stripLocation :: (UnXRec p) => XRec p a -> f NoLocated
-stripLocation p = undefined
+makePrisms ''Pat
 

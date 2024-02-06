@@ -2,6 +2,7 @@ module Compiler.Types
     ( SrcSpan(..)
     , srcspanLine, srcspanColumn, srcspanAbs, srcspanLen
     , Located(..)
+    , locating
     , nolo
     , (<<~), (<~>)
 
@@ -56,6 +57,9 @@ srcspanLen = tupling . _4
 -- | debug tool
 nolo :: a -> Located a
 nolo = Located (SrcSpan 0 0 0 0)
+
+locating :: Lens (Located a) (Located b) a b
+locating = lens extract ($>)
 
 instance Semigroup SrcSpan where
     SrcSpan la ca aa sa <> SrcSpan lb cb ab sb = SrcSpan l c a s where

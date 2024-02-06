@@ -1,5 +1,9 @@
+-- repl extensions
 :set -XOverloadedStrings
 
+--------------------------------------------------------------------------------
+
+-- happy/alex: override :r to rebuild parsers
 :set -package process
 
 :{
@@ -15,4 +19,9 @@ _reload_and_make _ = do
 :}
 
 :def! r _reload_and_make
+
+--------------------------------------------------------------------------------
+
+-- import rlpc quasiquoters
+:m + Core.TH Rlp.TH
 

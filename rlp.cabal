@@ -75,6 +75,7 @@ library
                     , comonad
                     , lens
                     , text-ansi
+                    , microlens-pro ^>=0.2.0
 
     hs-source-dirs:   src
     default-language: GHC2021
