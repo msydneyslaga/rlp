@@ -7,6 +7,7 @@ module Rlp2Core
 --------------------------------------------------------------------------------
 import Control.Monad
 import Control.Monad.Writer.CPS
+import Control.Monad.Utils              (mapAccumLM)
 import Control.Arrow
 import Control.Applicative
 import Control.Comonad
@@ -25,7 +26,6 @@ import Data.Functor.Bind
 import Debug.Trace
 import Effectful.State.Static.Local
 import Effectful
-import Control.Monad.Utils              (mapAccumLM)
 import Text.Show.Deriving
 
 import Core.Syntax                      as Core
@@ -34,8 +34,18 @@ import Rlp.Syntax                       as Rlp
 import Rlp.Parse.Types                  (RlpcPs, PsName)
 --------------------------------------------------------------------------------
 
-data Branch a = Branch Name [Either Name (Name, Branch a)]
+type Tree a = Either Name (Name, Branch a)
+
+-- | Rose tree branch representing "nested" "patterns" in the Core language. That
+-- is, a constructor with children that are either a normal binder (Left (Given)
+-- name) or an indirection to another pattern (Right (Generated name) (Pattern))
+
+data Branch a = Branch Name [Tree a]
     deriving (Show, Functor, Foldable, Traversable)
+
+-- | The actual rose tree.
+-- @type Rose = 'Data.Fix.Fix' 'Branch'@
+
 type Rose = Fix Branch
 
 deriveShow1 ''Branch
@@ -84,17 +94,44 @@ exprToCore (CaseE (unXRec -> e) as) = Case (exprToCore e) (caseAltToCore <$> as)
 caseAltToCore :: (Alt RlpcPs, Where RlpcPs) -> Alter'
 caseAltToCore = undefined
 
+-- roseToCore :: Rose -> Expr' -> Alter'
+-- roseToCore (unFix -> Branch cn as) = alter
+--     where
+--         alter :: Alter'
+--         alter = Alter (AltData cn) (treeToCore <$> as) (Var "expr")
+--         -- foldFix :: Functor f => (f a -> a) -> Fix f -> a
+--         treeToCore :: Tree Rose -> Expr' -> Expr'
+--         treeToCore (Left n)       = id
+--         treeToCore (Right (n,cs)) = \e -> Case (Var n) [_]
+
 conToRose :: forall es. (State [IdP RlpcPs] :> es) => Pat RlpcPs -> Eff es Rose
-conToRose (ConP cn as) = Fix . Branch cn <$> patToBranch `traverse` as
+conToRose (ConP cn as) = Fix . Branch cn <$> patToForrest `traverse` as
     where
-        patToBranch :: Pat' RlpcPs -> Eff es (Either Name (Name, Branch (Fix Branch)))
-        patToBranch (VarP'' x) = pure $ Left (dsNameToName x)
-        patToBranch p@(ConP'' _ _) =
+        patToForrest :: Pat' RlpcPs -> Eff es (Tree Rose)
+        patToForrest (VarP'' x) = pure $ Left (dsNameToName x)
+        patToForrest p@(ConP'' _ _) =
             Right <$> liftA2 (,) getName br
           where
             br = unwrapFix <$> conToRose (unXRec p)
 
         getName = state $ fromJust . uncons @[IdP RlpcPs]
+
+test :: Expr' -> Branch Alter' -> Alter'
+test e (Branch cn as) = Alter (AltData cn) myBinds e'
+    where
+        (e', myBinds) = mapAccumL f e as
+
+        f :: Expr' -> Tree Alter' -> (Expr', Name)
+        f e (Left n)       = (e, dsNameToName n)
+        f e (Right (n,cs)) = (e', dsNameToName n) where
+            e' = Case (Var $ dsNameToName n) [test e cs]
+
+runNames = runPureEff . evalState nameSupply
+
+-- | debug tool
+
+nameSupply :: [IdP RlpcPs]
+nameSupply = [ T.pack $ "$x_" <> show n | n <- [0..] ]
 
 constructorToCore :: Type -> Tag -> ConAlt RlpcPs -> Program'
 constructorToCore t tag (ConAlt cn as) =
