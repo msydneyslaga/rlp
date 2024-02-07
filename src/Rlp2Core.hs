@@ -25,6 +25,7 @@ import Data.Maybe                       (fromJust)
 import Data.Functor.Bind
 import Debug.Trace
 import Effectful.State.Static.Local
+import Effectful.Labeled
 import Effectful
 import Text.Show.Deriving
 
@@ -73,7 +74,7 @@ declToCore fd@(FunD'' n as e _) = mempty & programScDefs .~ [ScDef n' as' e'']
     where
         n' = dsNameToName n
         (e',as') = mapAccumL caseify (extract e) (names `zip` as)
-        e'' = exprToCore e'
+        e'' = runPureEff . runNameSupply n $ exprToCore e'
         names = [ nolo $ "$x_" <> tshow n | n <- [0..] ]
         tshow = T.pack . show
 
@@ -84,11 +85,13 @@ caseify e (x,p) = (e', x') where
     e' = CaseE (VarE <$> x) [(alt, [])]
     alt = AltA p (nolo e)
 
-exprToCore :: RlpExpr RlpcPs -> Expr'
+type NameSupply = Labeled "expr-name-supply" (State [IdP RlpcPs])
 
-exprToCore (VarE n) = Var (dsNameToName n)
+exprToCore :: (NameSupply :> es) => RlpExpr RlpcPs -> Eff es Expr'
 
-exprToCore (CaseE (unXRec -> e) as) = Case (exprToCore e) (caseAltToCore <$> as)
+exprToCore (VarE n) = pure $ Var (dsNameToName n)
+
+exprToCore (CaseE (unXRec -> e) as) = undefined
 
 -- TODO: where-binds
 caseAltToCore :: (Alt RlpcPs, Where RlpcPs) -> Alter'
@@ -128,10 +131,9 @@ branchToCore e (Branch cn as) = Alter (AltData cn) myBinds e'
         f e (Right (n,cs)) = (e', dsNameToName n) where
             e' = Case (Var $ dsNameToName n) [branchToCore e cs]
 
--- | debug helper
-
-runNames :: Eff '[State [PsName]] c -> c
-runNames = runPureEff . evalState nameSupply
+runNameSupply :: IdP RlpcPs -> Eff (NameSupply ': es) a -> Eff es a
+runNameSupply n = runLabeled @"expr-name-supply" (evalState ns) where
+    ns = [ "$" <> n <> "_" <> T.pack (show k) | k <- [0..] ]
 
 -- | debug helper
 
