@@ -76,6 +76,8 @@ library
                     , lens
                     , text-ansi
                     , microlens-pro ^>=0.2.0
+                    , effectful-core ^>=2.3.0.0
+                    , deriving-compat ^>=0.6.0
 
     hs-source-dirs:   src
     default-language: GHC2021

@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveTraversable #-}
 module Rlp2Core
     ( rlpProgToCore
     )
@@ -17,14 +19,26 @@ import Data.Text                        qualified as T
 import Data.HashMap.Strict              qualified as H
 import Data.Monoid                      (Endo(..))
 import Data.Foldable
+import Data.Fix
+import Data.Maybe                       (fromJust)
 import Data.Functor.Bind
 import Debug.Trace
+import Effectful.State.Static.Local
+import Effectful
+import Control.Monad.Utils              (mapAccumLM)
+import Text.Show.Deriving
 
 import Core.Syntax                      as Core
 import Compiler.Types
 import Rlp.Syntax                       as Rlp
 import Rlp.Parse.Types                  (RlpcPs, PsName)
 --------------------------------------------------------------------------------
+
+data Branch a = Branch Name [Either Name (Name, Branch a)]
+    deriving (Show, Functor, Foldable, Traversable)
+type Rose = Fix Branch
+
+deriveShow1 ''Branch
 
 -- the rl' program is desugared by desugaring each declaration as a separate
 -- program, and taking the monoidal product of the lot :3
@@ -68,60 +82,19 @@ exprToCore (CaseE (unXRec -> e) as) = Case (exprToCore e) (caseAltToCore <$> as)
 
 -- TODO: where-binds
 caseAltToCore :: (Alt RlpcPs, Where RlpcPs) -> Alter'
-caseAltToCore (AltA (VarP'' x) e, wh) =
-    Alter AltDefault [] (exprToCore $ unXRec e)
-caseAltToCore (AltA rootPat@(ConP'' cn as) e, wh) =
-    case firstNestedPat of
-        -- this case matches a nested pattern, which must be unrolled:
-        Just (c,p) -> undefined
-        -- no nested patterns! direct translation:
-        Nothing    -> Alter (AltData cn) as' e'
-            where
-                as' = (\ (VarP'' x) -> dsNameToName x) <$> traceShowId as
-                e' = exprToCore (unXRec e)
-  where
-    firstNestedPat = expandableAlt "NAME" . unXRec $ rootPat
+caseAltToCore = undefined
 
--- >>> pat1 = nolo $ ConP "C" [nolo $ ConP "P" []]
--- >>> expandableAlt "name" (AltA pat1 (nolo $ VarE "e"))
--- Just (ConP "C" [Located (SrcSpan 0 0 0 0) (VarP "name")],ConP "P" [],VarE' () "e")
--- 
--- >>> pat2 = nolo $ ConP "C" [nolo $ VarP "p", nolo $ ConP "P" []]
--- >>> expandableAlt "name" (AltA pat2 (nolo $ VarE "e"))
--- Just (ConP "C" [Located (SrcSpan 0 0 0 0) (VarP "p"),Located (SrcSpan 0 0 0 0) (VarP "name")],ConP "P" [],VarE' () "e")
-expandableAlt :: IdP RlpcPs -> Pat RlpcPs
-              -> Maybe (Pat RlpcPs, Pat RlpcPs)
-expandableAlt n c@(ConP cn as) =
-    nestedPat <&> (c',)
-  where
-    l :: Lens' [Pat RlpcPs] (Maybe (Pat RlpcPs))
-    l = atFound (has _ConP)
+conToRose :: forall es. (State [IdP RlpcPs] :> es) => Pat RlpcPs -> Eff es Rose
+conToRose (ConP cn as) = Fix . Branch cn <$> patToBranch `traverse` as
+    where
+        patToBranch :: Pat' RlpcPs -> Eff es (Either Name (Name, Branch (Fix Branch)))
+        patToBranch (VarP'' x) = pure $ Left (dsNameToName x)
+        patToBranch p@(ConP'' _ _) =
+            Right <$> liftA2 (,) getName br
+          where
+            br = unwrapFix <$> conToRose (unXRec p)
 
-    c' = ConP cn as'
-    nestedPat = (unXRec <$> as) ^. l
-    as' = (unXRec <$> as) & l ?~ VarP n
-                          & fmap nolo
-expandableAlt _ _ = Nothing
-
--- this is an illegal lens, and we're using it illegally. it's convenient :3
--- TODO: adhere to the holy laws of the Lens Herself
-atFound :: forall a. (a -> Bool) -> Lens' [a] (Maybe a)
-atFound p = lens (find p) alter where
-    alter :: [a] -> Maybe a -> [a]
-    alter l Nothing  = deleteFound l
-    alter l (Just x') = setFound x' l
-
-    deleteFound :: [a] -> [a]
-    deleteFound []  = []
-    deleteFound (x:xs)
-        | p x       = xs
-        | otherwise = x : deleteFound xs
-
-    setFound :: a -> [a] -> [a]
-    setFound _  []  = []
-    setFound x' (x:xs)
-        | p x       = x' : xs
-        | otherwise = x : setFound x' xs
+        getName = state $ fromJust . uncons @[IdP RlpcPs]
 
 constructorToCore :: Type -> Tag -> ConAlt RlpcPs -> Program'
 constructorToCore t tag (ConAlt cn as) =
