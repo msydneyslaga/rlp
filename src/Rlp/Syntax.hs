@@ -47,10 +47,12 @@ module Rlp.Syntax
 import Data.Text                    (Text)
 import Data.Text                    qualified as T
 import Data.String                  (IsString(..))
+import Data.Functor.Foldable
 import Data.Functor.Foldable.TH     (makeBaseFunctor)
 import Data.Functor.Classes
 import Data.Functor.Identity
 import Data.Kind                    (Type)
+import GHC.Generics
 import Language.Haskell.TH.Syntax   (Lift)
 import Lens.Micro.Pro
 import Lens.Micro.Pro.TH
@@ -173,6 +175,7 @@ data RlpExpr p = LetE'  (XLetE p) [Binding' p] (RlpExpr' p)
                | ParE'  (XParE p) (RlpExpr' p)
                | OAppE' (XOAppE p) (IdP p) (RlpExpr' p) (RlpExpr' p)
                | XRlpExprE' !(XXRlpExprE p)
+               deriving (Generic)
 
 type family XLetE p
 type family XVarE p
@@ -219,6 +222,9 @@ type RlpExpr' p = XRec p (RlpExpr p)
 
 class UnXRec p where
     unXRec :: XRec p a -> a
+
+class WrapXRec p where
+    wrapXRec :: a -> XRec p a
 
 class MapXRec p where
     mapXRec :: (a -> b) -> XRec p a -> XRec p b
@@ -298,4 +304,46 @@ type Lit' p = XRec p (Lit p)
 
 makeLenses ''RlpModule
 makePrisms ''Pat
+
+--------------------------------------------------------------------------------
+
+data RlpExprF p a = LetE'F  (XLetE p) [Binding' p] a
+                  | VarE'F  (XVarE p) (IdP p)
+                  | LamE'F  (XLamE p) [Pat p] a
+                  | CaseE'F (XCaseE p) a [(Alt p, Where p)]
+                  | IfE'F   (XIfE p) a a a
+                  | AppE'F  (XAppE p) a a
+                  | LitE'F  (XLitE p) (Lit p)
+                  | ParE'F  (XParE p) a
+                  | OAppE'F (XOAppE p) (IdP p) a a
+                  | XRlpExprE'F !(XXRlpExprE p)
+                  deriving (Functor, Foldable, Traversable, Generic)
+
+type instance Base (RlpExpr p) = RlpExprF p
+
+instance (UnXRec p) => Recursive (RlpExpr p) where
+    project = \case
+        LetE' xx bs e   -> LetE'F xx bs (unXRec e)
+        VarE' xx n      -> VarE'F xx n
+        LamE' xx ps e   -> LamE'F xx ps (unXRec e)
+        CaseE' xx e as  -> CaseE'F xx (unXRec e) as
+        IfE' xx a b c   -> IfE'F xx (unXRec a) (unXRec b) (unXRec c)
+        AppE' xx f x    -> AppE'F xx (unXRec f) (unXRec x)
+        LitE' xx l      -> LitE'F xx l
+        ParE' xx e      -> ParE'F xx (unXRec e)
+        OAppE' xx f a b -> OAppE'F xx f (unXRec a) (unXRec b)
+        XRlpExprE' xx   -> XRlpExprE'F xx
+
+instance (WrapXRec p) => Corecursive (RlpExpr p) where
+    embed = \case
+        LetE'F xx bs e   -> LetE' xx bs (wrapXRec e)
+        VarE'F xx n      -> VarE' xx n
+        LamE'F xx ps e   -> LamE' xx ps (wrapXRec e)
+        CaseE'F xx e as  -> CaseE' xx (wrapXRec e) as
+        IfE'F xx a b c   -> IfE' xx (wrapXRec a) (wrapXRec b) (wrapXRec c)
+        AppE'F xx f x    -> AppE' xx (wrapXRec f) (wrapXRec x)
+        LitE'F xx l      -> LitE' xx l
+        ParE'F xx e      -> ParE' xx (wrapXRec e)
+        OAppE'F xx f a b -> OAppE' xx f (wrapXRec a) (wrapXRec b)
+        XRlpExprE'F xx   -> XRlpExprE' xx
 
