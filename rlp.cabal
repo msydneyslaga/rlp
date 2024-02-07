@@ -87,6 +87,7 @@ library
         TypeFamilies
         LambdaCase
         ViewPatterns
+        DataKinds
 
 executable rlpc
     import:           warnings

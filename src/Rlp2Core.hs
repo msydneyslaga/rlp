@@ -116,19 +116,24 @@ conToRose (ConP cn as) = Fix . Branch cn <$> patToForrest `traverse` as
 
         getName = state $ fromJust . uncons @[IdP RlpcPs]
 
-test :: Expr' -> Branch Alter' -> Alter'
-test e (Branch cn as) = Alter (AltData cn) myBinds e'
+branchToCore :: Expr' -> Branch Alter' -> Alter'
+branchToCore e (Branch cn as) = Alter (AltData cn) myBinds e'
     where
+        -- gather binders for the /current/ pattern, and build an expression
+        -- matching subpatterns
         (e', myBinds) = mapAccumL f e as
 
         f :: Expr' -> Tree Alter' -> (Expr', Name)
         f e (Left n)       = (e, dsNameToName n)
         f e (Right (n,cs)) = (e', dsNameToName n) where
-            e' = Case (Var $ dsNameToName n) [test e cs]
+            e' = Case (Var $ dsNameToName n) [branchToCore e cs]
 
+-- | debug helper
+
+runNames :: Eff '[State [PsName]] c -> c
 runNames = runPureEff . evalState nameSupply
 
--- | debug tool
+-- | debug helper
 
 nameSupply :: [IdP RlpcPs]
 nameSupply = [ T.pack $ "$x_" <> show n | n <- [0..] ]
