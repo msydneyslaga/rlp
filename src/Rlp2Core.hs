@@ -95,14 +95,16 @@ exprToCore :: (NameSupply :> es) => RlpExpr RlpcPs -> Eff es Expr'
 
 exprToCore (VarE n) = pure $ Var (dsNameToName n)
 
-exprToCore (CaseE (unXRec -> e) as) = undefined
+exprToCore (CaseE (unXRec -> e) as) = do
+    e' <- exprToCore e
+    Case e' <$> caseAltToCore `traverse` as
 
 -- TODO: where-binds
 caseAltToCore :: (NameSupply :> es)
               => (Alt RlpcPs, Where RlpcPs) -> Eff es Alter'
-caseAltToCore (AltA (extract -> p) e, wh) = undefined
-    where
-        
+caseAltToCore (AltA (unXRec -> p) e, wh) = do
+    e' <- exprToCore . unXRec $ e
+    conToRose p <&> foldFix (branchToCore e')
 
 conToRose :: forall es. (NameSupply :> es) => Pat RlpcPs -> Eff es Rose
 conToRose (ConP cn as) = Fix . Branch cn <$> patToForrest `traverse` as

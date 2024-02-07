@@ -183,6 +183,7 @@ putRlpcErrs opts = filter byTag
         byTag :: MsgEnvelope RlpcError -> Bool
         byTag (view msgSeverity -> SevDebug t) =
             t `S.member` dflags
+        byTag _ = True
 
 prettyRlpcMsg :: MsgEnvelope RlpcError -> String
 prettyRlpcMsg m@(view msgSeverity -> SevDebug _) = prettyRlpcDebugMsg m
