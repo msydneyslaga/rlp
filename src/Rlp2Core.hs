@@ -21,7 +21,7 @@ import Data.HashMap.Strict              qualified as H
 import Data.Monoid                      (Endo(..))
 import Data.Foldable
 import Data.Fix
-import Data.Maybe                       (fromJust)
+import Data.Maybe                       (fromJust, fromMaybe)
 import Data.Functor.Bind
 import Debug.Trace
 import Effectful.State.Static.Local
@@ -73,19 +73,23 @@ declToCore (DataD'' n as ds) = fold . getZipList $
 declToCore fd@(FunD'' n as e _) = mempty & programScDefs .~ [ScDef n' as' e'']
     where
         n' = dsNameToName n
-        (e',as') = mapAccumL caseify (extract e) (names `zip` as)
+        -- e   : verbatim function body
+        -- e'  : function body w/ case-exprs matching pattern arguments
+        -- e'' : exprToCore e'
+        (e',as') = mapAccumL patArgsToCase (extract e) (names `zip` as)
         e'' = runPureEff . runNameSupply n $ exprToCore e'
         names = [ nolo $ "$x_" <> tshow n | n <- [0..] ]
         tshow = T.pack . show
 
-caseify :: RlpExpr RlpcPs -> (IdP' RlpcPs, Pat' RlpcPs)
+patArgsToCase :: RlpExpr RlpcPs -> (IdP' RlpcPs, Pat' RlpcPs)
         -> (RlpExpr RlpcPs, Name)
-caseify e (x,p) = (e', x') where
+patArgsToCase e (x,p) = (e', x') where
     x' = dsNameToName (extract x)
     e' = CaseE (VarE <$> x) [(alt, [])]
     alt = AltA p (nolo e)
 
-type NameSupply = Labeled "expr-name-supply" (State [IdP RlpcPs])
+type NameSupply = Labeled NameSupplyLabel (State [IdP RlpcPs])
+type NameSupplyLabel = "expr-name-supply"
 
 exprToCore :: (NameSupply :> es) => RlpExpr RlpcPs -> Eff es Expr'
 
@@ -94,30 +98,21 @@ exprToCore (VarE n) = pure $ Var (dsNameToName n)
 exprToCore (CaseE (unXRec -> e) as) = undefined
 
 -- TODO: where-binds
-caseAltToCore :: (Alt RlpcPs, Where RlpcPs) -> Alter'
-caseAltToCore = undefined
+caseAltToCore :: (NameSupply :> es)
+              => (Alt RlpcPs, Where RlpcPs) -> Eff es Alter'
+caseAltToCore (AltA (extract -> p) e, wh) = undefined
+    where
+        
 
--- roseToCore :: Rose -> Expr' -> Alter'
--- roseToCore (unFix -> Branch cn as) = alter
---     where
---         alter :: Alter'
---         alter = Alter (AltData cn) (treeToCore <$> as) (Var "expr")
---         -- foldFix :: Functor f => (f a -> a) -> Fix f -> a
---         treeToCore :: Tree Rose -> Expr' -> Expr'
---         treeToCore (Left n)       = id
---         treeToCore (Right (n,cs)) = \e -> Case (Var n) [_]
-
-conToRose :: forall es. (State [IdP RlpcPs] :> es) => Pat RlpcPs -> Eff es Rose
+conToRose :: forall es. (NameSupply :> es) => Pat RlpcPs -> Eff es Rose
 conToRose (ConP cn as) = Fix . Branch cn <$> patToForrest `traverse` as
     where
         patToForrest :: Pat' RlpcPs -> Eff es (Tree Rose)
         patToForrest (VarP'' x) = pure $ Left (dsNameToName x)
         patToForrest p@(ConP'' _ _) =
-            Right <$> liftA2 (,) getName br
+            Right <$> liftA2 (,) uniqueName br
           where
             br = unwrapFix <$> conToRose (unXRec p)
-
-        getName = state $ fromJust . uncons @[IdP RlpcPs]
 
 branchToCore :: Expr' -> Branch Alter' -> Alter'
 branchToCore e (Branch cn as) = Alter (AltData cn) myBinds e'
@@ -132,13 +127,20 @@ branchToCore e (Branch cn as) = Alter (AltData cn) myBinds e'
             e' = Case (Var $ dsNameToName n) [branchToCore e cs]
 
 runNameSupply :: IdP RlpcPs -> Eff (NameSupply ': es) a -> Eff es a
-runNameSupply n = runLabeled @"expr-name-supply" (evalState ns) where
+runNameSupply n = runLabeled @NameSupplyLabel (evalState ns) where
     ns = [ "$" <> n <> "_" <> T.pack (show k) | k <- [0..] ]
 
 -- | debug helper
 
 nameSupply :: [IdP RlpcPs]
 nameSupply = [ T.pack $ "$x_" <> show n | n <- [0..] ]
+
+uniqueName :: (NameSupply :> es) => Eff es (IdP RlpcPs)
+uniqueName = labeled @NameSupplyLabel @(State [IdP RlpcPs]) $
+    state @[IdP RlpcPs] (fromMaybe err . uncons)
+  where
+    err = error "NameSupply ran out of names! This shound never happen.\
+                \ The caller of runNameSupply is responsible."
 
 constructorToCore :: Type -> Tag -> ConAlt RlpcPs -> Program'
 constructorToCore t tag (ConAlt cn as) =
