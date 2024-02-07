@@ -1,7 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveTraversable #-}
 module Rlp2Core
-    ( rlpProgToCore
+    ( desugarRlpProg
+    , desugarRlpExpr
     )
     where
 --------------------------------------------------------------------------------
@@ -23,6 +24,7 @@ import Data.Foldable
 import Data.Fix
 import Data.Maybe                       (fromJust, fromMaybe)
 import Data.Functor.Bind
+import Data.Function                    (on)
 import Debug.Trace
 import Effectful.State.Static.Local
 import Effectful.Labeled
@@ -50,6 +52,14 @@ data Branch a = Branch Name [Tree a]
 type Rose = Fix Branch
 
 deriveShow1 ''Branch
+
+--------------------------------------------------------------------------------
+
+desugarRlpProg :: RlpProgram RlpcPs -> Program'
+desugarRlpProg = rlpProgToCore
+
+desugarRlpExpr :: RlpExpr RlpcPs -> Expr'
+desugarRlpExpr = runPureEff . runNameSupply "anon" . exprToCore
 
 -- the rl' program is desugared by desugaring each declaration as a separate
 -- program, and taking the monoidal product of the lot :3
@@ -94,6 +104,8 @@ type NameSupplyLabel = "expr-name-supply"
 exprToCore :: (NameSupply :> es) => RlpExpr RlpcPs -> Eff es Expr'
 
 exprToCore (VarE n) = pure $ Var (dsNameToName n)
+
+exprToCore (AppE a b) = (liftA2 App `on` exprToCore . unXRec) a b
 
 exprToCore (CaseE (unXRec -> e) as) = do
     e' <- exprToCore e

@@ -143,7 +143,11 @@ Type1       :: { RlpType' RlpcPs }
 
 Type        :: { RlpType' RlpcPs }
             : Type '->' Type            { FunT <<~ $1 <~> $3 }
-            | Type1                     { $1 }
+            | TypeApp                   { $1 }
+
+TypeApp     :: { RlpType' RlpcPs }
+            : Type1                     { $1 }
+            | TypeApp Type1             { AppT <<~ $1 <~> $2 }
 
 FunDecl     :: { Decl' RlpcPs }
 FunDecl     : Var Params '=' Expr       { $4 =>> \e ->
@@ -173,7 +177,11 @@ Expr        :: { RlpExpr' RlpcPs }
                                           OAppE (extract o) $1 $3 }
             | LetExpr                   { $1 }
             | CaseExpr                  { $1 }
-            | Expr1                     { $1 }
+            | ExprApp                   { $1 }
+
+ExprApp     :: { RlpExpr' RlpcPs }
+            : Expr1                     { $1 }
+            | ExprApp Expr1             { AppE <<~ $1 <~> $2 }
 
 LetExpr     :: { RlpExpr' RlpcPs }
             : let layout1(Binding) in Expr { $1 \$> LetE $2 $4 }
