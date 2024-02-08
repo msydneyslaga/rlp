@@ -90,10 +90,9 @@ Decls               : Decl ';' Decls        { $1 : $3 }
                     | Decl                  { [$1] }
 
 DeclsV              :: { [Decl' RlpcPs] }
-DeclsV              : Decl VS Decls         { $1 : $3 }
+DeclsV              : Decl VS DeclsV        { $1 : $3 }
                     | Decl VS               { [$1] }
                     | Decl                  { [$1] }
-                    | {- epsilon -}         { [] }
 
 VS                  :: { Located RlpToken }
 VS                  : ';'                   { $1 }

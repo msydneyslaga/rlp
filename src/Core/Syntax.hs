@@ -253,8 +253,10 @@ instance Pretty Type where
     prettyPrec _ (TyVar n) = ttext n
     prettyPrec _ TyFun = "(->)"
     prettyPrec _ (TyCon n) = ttext n
-    prettyPrec p (TyApp f x) = maybeParens (p>0) $
-        prettyPrec 0 f <+> prettyPrec 1 x
+    prettyPrec p (a :-> b) = maybeParens (p>0) $
+        hsep [prettyPrec 1 a, "->", prettyPrec 0 b]
+    prettyPrec p (TyApp f x) = maybeParens (p>1) $
+        prettyPrec 1 f <+> prettyPrec 2 x
 
 instance (Pretty b) => Pretty (ScDef b) where
     pretty sc = hsep [name, as, "=", hang empty 1 e, ";"]
