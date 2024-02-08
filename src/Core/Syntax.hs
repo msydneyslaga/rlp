@@ -279,15 +279,6 @@ instance (Pretty b) => Pretty (Expr b) where
         "case" <+> pretty e <+> "of"
         $$ nest 2 (explicitLayout as)
 
-{-
-
-x = pretty $ desugarRlpProg [rlpProg|
-    main = 3
-    data B = T | F
-|]
-
--}
-
 instance (Pretty b) => Pretty (Alter b) where
     pretty (Alter c as e) =
         hsep [pretty c, hsep (pretty <$> as), "->", pretty e]
