@@ -1,18 +1,25 @@
 module Rlp.Parse.Associate
+    {-# WARNING "unimplemented" #-}
     ( associate
     )
     where
 --------------------------------------------------------------------------------
 import Data.HashMap.Strict              qualified as H
 import Data.Functor.Foldable
+import Data.Functor.Foldable.TH
 import Data.Functor.Const
+import Data.Functor
+import Data.Text                        qualified as T
+import Text.Printf
 import Lens.Micro
 import Rlp.Parse.Types
 import Rlp.Syntax
 --------------------------------------------------------------------------------
 
-associate :: OpTable -> RlpExpr' RlpcPs -> RlpExpr' RlpcPs
-associate pt e = undefined
+associate :: OpTable -> Decl' RlpcPs -> Decl' RlpcPs
+associate _ p = p
+
+{-# WARNING associate "unimplemented" #-}
 
 examplePrecTable :: OpTable
 examplePrecTable = H.fromList

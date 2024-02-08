@@ -9,7 +9,7 @@ module Rlp.Syntax
     -- * AST
       RlpProgram(..)
     , progDecls
-    , Decl(..), Decl', RlpExpr(..), RlpExpr'
+    , Decl(..), Decl', RlpExpr(..), RlpExpr', RlpExprF(..)
     , Pat(..), Pat'
     , Alt(..), Where
     , Assoc(..)

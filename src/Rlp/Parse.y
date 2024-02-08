@@ -173,15 +173,22 @@ Pat1        :: { Pat' RlpcPs }
             | '(' Pat ')'               { $1 .> $2 <. $3 }
 
 Expr        :: { RlpExpr' RlpcPs }
-            : Expr1 InfixOp Expr        { $2 =>> \o ->
-                                          OAppE (extract o) $1 $3 }
+            -- infixities delayed till next release :(
+            -- : Expr1 InfixOp Expr        { $2 =>> \o ->
+            --                              OAppE (extract o) $1 $3 }
+            : TempInfixExpr             { $1 }
             | LetExpr                   { $1 }
             | CaseExpr                  { $1 }
-            | ExprApp                   { $1 }
+            | AppExpr                   { $1 }
 
-ExprApp     :: { RlpExpr' RlpcPs }
+TempInfixExpr :: { RlpExpr' RlpcPs }
+TempInfixExpr : Expr1 InfixOp TempInfixExpr {% tempInfixExprErr $1 $3 }
+              | Expr1 InfixOp Expr1 { $2 =>> \o ->
+                                      OAppE (extract o) $1 $3 }
+
+AppExpr     :: { RlpExpr' RlpcPs }
             : Expr1                     { $1 }
-            | ExprApp Expr1             { AppE <<~ $1 <~> $2 }
+            | AppExpr Expr1             { AppE <<~ $1 <~> $2 }
 
 LetExpr     :: { RlpExpr' RlpcPs }
             : let layout1(Binding) in Expr { $1 \$> LetE $2 $4 }
@@ -287,6 +294,13 @@ mkInfixD a p n = do
 
 intOfToken :: Located RlpToken -> Int
 intOfToken (Located _ (TokenLitInt n)) = n
+
+tempInfixExprErr :: RlpExpr' RlpcPs -> RlpExpr' RlpcPs -> P a
+tempInfixExprErr (Located a _) (Located b _) =
+    addFatal $ errorMsg (a <> b) $ RlpParErrOther
+        [ "The rl' frontend is currently in beta. Support for infix expressions is minimal, sorry! :("
+        , "In the mean time, don't mix any infix operators."
+        ]
 
 }
 

@@ -200,12 +200,11 @@ data Layout = Explicit
 type OpTable = H.HashMap Name OpInfo
 type OpInfo = (Assoc, Int)
 
--- data WithLocation a = WithLocation [String] a
-
 data RlpParseError = RlpParErrOutOfBoundsPrecedence Int
                    | RlpParErrDuplicateInfixD Name
                    | RlpParErrLexical
                    | RlpParErrUnexpectedToken RlpToken [String]
+                   | RlpParErrOther [Text]
                    deriving (Show)
 
 instance IsRlpcError RlpParseError where
@@ -224,6 +223,8 @@ instance IsRlpcError RlpParseError where
             Text [ "Unexpected token " <> tshow t
                  , "Expected: " <> tshow exp
                  ]
+        RlpParErrOther ts ->
+            Text ts
         where
             tshow :: (Show a) => a -> T.Text
             tshow = T.pack . show

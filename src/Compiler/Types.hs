@@ -1,8 +1,9 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Compiler.Types
     ( SrcSpan(..)
     , srcspanLine, srcspanColumn, srcspanAbs, srcspanLen
     , Located(..)
-    , locating
+    , _Located
     , nolo
     , (<<~), (<~>), (<#>)
 
@@ -58,9 +59,6 @@ srcspanLen = tupling . _4
 nolo :: a -> Located a
 nolo = Located (SrcSpan 0 0 0 0)
 
-locating :: Lens (Located a) (Located b) a b
-locating = lens extract ($>)
-
 instance Semigroup SrcSpan where
     SrcSpan la ca aa sa <> SrcSpan lb cb ab sb = SrcSpan l c a s where
         l = min la lb
@@ -92,4 +90,6 @@ infixl 4 <~>
 fab <#> a = fmap ($ a) fab
 
 infixl 4 <#>
+
+makePrisms ''Located
 
