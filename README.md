@@ -3,6 +3,10 @@
 `rlp` (ruelang') will be a lazily-evaluated purely-functional language heavily
 imitating Haskell.
 
+### Architecture
+
+![rlpc architecture diagram](/rlpc.drawio.svg)
+
 ### Build Info
 * rlp is built using [Cabal](https://www.haskell.org/ghcup/)
 * rlp's documentation is built using [Sphinx](https://www.sphinx-doc.org/en/master/)
