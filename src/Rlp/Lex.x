@@ -125,6 +125,12 @@ $white_no_nl+       ;
     ()                  { doBol }
 }
 
+<layout_top>
+{
+    \n                  ;
+    "{"                 { explicitLBrace `thenDo` popLexState }
+}
+
 <layout, layout_let, layout_of>
 {
     \n                  { beginPush bol }
@@ -153,6 +159,7 @@ lexReservedName = \case
     "infix"     -> TokenInfix
     "infixl"    -> TokenInfixL
     "infixr"    -> TokenInfixR
+    s           -> error (show s)
 
 lexReservedOp :: Text -> RlpToken
 lexReservedOp = \case
@@ -160,6 +167,7 @@ lexReservedOp = \case
     "::"    -> TokenHasType
     "|"     -> TokenPipe
     "->"    -> TokenArrow
+    s       -> error (show s)
 
 -- | @andBegin@, with the subtle difference that the start code is set
 --   /after/ the action
@@ -325,7 +333,7 @@ doBol :: LexerAction (Located RlpToken)
 doBol inp l = do
     off <- cmpLayout
     i <- indentLevel
-    traceM $ "i: " <> show i
+    -- traceM $ "i: " <> show i
     -- important that we pop the lex state lest we find our lexer diverging
     popLexState
     case off of
