@@ -3,6 +3,8 @@ module Data.Pretty
     , ttext
     -- * Pretty-printing lens combinators
     , hsepOf, vsepOf
+    , vcatOf
+    , vlinesOf
     , module Text.PrettyPrint
     , maybeParens
     )
@@ -48,4 +50,11 @@ hsepOf l = foldrOf l (<+>) mempty
 
 vsepOf :: Getting (Endo Doc) s Doc -> s -> Doc
 vsepOf l = foldrOf l ($+$) mempty
+
+vcatOf :: Getting (Endo Doc) s Doc -> s -> Doc
+vcatOf l = foldrOf l ($$) mempty
+
+vlinesOf :: Getting (Endo Doc) s Doc -> s -> Doc
+vlinesOf l = foldrOf l (\a b -> a $+$ "" $+$ b) mempty
+-- hack(?) to separate chunks with a blankline
 

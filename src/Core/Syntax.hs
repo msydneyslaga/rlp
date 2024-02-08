@@ -57,6 +57,8 @@ import Data.HashMap.Strict          qualified as H
 import Data.Hashable
 import Data.Text                    qualified as T
 import Data.Char
+import Data.These
+import Data.Bifoldable              (bifoldr)
 import GHC.Generics                 (Generic, Generically(..))
 -- Lift instances for the Core quasiquoters
 import Language.Haskell.TH.Syntax   (Lift)
@@ -220,11 +222,39 @@ instance HasLHS (Binding b) (Binding b) b b where
 
 -- TODO: print type sigs with corresponding scdefs
 -- TODO: emit pragmas for datatags
-instance (Pretty b) => Pretty (Program b) where
-    pretty = vsepOf (programScDefs . each . to pretty)
+instance (Hashable b, Pretty b) => Pretty (Program b) where
+    -- pretty = vsepOf (programScDefs . each . to pretty)
+    pretty = vlinesOf (programJoinedDefs . to prettyGroup) where
+        programJoinedDefs :: Fold (Program b) (These (b, Type) (ScDef b))
+        programJoinedDefs = folding $ \p ->
+            foldMapOf programTypeSigs thing1 p
+            `u` foldMapOf programScDefs thing2 p
+          where u = H.unionWith unionThese
+
+        thing1 = ifoldMap @b @(HashMap b)
+            (\n t -> H.singleton n (This (n,t)))
+        thing2 = foldMap $ \sc ->
+            H.singleton (sc ^. _lhs . _1) (That sc)
+
+        prettyGroup :: These (b, Type) (ScDef b) -> Doc
+        prettyGroup = bifoldr ($$) ($$) mempty . bimap prettyTySig pretty
+
+        prettyTySig (n,t) = hsep [ttext n, "::", pretty t]
+
+        unionThese :: forall a b. These a b -> These a b -> These a b
+        unionThese (This a) (That b) = These a b
+        unionThese (That b) (This a) = These a b
+        unionThese (These a b) _     = These a b
+
+instance Pretty Type where
+    prettyPrec _ (TyVar n) = ttext n
+    prettyPrec _ TyFun = "(->)"
+    prettyPrec _ (TyCon n) = ttext n
+    prettyPrec p (TyApp f x) = maybeParens (p>0) $
+        prettyPrec 0 f <+> prettyPrec 1 x
 
 instance (Pretty b) => Pretty (ScDef b) where
-    pretty sc = hsep [name, as, "=", hang empty 1 e]
+    pretty sc = hsep [name, as, "=", hang empty 1 e, ";"]
         where
             name = ttext $ sc ^. _lhs . _1
             as = sc & hsepOf (_lhs . _2 . each . to ttext)
