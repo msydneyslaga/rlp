@@ -145,8 +145,8 @@ data Module b = Module (Maybe (Name, [Name])) (Program b)
 data Program b = Program
     { _programScDefs   :: [ScDef b]
     , _programTypeSigs :: HashMap b Type
-    -- map constructors to their tag and arity
     , _programDataTags :: HashMap b (Tag, Int)
+    -- ^ map constructors to their tag and arity
     }
     deriving (Show, Lift, Generic)
     deriving (Semigroup, Monoid)
@@ -223,28 +223,33 @@ instance HasLHS (Binding b) (Binding b) b b where
 -- TODO: print type sigs with corresponding scdefs
 -- TODO: emit pragmas for datatags
 instance (Hashable b, Pretty b) => Pretty (Program b) where
-    -- pretty = vsepOf (programScDefs . each . to pretty)
-    pretty = vlinesOf (programJoinedDefs . to prettyGroup) where
-        programJoinedDefs :: Fold (Program b) (These (b, Type) (ScDef b))
-        programJoinedDefs = folding $ \p ->
-            foldMapOf programTypeSigs thing1 p
-            `u` foldMapOf programScDefs thing2 p
-          where u = H.unionWith unionThese
+    pretty p = ifoldrOf (programDataTags . ifolded) cataDataTag mempty p
+           $+$ vlinesOf (programJoinedDefs . to prettyGroup) p
+        where
+            programJoinedDefs :: Fold (Program b) (These (b, Type) (ScDef b))
+            programJoinedDefs = folding $ \p ->
+                foldMapOf programTypeSigs thisTs p
+                `u` foldMapOf programScDefs thatSc p
+              where u = H.unionWith unionThese
 
-        thing1 = ifoldMap @b @(HashMap b)
-            (\n t -> H.singleton n (This (n,t)))
-        thing2 = foldMap $ \sc ->
-            H.singleton (sc ^. _lhs . _1) (That sc)
+            thisTs = ifoldMap @b @(HashMap b)
+                (\n t -> H.singleton n (This (n,t)))
+            thatSc = foldMap $ \sc ->
+                H.singleton (sc ^. _lhs . _1) (That sc)
 
-        prettyGroup :: These (b, Type) (ScDef b) -> Doc
-        prettyGroup = bifoldr ($$) ($$) mempty . bimap prettyTySig pretty
+            prettyGroup :: These (b, Type) (ScDef b) -> Doc
+            prettyGroup = bifoldr ($$) ($$) mempty . bimap prettyTySig pretty
 
-        prettyTySig (n,t) = hsep [ttext n, "::", pretty t]
+            prettyTySig (n,t) = hsep [ttext n, "::", pretty t]
 
-        unionThese :: forall a b. These a b -> These a b -> These a b
-        unionThese (This a) (That b) = These a b
-        unionThese (That b) (This a) = These a b
-        unionThese (These a b) _     = These a b
+            unionThese (This a) (That b) = These a b
+            unionThese (That b) (This a) = These a b
+            unionThese (These a b) _     = These a b
+
+            cataDataTag n (t,a) acc = prettyDataTag n t a $+$ acc
+
+            prettyDataTag n t a =
+                hsep ["{-#", "PackData", ttext n, ttext t, ttext a, "#-}"]
 
 instance Pretty Type where
     prettyPrec _ (TyVar n) = ttext n
