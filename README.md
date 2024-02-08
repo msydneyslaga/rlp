@@ -46,6 +46,14 @@ Listed in order of importance.
 ### Milestones
 (This list is incomplete.)
 
+Items are marked off not as they are 100% implemented, but rather once I
+consider them stable enough that completion is soley a matter of getting
+around to it -- no tough design decisions, theorising, etc. remain. For
+example, as of writing this, the rl' frontend parser is not fully featured,
+yet it is marked off on this list; finishing it would require cranking out
+the remaining grammatical rules, and no work on complex tasks like layout
+parsing remains.
+
 - [ ] Backend
     - [x] Core language
         - [x] AST
@@ -73,7 +81,7 @@ Listed in order of importance.
         - [x] AST
         - [x] Lexer
         - [x] Parser
-    - [ ] Translation to the core language
+    - [x] Translation to the core language
         - [ ] Constraint solver
         - [ ] `do`-notation
     - [x] CLI
@@ -101,13 +109,14 @@ Listed in order of importance.
     - [x] Garbage Collection
 - [ ] Stable documentation for the evaluation model
 
-### January Release Plan
-- [ ] Beta rl' to Core
-- [ ] UX improvements
+### February Release Plan
+- [x] Beta rl' to Core
+- [x] UX improvements
     - [x] Actual compiler errors -- no more unexceptional `error` calls
     - [x] Better CLI dump flags
-    - [ ] Annotate the AST with token positions for errors (NOTE: As of Feb. 1,
+    - [x] Annotate the AST with token positions for errors (NOTE: As of Feb. 1,
       this has been done, but the locational info is not yet used in error messages)
+- [x] Compiler architecture diagram
 - [ ] More examples
 
 ### March Release Plan
@@ -120,11 +129,16 @@ Listed in order of importance.
 This list is more concrete than the milestones, but likely further in the future
 than the other release plans.
 
+- [ ] Overall codebase cleaning
+    - [ ] Complete all TODOs
+    - [ ] Replace mtl with effectful
+- [ ] rl' type-checker
+- [ ] Ditch TTG in favour of a simpler AST focusing on extendability via Fix, Free, 
+  Cofree, etc. rather than boilerplate-heavy type families
 - [ ] Stable rl' to Core
 - [ ] Core polish
     - [ ] Better, stable parser
     - [ ] Better, stable lexer
     - [ ] Less hacky handling of named data
     - [ ] Less hacky pragmas
-- [ ] GM to LLVM
-
+- [ ] Choose a target. LLVM, JS, C, and WASM are currently top contenders
