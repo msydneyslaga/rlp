@@ -1,5 +1,4 @@
 {-# LANGUAGE ImplicitParams #-}
-{-# LANGUAGE LambdaCase #-}
 module Core2Core
     ( core2core
     , gmPrep
@@ -15,13 +14,15 @@ import Data.Maybe               (fromJust)
 import Data.Set                 (Set)
 import Data.Set                 qualified as S
 import Data.List
+import Data.Foldable
 import Control.Monad.Writer
 import Control.Monad.State.Lazy
 import Control.Arrow            ((>>>))
 import Data.Text                qualified as T
 import Data.HashMap.Strict      (HashMap)
 import Numeric                  (showHex)
-import Lens.Micro.Platform
+-- import Lens.Micro.Platform
+import Control.Lens
 import Core.Syntax
 import Core.Utils
 ----------------------------------------------------------------------------------
@@ -29,12 +30,27 @@ import Core.Utils
 core2core :: Program' -> Program'
 core2core p = undefined
 
+-- | G-machine preprocessing.
+
 gmPrep :: Program' -> Program'
 gmPrep p = p & appFloater (floatNonStrictCases globals)
              & tagData
+             & defineData
     where
         globals = p ^.. programScDefs . each . _lhs . _1
                 & S.fromList
+
+-- | Define concrete supercombinators for all datatags defined via pragmas (or
+-- desugaring)
+
+defineData :: Program' -> Program'
+defineData p = p & programScDefs <>~ defs
+    where
+        -- defs = ifoldMap' _ (p ^. programDataTags)
+        defs = p ^. programDataTags
+             . to (ifoldMap (\k (t,a) -> [ScDef k [] (Con t a)]))
+
+-- | Substitute all pattern matches on named constructors for matches on tags
 
 tagData :: Program' -> Program'
 tagData p = let ?dt = p ^. programDataTags
@@ -59,6 +75,7 @@ appFloater fl p = p & traverseOf programRhss fl
                     & runFloater
                     & \ (me,floats) -> me & programScDefs %~ (<>floats)
 
+-- TODO: move NameSupply from Rlp2Core into a common module to share here
 runFloater :: Floater a -> (a, [ScDef'])
 runFloater = flip evalStateT ns >>> runWriter
     where
@@ -88,7 +105,7 @@ floatNonStrictCases g = goE
                 altBodies = (\(Alter _ _ b) -> b) <$> as
             tell [sc]
             goE e
-            traverse goE altBodies
+            traverse_ goE altBodies
             pure e'
         goC (f :$ x)            = (:$) <$> goC f <*> goC x
         goC (Let r bs e)        = Let r <$> bs' <*> goE e
@@ -97,7 +114,7 @@ floatNonStrictCases g = goE
         goC (Var k)             = pure (Var k)
         goC (Con t as)          = pure (Con t as)
 
-        name = state (fromJust . uncons)
+        name = state (fromJust . Data.List.uncons)
 
         -- extract the right-hand sides of a list of bindings, traverse each
         -- one, and return the original list of bindings
@@ -105,6 +122,7 @@ floatNonStrictCases g = goE
         travBs c bs = bs ^.. each . _rhs
                     & traverse goC
                     & const (pure bs)
+        -- ^ ??? what the fuck?
 
 -- when provided with a case expr, floatCase will float the case into a
 -- supercombinator of its free variables. the sc is returned along with an

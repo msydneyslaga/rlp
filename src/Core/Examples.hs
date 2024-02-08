@@ -207,8 +207,6 @@ namedConsCase :: Program'
 namedConsCase = [coreProg|
         {-# PackData Nil  0 0 #-}
         {-# PackData Cons 1 2 #-}
-        Nil = Pack{0 0};
-        Cons = Pack{1 2};
         foldr f z l = case l of
             { Nil       -> z
             ; Cons x xs -> f x (foldr f z xs)
