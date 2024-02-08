@@ -5,10 +5,8 @@ Description : Core ASTs and the like
 {-# LANGUAGE PatternSynonyms, OverloadedStrings #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DerivingStrategies, DerivingVia #-}
 -- for recursion-schemes
-{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable
-  , TemplateHaskell, TypeFamilies #-}
+{-# LANGUAGE DeriveTraversable, TypeFamilies #-}
 module Core.Syntax
     ( Expr(..)
     , ExprF(..)
