@@ -10,7 +10,6 @@ errors and the family of RLPC monads.
 {-# LANGUAGE TemplateHaskell #-}
 -- only used for mtl instances
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE DeriveGeneric, DerivingStrategies, DerivingVia #-}
 {-# LANGUAGE BlockArguments, ViewPatterns #-}
 module Compiler.RLPC
     (
@@ -18,6 +17,7 @@ module Compiler.RLPC
       RLPCT(RLPCT),
     -- ** Special cases
       RLPC, RLPCIO
+    , liftIO
     -- ** Running
     , runRLPCT
     , evalRLPCT, evalRLPCIO, evalRLPC
@@ -61,6 +61,7 @@ import Data.Coerce
 import Data.Text                (Text)
 import Data.Text                qualified as T
 import Data.Text.IO             qualified as T
+import System.IO
 import Text.ANSI                qualified as Ansi
 import Text.PrettyPrint         hiding ((<>))
 import Lens.Micro.Platform
@@ -84,7 +85,11 @@ type RLPC = RLPCT Identity
 
 type RLPCIO = RLPCT IO
 
+instance MonadTrans RLPCT where
+    lift = RLPCT . lift . lift
+
 instance (MonadIO m) => MonadIO (RLPCT m) where
+    liftIO = lift . liftIO
 
 evalRLPC :: RLPCOptions
          -> RLPC a
@@ -114,7 +119,7 @@ data RLPCOptions = RLPCOptions
     , _rlpcFFlags      :: HashSet CompilerFlag
     , _rlpcEvaluator   :: Evaluator
     , _rlpcHeapTrigger :: Int
-    , _rlpcLanguage    :: Language
+    , _rlpcLanguage    :: Maybe Language
     , _rlpcInputFiles  :: [FilePath]
     }
     deriving Show
@@ -135,7 +140,7 @@ instance Default RLPCOptions where
         , _rlpcEvaluator = EvaluatorGM
         , _rlpcHeapTrigger = 200
         , _rlpcInputFiles = []
-        , _rlpcLanguage = LanguageRlp
+        , _rlpcLanguage = Nothing
         }
 
 -- debug flags are passed with -dFLAG
@@ -175,10 +180,18 @@ evalRLPCIO opt r = do
         Nothing -> die "Failed, no code compiled."
 
 putRlpcErrs :: RLPCOptions -> [MsgEnvelope RlpcError] -> IO ()
-putRlpcErrs opts = filter byTag
-               >>> traverse_ (putStrLn . ('\n':) . prettyRlpcMsg)
+putRlpcErrs opt es = case opt ^. rlpcLogFile of
+    Just lf -> withFile lf WriteMode putter
+    Nothing -> putter stderr
+  where
+    putter h = hPutStrLn h `traverse_` renderRlpcErrs opt es
+
+renderRlpcErrs :: RLPCOptions -> [MsgEnvelope RlpcError] -> [String]
+renderRlpcErrs opts = (if don'tBother then id else filter byTag)
+                  >>> fmap prettyRlpcMsg
     where
         dflags = opts ^. rlpcDFlags
+        don'tBother = "ALL" `S.member` (opts ^. rlpcDFlags)
 
         byTag :: MsgEnvelope RlpcError -> Bool
         byTag (view msgSeverity -> SevDebug t) =

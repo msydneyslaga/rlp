@@ -22,21 +22,38 @@ $ cabal test --test-show-details=direct
 ```
 
 ### Use
+
+#### TLDR
+
 ```sh
-# Compile and evaluate examples/factorial.hs, with evaluation info dumped to stderr
-$ rlpc -ddump-eval examples/factorial.hs
-# Compile and evaluate t.hs, with evaluation info dumped to t.log
-$ rlpc -ddump-eval -l t.log t.hs
-# Print the raw structure describing the compiler options
-# (option parsing still must succeed in order to print)
-$ rlpc -ddump-opts t.hs
+# Compile and evaluate examples/factorial.cr, with evaluation info dumped to stderr
+$ rlpc -ddump-eval examples/factorial.cr
+# Compile and evaluate t.cr, with evaluation info dumped to t.log
+$ rlpc -ddump-eval -l t.log t.cr
+# Compile and evaluate t.rl, dumping the desugared Core
+$ rlpc -ddump-desugared t.rl
 ```
+
+#### Options
+
+```sh
+Usage: rlpc [-l|--log FILE] [-d DEBUG FLAG] [-f COMPILATION FLAG] 
+            [-e|--evaluator gm|ti] [--heap-trigger INT] [-x|--language rlp|core]
+            FILES...
+```
+
+Available debug flags include:
+* `-ddump-desugared`: dump Core generated from rl'
+* `-ddump-parsed-core`: dump raw Core AST
+* `-ddump-parsed`: dump raw rl' AST
+* `-ddump-eval`: dump evaluation logs
+* `-dALL`: disable debug message filtering. enables **all** debug messages
 
 ### Potential Features
 Listed in order of importance.
 - [x] ADTs
 - [x] First-class functions
-- [ ] Higher-kinded types
+- [x] Higher-kinded types
 - [ ] Typeclasses
 - [x] Parametric polymorphism
 - [x] Hindley-Milner type inference

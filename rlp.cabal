@@ -88,6 +88,9 @@ library
         LambdaCase
         ViewPatterns
         DataKinds
+        DerivingVia
+        StandaloneDeriving
+        DerivingStrategies
 
 executable rlpc
     import:           warnings
@@ -98,8 +101,7 @@ executable rlpc
     build-depends: base >=4.17.0.0 && <4.20.0.0
                  , rlp
                  , optparse-applicative >= 0.18.1 && < 0.19
-                 , microlens >= 0.4.13 && < 0.5
-                 , microlens-mtl >= 0.2.0 && < 0.3
+                 , microlens-platform
                  , mtl >= 2.3.1 && < 2.4
                  , unordered-containers >= 0.2.20 && < 0.3
                  , text >= 2.0.2 && < 2.1

@@ -1,7 +1,9 @@
 {-# LANGUAGE BlockArguments, LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 ----------------------------------------------------------------------------------
 import Compiler.RLPC
+import Compiler.RlpcError
 import Control.Exception
 import Options.Applicative      hiding (ParseError)
 import Control.Monad
@@ -11,12 +13,13 @@ import Data.Text                (Text)
 import Data.Text                qualified as T
 import Data.Text.IO             qualified as TIO
 import Data.List
+import Data.Maybe               (listToMaybe)
 import System.IO
 import System.Exit              (exitSuccess)
 import Core
 import TI
 import GM
-import Lens.Micro.Mtl
+import Lens.Micro.Platform
 
 import CoreDriver               qualified
 import RlpDriver                qualified
@@ -65,7 +68,7 @@ options = RLPCOptions
                 \triggering the garbage collector"
         <> value 50
         )
-    <*> option languageReader
+    <*> optional # option languageReader
         (  long "language"
         <> short 'x'
         <> metavar "rlp|core"
@@ -80,6 +83,8 @@ languageReader :: ReadM Language
 languageReader = maybeReader $ \case
     "rlp"   -> Just LanguageRlp
     "core"  -> Just LanguageCore
+    "rl"    -> Just LanguageRlp
+    "cr"    -> Just LanguageCore
     _       -> Nothing
 
 debugFlagReader :: ReadM DebugFlag
@@ -102,10 +107,34 @@ mmany v = liftA2 (<>) v (mmany v)
 main :: IO ()
 main = do
     opts <- execParser optParser
-    void $ evalRLPCIO opts driver
+    void $ evalRLPCIO opts dispatch
+
+dispatch :: RLPCIO ()
+dispatch = getLang >>= \case
+    Just LanguageCore -> CoreDriver.driver
+    Just LanguageRlp  -> RlpDriver.driver
+    Nothing           -> addFatal err
+        where
+            -- TODO: why didn't i make the srcspan optional LOL
+            err = errorMsg (SrcSpan 0 0 0 0) $ Text
+                [ "Could not determine source language from filetype."
+                , "Possible Solutions:\n\
+                  \  Suffix the file with `.cr' for Core, or `.rl' for rl'\n\
+                  \  Specify a language with `rlpc -x core' or `rlpc -x rlp'"
+                ]
+  where
+    getLang = liftA2 (<|>)
+        (view rlpcLanguage)
+        -- TODO: we only check the first file lol
+        ((listToMaybe >=> inferLanguage) <$> view rlpcInputFiles)
+
 
 driver :: RLPCIO ()
-driver = view rlpcLanguage >>= \case
-    LanguageCore -> CoreDriver.driver
-    LanguageRlp  -> RlpDriver.driver
+driver = undefined
+
+inferLanguage :: FilePath -> Maybe Language
+inferLanguage fp
+    | ".rl" `isSuffixOf` fp     = Just LanguageRlp
+    | ".cr" `isSuffixOf` fp     = Just LanguageCore
+    | otherwise                 = Nothing
 

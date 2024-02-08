@@ -1,7 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveTraversable #-}
 module Rlp2Core
-    ( desugarRlpProg
+    ( desugarRlpProgR
+    , desugarRlpProg
     , desugarRlpExpr
     )
     where
@@ -15,6 +16,7 @@ import Control.Comonad
 -- import Lens.Micro
 -- import Lens.Micro.Internal
 import Control.Lens
+import Compiler.RLPC
 import Data.List                        (mapAccumL)
 import Data.Text                        (Text)
 import Data.Text                        qualified as T
@@ -26,6 +28,7 @@ import Data.Maybe                       (fromJust, fromMaybe)
 import Data.Functor.Bind
 import Data.Function                    (on)
 import Debug.Trace
+
 import Effectful.State.Static.Local
 import Effectful.Labeled
 import Effectful
@@ -33,6 +36,7 @@ import Text.Show.Deriving
 
 import Core.Syntax                      as Core
 import Compiler.Types
+import Data.Pretty                      (render, pretty)
 import Rlp.Syntax                       as Rlp
 import Rlp.Parse.Types                  (RlpcPs, PsName)
 --------------------------------------------------------------------------------
@@ -54,6 +58,12 @@ type Rose = Fix Branch
 deriveShow1 ''Branch
 
 --------------------------------------------------------------------------------
+
+desugarRlpProgR :: forall m. (Monad m) => RlpProgram RlpcPs -> RLPCT m Program'
+desugarRlpProgR p = do
+    let p' = desugarRlpProg p
+    addDebugMsg "dump-desugared" $ render (pretty p')
+    pure p'
 
 desugarRlpProg :: RlpProgram RlpcPs -> Program'
 desugarRlpProg = rlpProgToCore
@@ -107,9 +117,18 @@ exprToCore (VarE n) = pure $ Var (dsNameToName n)
 
 exprToCore (AppE a b) = (liftA2 App `on` exprToCore . unXRec) a b
 
+exprToCore (OAppE f a b) = (liftA2 mkApp `on` exprToCore . unXRec) a b
+    where
+        mkApp s t = (Var f `App` s) `App` t
+
 exprToCore (CaseE (unXRec -> e) as) = do
     e' <- exprToCore e
     Case e' <$> caseAltToCore `traverse` as
+
+exprToCore (LitE l) = litToCore l
+
+litToCore :: (NameSupply :> es) => Rlp.Lit RlpcPs -> Eff es Expr'
+litToCore (Rlp.IntL n) = pure . Lit $ Core.IntL n
 
 -- TODO: where-binds
 caseAltToCore :: (NameSupply :> es)
@@ -127,6 +146,7 @@ conToRose (ConP cn as) = Fix . Branch cn <$> patToForrest `traverse` as
             Right <$> liftA2 (,) uniqueName br
           where
             br = unwrapFix <$> conToRose (unXRec p)
+conToRose _ = error "conToRose: not a ConP!"
 
 branchToCore :: Expr' -> Branch Alter' -> Alter'
 branchToCore e (Branch cn as) = Alter (AltData cn) myBinds e'

@@ -50,7 +50,7 @@ instance (MonadIO m) => MonadIO (ErrorfulT e m) where
     liftIO = lift . liftIO
 
 instance (Functor m) => Functor (ErrorfulT e m) where
-    fmap f (ErrorfulT m) = ErrorfulT (m & mapped . _1 . _Just %~ f)
+    fmap f (ErrorfulT m) = ErrorfulT (m <&> _1 . _Just %~ f)
 
 instance (Applicative m) => Applicative (ErrorfulT e m) where
     pure a = ErrorfulT . pure $ (Just a, [])
@@ -63,12 +63,12 @@ instance (Monad m) => Monad (ErrorfulT e m) where
     ErrorfulT m >>= k = ErrorfulT $ do
         (a,es) <- m
         case a of
-            Just x      -> runErrorfulT (k x)
+            Just x      -> runErrorfulT (k x) <&> _2 %~ (es<>)
             Nothing     -> pure (Nothing, es)
 
 mapErrorful :: (Functor m) => (e -> e') -> ErrorfulT e m a -> ErrorfulT e' m a
 mapErrorful f (ErrorfulT m) = ErrorfulT $
-    m & mapped . _2 . mapped %~ f
+    m <&> _2 . mapped %~ f
 
 -- when microlens-pro drops we can write this as
 --    mapErrorful f = coerced . mapped . _2 . mapped %~ f

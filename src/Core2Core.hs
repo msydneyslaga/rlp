@@ -21,16 +21,27 @@ import Control.Arrow            ((>>>))
 import Data.Text                qualified as T
 import Data.HashMap.Strict      (HashMap)
 import Numeric                  (showHex)
+
+import Data.Pretty
+import Compiler.RLPC
 -- import Lens.Micro.Platform
 import Control.Lens
 import Core.Syntax
 import Core.Utils
 ----------------------------------------------------------------------------------
 
+-- | General optimisations
+
 core2core :: Program' -> Program'
 core2core p = undefined
 
--- | G-machine preprocessing.
+gmPrepR :: (Monad m) => Program' -> RLPCT m Program'
+gmPrepR p = do
+    let p' = gmPrep p
+    addDebugMsg "dump-gm-preprocessed" $ render . pretty $ p'
+    pure p'
+
+-- | G-machine-specific preprocessing.
 
 gmPrep :: Program' -> Program'
 gmPrep p = p & appFloater (floatNonStrictCases globals)
@@ -46,7 +57,6 @@ gmPrep p = p & appFloater (floatNonStrictCases globals)
 defineData :: Program' -> Program'
 defineData p = p & programScDefs <>~ defs
     where
-        -- defs = ifoldMap' _ (p ^. programDataTags)
         defs = p ^. programDataTags
              . to (ifoldMap (\k (t,a) -> [ScDef k [] (Con t a)]))
 

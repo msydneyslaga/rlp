@@ -228,6 +228,7 @@ Expr1       :: { RlpExpr' RlpcPs }
             : '(' Expr ')'              { $1 .> $2 <. $3 }
             | Lit                       { fmap LitE $1 }
             | Var                       { fmap VarE $1 }
+            | Con                       { fmap VarE $1 }
 
 InfixOp     :: { Located PsName }
             : consym                    { mkPsName $1 }
@@ -251,8 +252,11 @@ parseRlpExprR s = liftErrorful $ pToErrorful parseRlpExpr st
         st = programInitState s
 
 parseRlpProgR :: (Monad m) => Text -> RLPCT m (RlpProgram RlpcPs)
-parseRlpProgR s = liftErrorful $ pToErrorful parseRlpProg st
-    where
+parseRlpProgR s = do
+    a <- liftErrorful $ pToErrorful parseRlpProg st
+    addDebugMsg @_ @String "dump-parsed" $ show a
+    pure a
+  where
         st = programInitState s
 
 mkPsName :: Located RlpToken -> Located PsName

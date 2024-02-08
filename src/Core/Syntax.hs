@@ -41,6 +41,7 @@ module Core.Syntax
     , Binding'
     , HasRHS(_rhs)
     , HasLHS(_lhs)
+    , Pretty(pretty)
     )
     where
 ----------------------------------------------------------------------------------
@@ -56,7 +57,7 @@ import Data.HashMap.Strict          qualified as H
 import Data.Hashable
 import Data.Text                    qualified as T
 import Data.Char
-import GHC.Generics
+import GHC.Generics                 (Generic, Generically(..))
 -- Lift instances for the Core quasiquoters
 import Language.Haskell.TH.Syntax   (Lift)
 -- import Lens.Micro.TH                (makeLenses)
@@ -214,4 +215,62 @@ instance HasLHS (Binding b) (Binding b) b b where
     _lhs = lens
         (\ (k := _) -> k)
         (\ (_ := e) k' -> k' := e)
+
+--------------------------------------------------------------------------------
+
+-- TODO: print type sigs with corresponding scdefs
+-- TODO: emit pragmas for datatags
+instance (Pretty b) => Pretty (Program b) where
+    pretty = vsepOf (programScDefs . each . to pretty)
+
+instance (Pretty b) => Pretty (ScDef b) where
+    pretty sc = hsep [name, as, "=", hang empty 1 e]
+        where
+            name = ttext $ sc ^. _lhs . _1
+            as = sc & hsepOf (_lhs . _2 . each . to ttext)
+            e = pretty $ sc ^. _rhs
+
+instance (Pretty b) => Pretty (Expr b) where
+    prettyPrec _ (Var n)      = ttext n
+    prettyPrec _ (Con t a)    = "Pack{" <> (ttext t <+> ttext a) <> "}"
+    prettyPrec _ (Lam bs e)   = hsep ["λ", hsep (prettyPrec 1 <$> bs), "->", pretty e]
+    prettyPrec _ (Let r bs e) = hsep [word, explicitLayout bs]
+                             $$ hsep ["in", pretty e]
+        where word = if r == Rec then "letrec" else "let"
+    prettyPrec p (App f x)    = maybeParens (p>0) $
+        prettyPrec 0 f <+> prettyPrec 1 x
+    prettyPrec _ (Lit l)      = pretty l
+    prettyPrec p (Case e as)  = maybeParens (p>0) $
+        "case" <+> pretty e <+> "of"
+        $$ nest 2 (explicitLayout as)
+
+{-
+
+x = pretty $ desugarRlpProg [rlpProg|
+    main = 3
+    data B = T | F
+|]
+
+-}
+
+instance (Pretty b) => Pretty (Alter b) where
+    pretty (Alter c as e) =
+        hsep [pretty c, hsep (pretty <$> as), "->", pretty e]
+
+instance Pretty AltCon where
+    pretty (AltData n) = ttext n
+    pretty (AltLit l) = pretty l
+    pretty (AltTag t) = ttext t
+    pretty AltDefault = "_"
+
+instance Pretty Lit where
+    pretty (IntL n) = ttext n
+
+instance (Pretty b) => Pretty (Binding b) where
+    pretty (k := v) = hsep [pretty k, "=", pretty v]
+
+explicitLayout :: (Pretty a) => [a] -> Doc
+explicitLayout as = vcat inner <+> "}" where
+    inner = zipWith (<+>) delims (pretty <$> as)
+    delims = "{" : repeat ";"
 

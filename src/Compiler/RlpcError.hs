@@ -34,7 +34,7 @@ data MsgEnvelope e = MsgEnvelope
    deriving (Functor, Show)
 
 newtype RlpcError = Text [Text]
-    deriving Show
+               deriving Show
 
 instance IsString RlpcError where
     fromString = Text . pure . T.pack
@@ -47,7 +47,7 @@ instance IsRlpcError RlpcError where
 
 data Severity = SevWarning
               | SevError
-              | SevDebug Text
+              | SevDebug Text -- ^ Tag
               deriving Show
 
 makeLenses ''MsgEnvelope
