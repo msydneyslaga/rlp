@@ -335,16 +335,17 @@ doBol inp l = do
     i <- indentLevel
     -- traceM $ "i: " <> show i
     -- important that we pop the lex state lest we find our lexer diverging
-    popLexState
     case off of
         -- the line is aligned with the previous. it therefore belongs to the
         -- same list
-        EQ -> insertSemicolon
+        EQ -> popLexState *> insertSemicolon
         -- the line is indented further than the previous, so we assume it is a
         -- line continuation. ignore it and move on!
-        GT -> lexToken
+        GT -> popLexState *> lexToken
         -- the line is indented less than the previous, pop the layout stack and
-        -- insert a closing brace.
+        -- insert a closing brace. make VERY good note of the fact that we do not
+        -- pop the lex state! this means doBol is called until indentation is EQ
+        -- GT. so if multiple layouts are closed at once, this catches that.
         LT -> popLayout >> insertRBrace
 
 thenDo :: LexerAction a -> P b -> LexerAction a
