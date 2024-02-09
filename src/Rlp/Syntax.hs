@@ -26,15 +26,15 @@ module Rlp.Syntax
     -- *** Decl
     , XFunD, XTySigD, XInfixD, XDataD, XXDeclD
     -- *** RlpExpr
-    , XLetE, XVarE, XLamE, XCaseE, XIfE, XAppE, XLitE
+    , XLetE, XLetrecE, XVarE, XLamE, XCaseE, XIfE, XAppE, XLitE
     , XParE, XOAppE, XXRlpExprE
     -- ** Pattern synonyms
     -- *** Decl
     , pattern FunD, pattern TySigD, pattern InfixD, pattern DataD
     , pattern FunD'', pattern TySigD'', pattern InfixD'', pattern DataD''
     -- *** RlpExpr
-    , pattern LetE, pattern VarE, pattern LamE, pattern CaseE, pattern IfE
-    , pattern AppE, pattern LitE, pattern ParE, pattern OAppE
+    , pattern LetE, pattern LetrecE, pattern VarE, pattern LamE, pattern CaseE
+    , pattern IfE , pattern AppE, pattern LitE, pattern ParE, pattern OAppE
     , pattern XRlpExprE
     -- *** RlpType
     , pattern FunConT'', pattern FunT'', pattern AppT'', pattern VarT''
@@ -165,19 +165,21 @@ data ConAlt p = ConAlt (IdP p) [RlpType' p]
 
 deriving instance (Show (IdP p), Show (XRec p (RlpType p))) => Show (ConAlt p)
 
-data RlpExpr p = LetE'  (XLetE p) [Binding' p] (RlpExpr' p)
-               | VarE'  (XVarE p) (IdP p)
-               | LamE'  (XLamE p) [Pat p] (RlpExpr' p)
-               | CaseE' (XCaseE p) (RlpExpr' p) [(Alt p, Where p)]
-               | IfE'   (XIfE p) (RlpExpr' p) (RlpExpr' p) (RlpExpr' p)
-               | AppE'  (XAppE p) (RlpExpr' p) (RlpExpr' p)
-               | LitE'  (XLitE p) (Lit p)
-               | ParE'  (XParE p) (RlpExpr' p)
-               | OAppE' (XOAppE p) (IdP p) (RlpExpr' p) (RlpExpr' p)
+data RlpExpr p = LetE'      (XLetE p) [Binding' p] (RlpExpr' p)
+               | LetrecE'   (XLetrecE p) [Binding' p] (RlpExpr' p)
+               | VarE'      (XVarE p) (IdP p)
+               | LamE'      (XLamE p) [Pat p] (RlpExpr' p)
+               | CaseE'     (XCaseE p) (RlpExpr' p) [(Alt p, Where p)]
+               | IfE'       (XIfE p) (RlpExpr' p) (RlpExpr' p) (RlpExpr' p)
+               | AppE'      (XAppE p) (RlpExpr' p) (RlpExpr' p)
+               | LitE'      (XLitE p) (Lit p)
+               | ParE'      (XParE p) (RlpExpr' p)
+               | OAppE'     (XOAppE p) (IdP p) (RlpExpr' p) (RlpExpr' p)
                | XRlpExprE' !(XXRlpExprE p)
                deriving (Generic)
 
 type family XLetE p
+type family XLetrecE p
 type family XVarE p
 type family XLamE p
 type family XCaseE p
@@ -189,6 +191,7 @@ type family XOAppE p
 type family XXRlpExprE p
 
 pattern LetE :: (XLetE p ~ ()) => [Binding' p] -> RlpExpr' p -> RlpExpr p
+pattern LetrecE :: (XLetrecE p ~ ()) => [Binding' p] -> RlpExpr' p -> RlpExpr p
 pattern VarE :: (XVarE p ~ ()) => IdP p -> RlpExpr p
 pattern LamE :: (XLamE p ~ ()) => [Pat p] -> RlpExpr' p -> RlpExpr p
 pattern CaseE :: (XCaseE p ~ ()) => RlpExpr' p -> [(Alt p, Where p)] -> RlpExpr p
@@ -200,6 +203,7 @@ pattern OAppE :: (XOAppE p ~ ()) => IdP p -> RlpExpr' p -> RlpExpr' p -> RlpExpr
 pattern XRlpExprE :: (XXRlpExprE p ~ ()) => RlpExpr p
 
 pattern LetE bs e = LetE' () bs e
+pattern LetrecE bs e = LetrecE' () bs e
 pattern VarE n = VarE' () n
 pattern LamE as e = LamE' () as e
 pattern CaseE e as = CaseE' () e as
@@ -211,10 +215,10 @@ pattern OAppE n a b = OAppE' () n a b
 pattern XRlpExprE = XRlpExprE' ()
 
 deriving instance
-    ( Show (XLetE p), Show (XVarE p), Show (XLamE p)
-    , Show (XCaseE p), Show (XIfE p), Show (XAppE p)
-    , Show (XLitE p), Show (XParE p), Show (XOAppE p)
-    , Show (XXRlpExprE p)
+    ( Show (XLetE p), Show (XLetrecE p), Show (XVarE p)
+    , Show (XLamE p), Show (XCaseE p), Show (XIfE p)
+    , Show (XAppE p), Show (XLitE p), Show (XParE p)
+    , Show (XOAppE p), Show (XXRlpExprE p)
     , PhaseShow p
     ) => Show (RlpExpr p)
 
@@ -308,6 +312,7 @@ makePrisms ''Pat
 --------------------------------------------------------------------------------
 
 data RlpExprF p a = LetE'F  (XLetE p) [Binding' p] a
+                  | LetrecE'F  (XLetrecE p) [Binding' p] a
                   | VarE'F  (XVarE p) (IdP p)
                   | LamE'F  (XLamE p) [Pat p] a
                   | CaseE'F (XCaseE p) a [(Alt p, Where p)]
@@ -324,6 +329,7 @@ type instance Base (RlpExpr p) = RlpExprF p
 instance (UnXRec p) => Recursive (RlpExpr p) where
     project = \case
         LetE' xx bs e   -> LetE'F xx bs (unXRec e)
+        LetrecE' xx bs e   -> LetrecE'F xx bs (unXRec e)
         VarE' xx n      -> VarE'F xx n
         LamE' xx ps e   -> LamE'F xx ps (unXRec e)
         CaseE' xx e as  -> CaseE'F xx (unXRec e) as
@@ -337,6 +343,7 @@ instance (UnXRec p) => Recursive (RlpExpr p) where
 instance (WrapXRec p) => Corecursive (RlpExpr p) where
     embed = \case
         LetE'F xx bs e   -> LetE' xx bs (wrapXRec e)
+        LetrecE'F xx bs e   -> LetrecE' xx bs (wrapXRec e)
         VarE'F xx n      -> VarE' xx n
         LamE'F xx ps e   -> LamE' xx ps (wrapXRec e)
         CaseE'F xx e as  -> CaseE' xx (wrapXRec e) as

@@ -8,6 +8,7 @@ module Control.Monad.Errorful
     , errorful
     , runErrorful
     , mapErrorful
+    , hoistErrorfulT
     , MonadErrorful(..)
     )
     where
@@ -73,6 +74,9 @@ mapErrorful f (ErrorfulT m) = ErrorfulT $
 -- when microlens-pro drops we can write this as
 --    mapErrorful f = coerced . mapped . _2 . mapped %~ f
 -- lol
+
+hoistErrorfulT :: (forall a. m a -> n a) -> ErrorfulT e m a -> ErrorfulT e n a
+hoistErrorfulT nt (ErrorfulT m) = ErrorfulT (nt m)
 
 --------------------------------------------------------------------------------
 -- daily dose of n^2 instances

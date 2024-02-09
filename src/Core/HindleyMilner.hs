@@ -22,9 +22,13 @@ import Data.Maybe               (fromMaybe)
 import Data.Text                qualified as T
 import Data.HashMap.Strict      qualified as H
 import Data.Foldable            (traverse_)
+import Data.Functor
+import Data.Functor.Identity
 import Compiler.RLPC
+import Compiler.Types
+import Compiler.RlpcError
 import Control.Monad            (foldM, void, forM)
-import Control.Monad.Errorful   (Errorful, addFatal)
+import Control.Monad.Errorful
 import Control.Monad.State
 import Control.Monad.Utils      (mapAccumLM)
 import Text.Printf
@@ -37,8 +41,6 @@ type Context b = [(b, Type)]
 
 -- | Unannotated typing context, AKA our beloved Γ.
 type Context' = Context Name
-
--- TODO: Errorful monad?
 
 -- | Type error enum.
 data TypeError
@@ -93,7 +95,7 @@ check g t1 e = do
 -- in the mean time all top-level binders must have a type annotation.
 checkCoreProg :: Program' -> HMError ()
 checkCoreProg p = scDefs
-            & traverse_ k
+                & traverse_ k
     where
         scDefs = p ^. programScDefs
         g = gatherTypeSigs p
@@ -105,10 +107,14 @@ checkCoreProg p = scDefs
              where scname = sc ^. _lhs._1
 
 -- | @checkCoreProgR p@ returns @p@ if @p@ successfully typechecks.
-checkCoreProgR :: (Applicative m) => Program' -> RLPCT m Program'
-checkCoreProgR p = undefined
+checkCoreProgR :: forall m. (Monad m) => Program' -> RLPCT m Program'
+checkCoreProgR p = (hoistRlpcT generalise . liftE . checkCoreProg $ p)
+                $> p
+    where
+        liftE = liftErrorful . mapErrorful (errorMsg (SrcSpan 0 0 0 0))
 
-{-# WARNING checkCoreProgR "unimpl" #-}
+        generalise :: forall a. Identity a -> m a
+        generalise (Identity a) = pure a
 
 -- | Infer the type of an expression under some context.
 --

@@ -62,6 +62,7 @@ import Compiler.Types
     infixr          { Located _ TokenInfixR }
     infix           { Located _ TokenInfix }
     let             { Located _ TokenLet }
+    letrec          { Located _ TokenLetrec }
     in              { Located _ TokenIn }
 
 %nonassoc '='
@@ -190,7 +191,8 @@ AppExpr     :: { RlpExpr' RlpcPs }
             | AppExpr Expr1             { AppE <<~ $1 <~> $2 }
 
 LetExpr     :: { RlpExpr' RlpcPs }
-            : let layout1(Binding) in Expr { $1 \$> LetE $2 $4 }
+            : let layout1(Binding) in Expr      { $1 \$> LetE $2 $4 }
+            | letrec layout1(Binding) in Expr   { $1 \$> LetrecE $2 $4 }
 
 CaseExpr    :: { RlpExpr' RlpcPs }
             : case Expr of layout0(CaseAlt)

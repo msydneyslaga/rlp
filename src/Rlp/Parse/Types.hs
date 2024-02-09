@@ -64,6 +64,7 @@ type instance XTySigD RlpcPs = ()
 type instance XXDeclD RlpcPs = ()
 
 type instance XLetE RlpcPs = ()
+type instance XLetrecE RlpcPs = ()
 type instance XVarE RlpcPs = ()
 type instance XLamE RlpcPs = ()
 type instance XCaseE RlpcPs = ()
@@ -127,6 +128,7 @@ data RlpToken
     | TokenCase
     | TokenOf
     | TokenLet
+    | TokenLetrec
     | TokenIn
     | TokenInfixL
     | TokenInfixR

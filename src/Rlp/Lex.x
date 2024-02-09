@@ -85,6 +85,7 @@ $white_no_nl+       ;
 <0>
 {
     "let"               { constToken TokenLet `thenBeginPush` layout_let }
+    "letrec"            { constToken TokenLet `thenBeginPush` layout_let }
     "of"                { constToken TokenOf `thenBeginPush` layout_of }
 }
 
@@ -155,6 +156,7 @@ lexReservedName = \case
     "case"      -> TokenCase
     "of"        -> TokenOf
     "let"       -> TokenLet
+    "letrec"    -> TokenLetrec
     "in"        -> TokenIn
     "infix"     -> TokenInfix
     "infixl"    -> TokenInfixL
