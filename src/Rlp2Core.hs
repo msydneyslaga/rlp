@@ -17,11 +17,12 @@ import Control.Comonad
 -- import Lens.Micro.Internal
 import Control.Lens
 import Compiler.RLPC
-import Data.List                        (mapAccumL)
+import Data.List                        (mapAccumL, partition)
 import Data.Text                        (Text)
 import Data.Text                        qualified as T
 import Data.HashMap.Strict              qualified as H
 import Data.Monoid                      (Endo(..))
+import Data.Either                      (partitionEithers)
 import Data.Foldable
 import Data.Fix
 import Data.Maybe                       (fromJust, fromMaybe)
@@ -111,7 +112,7 @@ patArgsToCase e (x,p) = (e', x') where
 type NameSupply = Labeled NameSupplyLabel (State [IdP RlpcPs])
 type NameSupplyLabel = "expr-name-supply"
 
-exprToCore :: (NameSupply :> es) => RlpExpr RlpcPs -> Eff es Expr'
+exprToCore :: forall es. (NameSupply :> es) => RlpExpr RlpcPs -> Eff es Expr'
 
 exprToCore (VarE n) = pure $ Var (dsNameToName n)
 
@@ -125,15 +126,54 @@ exprToCore (CaseE (unXRec -> e) as) = do
     e' <- exprToCore e
     Case e' <$> caseAltToCore `traverse` as
 
+exprToCore (LetE bs e) = letToCore NonRec bs e
+exprToCore (LetrecE bs e) = letToCore Rec bs e
+
 exprToCore (LitE l) = litToCore l
+
+letToCore :: forall es. (NameSupply :> es)
+          => Rec -> [Rlp.Binding' RlpcPs] -> RlpExpr' RlpcPs -> Eff es Expr'
+letToCore r bs e = do
+    (bs',as) <- getParts
+    e' <- caseify as (unXRec e)
+    pure $ Let r bs' e'
+  where
+    -- partition & map the list of binders into:
+    --  bs'   : the let-binds that may be directly translated to Core
+    --          let-binds (we do exactly that). this is all the binders that
+    --          are a simple variable rather than a pattern match.
+    -- and as : the let-binds that may **not** be directly translated to
+    --          Core let-exprs. they get turned into case alternates.
+    getParts = traverse f bs <&> partitionEithers
+
+    f :: Rlp.Binding' RlpcPs
+      -> Eff es (Either Core.Binding' (Alt RlpcPs))
+    f (PatB'' (VarP'' n) e) = Left . (n :=) <$> exprToCore (unXRec e)
+    f (PatB'' p          e) = undefined
+
+    varPatB :: Traversal' (Rlp.Binding' RlpcPs) (IdP RlpcPs)
+    varPatB = located . _PatB . _1 . located . _VarP
 
 litToCore :: (NameSupply :> es) => Rlp.Lit RlpcPs -> Eff es Expr'
 litToCore (Rlp.IntL n) = pure . Lit $ Core.IntL n
+
+caseify :: (NameSupply :> es) => [Alt RlpcPs] -> RlpExpr RlpcPs -> Eff es Expr'
+caseify as ee = do
+    ee' <- exprToCore ee
+    foldrM go ee' as
+  where
+    go a e = Case e . pure <$> altToCore a
 
 -- TODO: where-binds
 caseAltToCore :: (NameSupply :> es)
               => (Alt RlpcPs, Where RlpcPs) -> Eff es Alter'
 caseAltToCore (AltA (unXRec -> p) e, wh) = do
+    e' <- exprToCore . unXRec $ e
+    conToRose p <&> foldFix (branchToCore e')
+
+altToCore :: (NameSupply :> es)
+          => Alt RlpcPs -> Eff es Alter'
+altToCore (AltA (unXRec -> p) e) = do
     e' <- exprToCore . unXRec $ e
     conToRose p <&> foldFix (branchToCore e')
 

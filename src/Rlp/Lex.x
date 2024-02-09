@@ -85,7 +85,7 @@ $white_no_nl+       ;
 <0>
 {
     "let"               { constToken TokenLet `thenBeginPush` layout_let }
-    "letrec"            { constToken TokenLet `thenBeginPush` layout_let }
+    "letrec"            { constToken TokenLetrec `thenBeginPush` layout_let }
     "of"                { constToken TokenOf `thenBeginPush` layout_of }
 }
 

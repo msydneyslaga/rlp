@@ -4,6 +4,7 @@ module Compiler.Types
     , srcspanLine, srcspanColumn, srcspanAbs, srcspanLen
     , Located(..)
     , _Located
+    , located
     , nolo
     , (<<~), (<~>), (<#>)
 
@@ -24,6 +25,9 @@ import Language.Haskell.TH.Syntax   (Lift)
 -- | Token wrapped with a span (line, column, absolute, length)
 data Located a = Located SrcSpan a
     deriving (Show, Lift, Functor)
+
+located :: Lens (Located a) (Located b) a b
+located = lens extract ($>)
 
 instance Apply Located where
     liftF2 f (Located sa p) (Located sb q)

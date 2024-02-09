@@ -270,14 +270,14 @@ instance (Pretty b) => Pretty (Expr b) where
     prettyPrec _ (Con t a)    = "Pack{" <> (ttext t <+> ttext a) <> "}"
     prettyPrec _ (Lam bs e)   = hsep ["λ", hsep (prettyPrec 1 <$> bs), "->", pretty e]
     prettyPrec _ (Let r bs e) = hsep [word, explicitLayout bs]
-                             $$ hsep ["in", pretty e]
+                            $+$ hsep ["in", pretty e]
         where word = if r == Rec then "letrec" else "let"
     prettyPrec p (App f x)    = maybeParens (p>0) $
         prettyPrec 0 f <+> prettyPrec 1 x
     prettyPrec _ (Lit l)      = pretty l
     prettyPrec p (Case e as)  = maybeParens (p>0) $
         "case" <+> pretty e <+> "of"
-        $$ nest 2 (explicitLayout as)
+        $+$ nest 2 (explicitLayout as)
 
 instance (Pretty b) => Pretty (Alter b) where
     pretty (Alter c as e) =

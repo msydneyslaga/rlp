@@ -18,6 +18,7 @@ module Rlp.Syntax
     , ConAlt(..)
     , Binding(..), Binding'
 
+    , _PatB, _FunB
     , _VarP, _LitP, _ConP
 
     -- * Trees That Grow boilerplate
@@ -41,6 +42,8 @@ module Rlp.Syntax
     , pattern ConT''
     -- *** Pat
     , pattern VarP'', pattern LitP'', pattern ConP''
+    -- *** Binding
+    , pattern PatB''
     )
     where
 ----------------------------------------------------------------------------------
@@ -253,6 +256,9 @@ data Binding p = PatB (Pat' p) (RlpExpr' p)
 
 type Binding' p = XRec p (Binding p)
 
+pattern PatB'' :: (UnXRec p) => Pat' p -> RlpExpr' p -> Binding' p
+pattern PatB'' p e <- (unXRec -> PatB p e)
+
 deriving instance (Show (XRec p (Pat p)), Show (XRec p (RlpExpr p)), Show (IdP p)
                   ) => Show (Binding p)
 
@@ -308,6 +314,7 @@ type Lit' p = XRec p (Lit p)
 
 makeLenses ''RlpModule
 makePrisms ''Pat
+makePrisms ''Binding
 
 --------------------------------------------------------------------------------
 
