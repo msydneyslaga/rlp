@@ -159,3 +159,4 @@ than the other release plans.
     - [ ] Less hacky handling of named data
     - [ ] Less hacky pragmas
 - [ ] Choose a target. LLVM, JS, C, and WASM are currently top contenders
+- [ ] https://proglangdesign.net/wiki/challenges
