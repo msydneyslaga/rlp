@@ -76,12 +76,12 @@ negExample3 = [coreProg|
 
 arithExample1 :: Program'
 arithExample1 = [coreProg|
-    main = (+#) 3 (negate# 2);
+    main = +# 3 (negate# 2);
 |]
 
 arithExample2 :: Program'
 arithExample2 = [coreProg|
-    main = negate# ((+#) 2 ((*#) 5 3));
+    main = negate# (+# 2 (*# 5 3));
 |]
 
 ifExample1 :: Program'
@@ -96,7 +96,7 @@ ifExample2 = [coreProg|
 
 facExample :: Program'
 facExample = [coreProg|
-    fac n = if# ((==#) n 0) 1 ((*#) n (fac ((-#) n 1)));
+    fac n = if# (==# n 0) 1 (*# n (fac (-# n 1)));
     main = fac 3;
 |]
 
@@ -149,14 +149,14 @@ caseBool1 = [coreProg|
     false = Pack{0 0};
     true = Pack{1 0};
 
-    main = _if false ((+#) 2 3) ((*#) 4 5);
+    main = _if false (+# 2 3) (*# 4 5);
 |]
 
 fac3 :: Program'
 fac3 = [coreProg|
-    fac n = case (==#) n 0 of
+    fac n = case ==# n 0 of
         { <1> -> 1
-        ; <0> -> (*#) n (fac ((-#) n 1))
+        ; <0> -> *# n (fac (-# n 1))
         };
 
     main = fac 3;
@@ -171,7 +171,7 @@ sumList = [coreProg|
         list = cons 1 (cons 2 (cons 3 nil));
         sum l = case l of
             { <0>      -> 0
-            ; <1> x xs -> (+#) x (sum xs)
+            ; <1> x xs -> +# x (sum xs)
             };
         main = sum list;
     |]
@@ -179,7 +179,7 @@ sumList = [coreProg|
 constDivZero :: Program'
 constDivZero = [coreProg|
         k x y = x;
-        main = k 3 ((/#) 1 0);
+        main = k 3 (/# 1 0);
     |]
 
 idCase :: Program'
@@ -187,7 +187,7 @@ idCase = [coreProg|
         id x = x;
 
         main = id (case Pack{1 0} of
-            { <1> -> (+#) 2 3
+            { <1> -> +# 2 3
             })
     |]
 
@@ -197,7 +197,7 @@ namedBoolCase :: Program'
 namedBoolCase = [coreProg|
         {-# PackData True 1 0 #-}
         {-# PackData False 0 0 #-}
-        main = case (==#) 1 1 of
+        main = case ==# 1 1 of
             { True -> 123
             ; False -> 456
             }
@@ -243,3 +243,4 @@ namedConsCase = [coreProg|
 --         ]
 
 --}
+

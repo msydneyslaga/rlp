@@ -40,34 +40,34 @@ import Data.HashMap.Strict  qualified as H
 %monad { RLPC } { happyBind } { happyPure }
 
 %token
-      let             { Located _ _ _ TokenLet }
-      letrec          { Located _ _ _ TokenLetrec }
-      module          { Located _ _ _ TokenModule }
-      where           { Located _ _ _ TokenWhere }
-      case            { Located _ _ _ TokenCase }
-      of              { Located _ _ _ TokenOf }
-      pack            { Located _ _ _ TokenPack } -- temp
-      in              { Located _ _ _ TokenIn }
-      litint          { Located _ _ _ (TokenLitInt $$) }
-      varname         { Located _ _ _ (TokenVarName $$) }
-      varsym          { Located _ _ _ (TokenVarSym $$) }
-      conname         { Located _ _ _ (TokenConName $$) }
-      consym          { Located _ _ _ (TokenConSym $$) }
-      alttag          { Located _ _ _ (TokenAltTag $$) }
-      word            { Located _ _ _ (TokenWord $$) }
-      'λ'             { Located _ _ _ TokenLambda }
-      '->'            { Located _ _ _ TokenArrow }
-      '='             { Located _ _ _ TokenEquals }
-      '@'             { Located _ _ _ TokenTypeApp }
-      '('             { Located _ _ _ TokenLParen }
-      ')'             { Located _ _ _ TokenRParen }
-      '{'             { Located _ _ _ TokenLBrace }
-      '}'             { Located _ _ _ TokenRBrace }
-      '{-#'           { Located _ _ _ TokenLPragma }
-      '#-}'           { Located _ _ _ TokenRPragma }
-      ';'             { Located _ _ _ TokenSemicolon }
-      '::'            { Located _ _ _ TokenHasType }
-      eof             { Located _ _ _ TokenEOF }
+      let             { Located _ TokenLet }
+      letrec          { Located _ TokenLetrec }
+      module          { Located _ TokenModule }
+      where           { Located _ TokenWhere }
+      case            { Located _ TokenCase }
+      of              { Located _ TokenOf }
+      pack            { Located _ TokenPack } -- temp
+      in              { Located _ TokenIn }
+      litint          { Located _ (TokenLitInt $$) }
+      varname         { Located _ (TokenVarName $$) }
+      varsym          { Located _ (TokenVarSym $$) }
+      conname         { Located _ (TokenConName $$) }
+      consym          { Located _ (TokenConSym $$) }
+      alttag          { Located _ (TokenAltTag $$) }
+      word            { Located _ (TokenWord $$) }
+      'λ'             { Located _ TokenLambda }
+      '->'            { Located _ TokenArrow }
+      '='             { Located _ TokenEquals }
+      '@'             { Located _ TokenTypeApp }
+      '('             { Located _ TokenLParen }
+      ')'             { Located _ TokenRParen }
+      '{'             { Located _ TokenLBrace }
+      '}'             { Located _ TokenRBrace }
+      '{-#'           { Located _ TokenLPragma }
+      '#-}'           { Located _ TokenRPragma }
+      ';'             { Located _ TokenSemicolon }
+      '::'            { Located _ TokenHasType }
+      eof             { Located _ TokenEOF }
 
 %%
 
@@ -187,18 +187,18 @@ Id              : Var                                { $1 }
                 | Con                                { $1 }
 
 Var             :: { Name }
-Var             : '(' varsym ')'                    { $2 }
-                | varname                           { $1 }
+Var             : varname                           { $1 }
+                | varsym                            { $1 }
 
 Con             :: { Name }
-Con             : '(' consym ')'                    { $2 }
-                | conname                           { $1 }
+Con             : conname                           { $1 }
+                | consym                            { $1 }
 
 {
 
 parseError :: [Located CoreToken] -> RLPC a
-parseError (Located y x l t : _) =
-    error $ show y <> ":" <> show x
+parseError (Located _ t : _) =
+    error $ "<line>" <> ":" <> "<col>"
          <> ": parse error at token `" <> show t <> "'"
 
 {-# WARNING parseError "unimpl" #-}

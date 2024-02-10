@@ -8,9 +8,9 @@ that use Prelude types such as @Either@ and @String@ rather than more complex
 types such as @RLPC@ or @Text@.
 -}
 module Compiler.JustRun
-    ( justLexSrc
-    , justParseSrc
-    , justTypeCheckSrc
+    ( justLexCore
+    , justParseCore
+    , justTypeCheckCore
     )
     where
 ----------------------------------------------------------------------------------
@@ -21,24 +21,26 @@ import Core.Syntax                      (Program')
 import Compiler.RLPC
 import Control.Arrow                    ((>>>))
 import Control.Monad                    ((>=>))
+import Control.Comonad
+import Control.Lens
 import Data.Text                        qualified as T
 import Data.Function                    ((&))
 import GM
 ----------------------------------------------------------------------------------
 
-justLexSrc :: String -> Either [MsgEnvelope RlpcError] [CoreToken]
-justLexSrc s = lexCoreR (T.pack s)
-             & fmap (map $ \ (Located _ _ _ t) -> t)
-             & rlpcToEither
+justLexCore :: String -> Either [MsgEnvelope RlpcError] [CoreToken]
+justLexCore s = lexCoreR (T.pack s)
+              & mapped . each %~ extract
+              & rlpcToEither
 
-justParseSrc :: String -> Either [MsgEnvelope RlpcError] Program'
-justParseSrc s = parse (T.pack s)
-               & rlpcToEither
+justParseCore :: String -> Either [MsgEnvelope RlpcError] Program'
+justParseCore s = parse (T.pack s)
+                & rlpcToEither
     where parse = lexCoreR >=> parseCoreProgR
 
-justTypeCheckSrc :: String -> Either [MsgEnvelope RlpcError] Program'
-justTypeCheckSrc s = typechk (T.pack s)
-                   & rlpcToEither
+justTypeCheckCore :: String -> Either [MsgEnvelope RlpcError] Program'
+justTypeCheckCore s = typechk (T.pack s)
+                    & rlpcToEither
     where typechk = lexCoreR >=> parseCoreProgR >=> checkCoreProgR
 
 rlpcToEither :: RLPC a -> Either [MsgEnvelope RlpcError] a

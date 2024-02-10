@@ -23,8 +23,9 @@ import Data.String          (IsString(..))
 import Data.Functor.Identity
 import Core.Syntax
 import Compiler.RLPC
+import Compiler.Types
 -- TODO: unify Located definitions
-import Compiler.RlpcError   hiding (Located(..))
+import Compiler.RlpcError
 import Lens.Micro
 import Lens.Micro.TH
 }
@@ -120,11 +121,9 @@ rlp :-
 }
 
 {
-data Located a = Located Int Int Int a
-    deriving Show
 
 constTok :: t -> AlexInput -> Int -> Alex (Located t)
-constTok t (AlexPn _ y x,_,_,_) l = pure $ Located y x l t
+constTok t (AlexPn _ y x,_,_,_) l = pure $ nolo t
 
 data CoreToken = TokenLet
                | TokenLetrec
@@ -171,7 +170,7 @@ data SrcErrorType = SrcErrLexical String
 type Lexer = AlexInput -> Int -> Alex (Located CoreToken)
 
 lexWith :: (Text -> CoreToken) -> Lexer
-lexWith f (AlexPn _ y x,_,_,s) l = pure $ Located y x l (f $ T.take l s)
+lexWith f (AlexPn _ y x,_,_,s) l = pure . nolo . f . T.take l $ s
 
 -- | The main lexer driver.
 lexCore :: Text -> RLPC [Located CoreToken]
@@ -191,14 +190,14 @@ lexCoreR = hoistRlpcT generalise . lexCore
 -- debugging
 lexCore' :: Text -> RLPC [CoreToken]
 lexCore' s = fmap f <$> lexCore s
-    where f (Located _ _ _ t) = t
+    where f (Located _ t) = t
 
 lexStream :: Alex [Located CoreToken]
 lexStream = do
     l <- alexMonadScan
     case l of
-        Located _ _ _ TokenEOF  -> pure [l]
-        _                       -> (l:) <$> lexStream
+        Located _ TokenEOF -> pure [l]
+        _                  -> (l:) <$> lexStream
 
 data ParseError = ParErrLexical String
                 | ParErrParse
@@ -214,7 +213,7 @@ instance IsRlpcError ParseError where
 
 alexEOF :: Alex (Located CoreToken)
 alexEOF = Alex $ \ st@(AlexState { alex_pos = AlexPn _ y x }) ->
-    Right (st, Located y x 0 TokenEOF)
+    Right (st, nolo $ TokenEOF)
 
 }
 
