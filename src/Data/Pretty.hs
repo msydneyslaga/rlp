@@ -1,5 +1,6 @@
 module Data.Pretty
     ( Pretty(..)
+    , rpretty
     , ttext
     -- * Pretty-printing lens combinators
     , hsepOf, vsepOf
@@ -12,6 +13,7 @@ module Data.Pretty
 ----------------------------------------------------------------------------------
 import Text.PrettyPrint             hiding ((<>))
 import Text.PrettyPrint.HughesPJ    hiding ((<>))
+import Text.Printf
 import Data.String                  (IsString(..))
 import Data.Text.Lens
 import Data.Monoid
@@ -26,6 +28,9 @@ class Pretty a where
     {-# MINIMAL pretty | prettyPrec #-}
     pretty = prettyPrec 0
     prettyPrec a _ = pretty a
+
+rpretty :: (IsString s, Pretty a) => a -> s
+rpretty = fromString . render . pretty
 
 instance Pretty String where
     pretty = Text.PrettyPrint.text

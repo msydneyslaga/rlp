@@ -40,6 +40,8 @@ coreExprT :: QuasiQuoter
 coreExprT = mkqq $ lexCoreR >=> parseCoreExprR >=> checkCoreExprR g
     where
         g = [ ("+#", TyCon "Int#" :-> TyCon "Int#" :-> TyCon "Int#")
+            , ("id", TyCon "a" :-> TyCon "a")
+            , ("fix", (TyCon "a" :-> TyCon "a") :-> TyCon "a")
             ]
 
 mkqq :: (Lift a) => (Text -> RLPCIO a) -> QuasiQuoter
