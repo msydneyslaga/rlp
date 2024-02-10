@@ -739,7 +739,7 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
         compileE g e = compileC g e ++ [Eval]
 
         compileD :: Env -> [Alter'] -> [(Tag, Code)]
-        compileD g as = fmap (compileA g) as
+        compileD g = fmap (compileA g)
 
         compileA :: Env -> Alter' -> (Tag, Code)
         compileA g (Alter (AltTag t) as e) = (t, [Split n] <> c <> [Slide n])
