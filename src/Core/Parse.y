@@ -7,6 +7,7 @@ Description : Parser for the Core language
 module Core.Parse
     ( parseCore
     , parseCoreExpr
+    , parseCoreExprR
     , parseCoreProg
     , parseCoreProgR
     , module Core.Lex -- temp convenience
@@ -16,6 +17,7 @@ module Core.Parse
     where
 
 import Control.Monad        ((>=>))
+import Control.Monad.Utils  (generalise)
 import Data.Foldable        (foldl')
 import Data.Functor.Identity
 import Core.Syntax
@@ -226,12 +228,12 @@ insScDef sc = programScDefs %~ (sc:)
 singletonScDef :: (Hashable b) => ScDef b -> Program b
 singletonScDef sc = insScDef sc mempty
 
+parseCoreExprR :: (Monad m) => [Located CoreToken] -> RLPCT m Expr'
+parseCoreExprR = hoistRlpcT generalise . parseCoreExpr
+
 parseCoreProgR :: forall m. (Monad m) => [Located CoreToken] -> RLPCT m Program'
 parseCoreProgR = ddumpast <=< (hoistRlpcT generalise . parseCoreProg)
     where
-        generalise :: forall a. Identity a -> m a
-        generalise (Identity a) = pure a
-
         ddumpast :: Program' -> RLPCT m Program'
         ddumpast p = do
             addDebugMsg "dump-parsed-core" . show $ p

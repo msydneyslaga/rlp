@@ -5,6 +5,7 @@ Description : Core quasiquoters
 module Core.TH
     ( coreExpr
     , coreProg
+    , coreExprT
     , coreProgT
     )
     where
@@ -22,20 +23,26 @@ import Data.Text                    qualified as T
 import Core.Parse
 import Core.Lex
 import Core.Syntax
-import Core.HindleyMilner           (checkCoreProgR)
+import Core.HindleyMilner           (checkCoreProgR, checkCoreExprR)
 ----------------------------------------------------------------------------------
 
 coreProg :: QuasiQuoter
 coreProg = mkqq $ lexCoreR >=> parseCoreProgR
 
 coreExpr :: QuasiQuoter
-coreExpr = mkqq $ lexCoreR >=> parseCoreExpr
+coreExpr = mkqq $ lexCoreR >=> parseCoreExprR
 
 -- | Type-checked @coreProg@
 coreProgT :: QuasiQuoter
 coreProgT = mkqq $ lexCoreR >=> parseCoreProgR >=> checkCoreProgR
 
-mkqq :: (Lift a) => (Text -> RLPC a) -> QuasiQuoter
+coreExprT :: QuasiQuoter
+coreExprT = mkqq $ lexCoreR >=> parseCoreExprR >=> checkCoreExprR g
+    where
+        g = [ ("+#", TyCon "Int#" :-> TyCon "Int#" :-> TyCon "Int#")
+            ]
+
+mkqq :: (Lift a) => (Text -> RLPCIO a) -> QuasiQuoter
 mkqq p = QuasiQuoter
     { quoteExp = mkq p
     , quotePat = error "core quasiquotes may only be used in expressions"
@@ -43,8 +50,6 @@ mkqq p = QuasiQuoter
     , quoteDec = error "core quasiquotes may only be used in expressions"
     }
 
-mkq :: (Lift a) => (Text -> RLPC a) -> String -> Q Exp
-mkq parse s = case evalRLPC def (parse $ T.pack s) of
-    (Just a,  _) -> lift a
-    (Nothing, _) -> error "todo: aaahhbbhjhbdjhabsjh"
+mkq :: (Lift a) => (Text -> RLPCIO a) -> String -> Q Exp
+mkq parse s = liftIO $ evalRLPCIO def (parse $ T.pack s) >>= lift
 

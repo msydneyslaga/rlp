@@ -1,11 +1,13 @@
 module Control.Monad.Utils
     ( mapAccumLM
     , Kendo(..)
+    , generalise
     )
     where
 ----------------------------------------------------------------------------------
 import Data.Tuple               (swap)
 import Data.Coerce
+import Data.Functor.Identity
 import Control.Monad.State
 import Control.Monad
 ----------------------------------------------------------------------------------
@@ -29,4 +31,7 @@ instance (Monad m) => Semigroup (Kendo m a) where
 
 instance (Monad m) => Monoid (Kendo m a) where
     mempty = Kendo pure
+
+generalise :: (Monad m) => Identity a -> m a
+generalise (Identity a) = pure a
 

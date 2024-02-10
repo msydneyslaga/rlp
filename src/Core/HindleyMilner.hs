@@ -10,6 +10,7 @@ module Core.HindleyMilner
     , check
     , checkCoreProg
     , checkCoreProgR
+    , checkCoreExprR
     , TypeError(..)
     , HMError
     )
@@ -30,7 +31,7 @@ import Compiler.RlpcError
 import Control.Monad            (foldM, void, forM)
 import Control.Monad.Errorful
 import Control.Monad.State
-import Control.Monad.Utils      (mapAccumLM)
+import Control.Monad.Utils      (mapAccumLM, generalise)
 import Text.Printf
 import Core.Syntax
 ----------------------------------------------------------------------------------
@@ -113,8 +114,11 @@ checkCoreProgR p = (hoistRlpcT generalise . liftE . checkCoreProg $ p)
     where
         liftE = liftErrorful . mapErrorful (errorMsg (SrcSpan 0 0 0 0))
 
-        generalise :: forall a. Identity a -> m a
-        generalise (Identity a) = pure a
+checkCoreExprR :: (Monad m) => Context' -> Expr' -> RLPCT m Expr'
+checkCoreExprR g e = (hoistRlpcT generalise . liftE . infer g $ e)
+                  $> e
+    where
+        liftE = liftErrorful . mapErrorful (errorMsg (SrcSpan 0 0 0 0))
 
 -- | Infer the type of an expression under some context.
 --
