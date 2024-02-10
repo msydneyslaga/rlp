@@ -9,7 +9,7 @@ module Rlp2Core
 --------------------------------------------------------------------------------
 import Control.Monad
 import Control.Monad.Writer.CPS
-import Control.Monad.Utils              (mapAccumLM)
+import Control.Monad.Utils
 import Control.Arrow
 import Control.Applicative
 import Control.Comonad
@@ -135,8 +135,10 @@ letToCore :: forall es. (NameSupply :> es)
           => Rec -> [Rlp.Binding' RlpcPs] -> RlpExpr' RlpcPs -> Eff es Expr'
 letToCore r bs e = do
     (bs',as) <- getParts
-    e' <- caseify as (unXRec e)
-    pure $ Let r bs' e'
+    e' <- appKendo (foldMap Kendo as) <=< exprToCore $ unXRec e
+    if null bs'
+        then pure e'
+        else pure $ Let r bs' e'
   where
     -- partition & map the list of binders into:
     --  bs'   : the let-binds that may be directly translated to Core
@@ -147,22 +149,27 @@ letToCore r bs e = do
     getParts = traverse f bs <&> partitionEithers
 
     f :: Rlp.Binding' RlpcPs
-      -> Eff es (Either Core.Binding' (Alt RlpcPs))
+      -> Eff es (Either Core.Binding' (Expr' -> Eff es Expr'))
     f (PatB'' (VarP'' n) e) = Left . (n :=) <$> exprToCore (unXRec e)
-    f (PatB'' p          e) = undefined
-
-    varPatB :: Traversal' (Rlp.Binding' RlpcPs) (IdP RlpcPs)
-    varPatB = located . _PatB . _1 . located . _VarP
+    f (PatB'' p          e) = pure $ Right (caseify p e)
 
 litToCore :: (NameSupply :> es) => Rlp.Lit RlpcPs -> Eff es Expr'
 litToCore (Rlp.IntL n) = pure . Lit $ Core.IntL n
 
-caseify :: (NameSupply :> es) => [Alt RlpcPs] -> RlpExpr RlpcPs -> Eff es Expr'
-caseify as ee = do
-    ee' <- exprToCore ee
-    foldrM go ee' as
+{-
+let C x = y
+in e
+
+case y of
+    C x -> e
+ -}
+
+caseify :: (NameSupply :> es)
+        => Pat' RlpcPs -> RlpExpr' RlpcPs -> Expr' -> Eff es Expr'
+caseify p (unXRec -> e) i =
+    Case <$> exprToCore e <*> ((:[]) <$> alt)
   where
-    go a e = Case e . pure <$> altToCore a
+    alt = conToRose (unXRec p) <&> foldFix (branchToCore i)
 
 -- TODO: where-binds
 caseAltToCore :: (NameSupply :> es)
@@ -173,8 +180,12 @@ caseAltToCore (AltA (unXRec -> p) e, wh) = do
 
 altToCore :: (NameSupply :> es)
           => Alt RlpcPs -> Eff es Alter'
-altToCore (AltA (unXRec -> p) e) = do
-    e' <- exprToCore . unXRec $ e
+altToCore (AltA p e) = altToCore' p e
+
+altToCore' :: (NameSupply :> es)
+           => Pat' RlpcPs -> RlpExpr' RlpcPs -> Eff es Alter'
+altToCore' (unXRec -> p) (unXRec -> e) = do
+    e' <- exprToCore e
     conToRose p <&> foldFix (branchToCore e')
 
 conToRose :: forall es. (NameSupply :> es) => Pat RlpcPs -> Eff es Rose
