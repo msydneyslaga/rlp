@@ -8,6 +8,7 @@ module Core.Examples where
 ----------------------------------------------------------------------------------
 import Core.Syntax
 import Core.TH
+import Rlp.TH
 ----------------------------------------------------------------------------------
 
 -- fac3 = undefined
@@ -243,4 +244,18 @@ namedConsCase = [coreProg|
 --         ]
 
 --}
+
+qsort = [rlpProg|
+    data List a = Nil | Cons a (List a)
+
+    list = Cons 9 (Cons 2 (Cons 3 (Cons 2
+                (Cons 5 (Cons 2 (Cons 12 (Cons 89 Nil)))))))
+
+    id x = x
+
+    main = case list of
+        Nil -> Nil
+        Cons a as -> let lesser = as
+                     in print# lesser
+|]
 

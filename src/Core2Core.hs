@@ -20,6 +20,7 @@ import Control.Monad.State.Lazy
 import Control.Arrow            ((>>>))
 import Data.Text                qualified as T
 import Data.HashMap.Strict      (HashMap)
+import Debug.Trace
 import Numeric                  (showHex)
 
 import Data.Pretty
@@ -70,7 +71,7 @@ tagData p = let ?dt = p ^. programDataTags
     go x                = embed x
 
     tagAlts :: (?dt :: HashMap Name (Tag, Int)) => Alter' -> Alter'
-    tagAlts (Alter (AltData c) bs e) = Alter (AltTag tag) bs e
+    tagAlts (Alter (AltData c) bs e) = Alter (AltTag tag) bs (cata go e)
         where tag = case ?dt ^. at c of
                 Just (t,_) -> t
                 -- TODO: errorful

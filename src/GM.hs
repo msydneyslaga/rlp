@@ -103,7 +103,7 @@ data Instr = Unwind
            -- arith
            | Neg | Add | Sub | Mul | Div
            -- comparison
-           | Equals | Lesser
+           | Equals | Lesser | GreaterEq
            | Pack Tag Int -- Pack Tag Arity
            | CaseJump [(Tag, Code)]
            | Split Int
@@ -228,6 +228,7 @@ step st = case head (st ^. gmCode) of
     Div            -> divI
     Equals         -> equalsI
     Lesser         -> lesserI
+    GreaterEq      -> greaterEqI
     Split      n   -> splitI        n
     Pack       t n -> packI       t n
     CaseJump    as -> caseJumpI    as
@@ -451,9 +452,10 @@ step st = case head (st ^. gmCode) of
         mulI = primitive2 boxInt unboxInt (*) st
         divI = primitive2 boxInt unboxInt div st
 
-        lesserI, equalsI :: GmState
+        lesserI, greaterEqI, equalsI :: GmState
         equalsI = primitive2 boxBool unboxInt (==) st
         lesserI = primitive2 boxBool unboxInt (<) st
+        greaterEqI = primitive2 boxBool unboxInt (>=) st
 
         splitI :: Int -> GmState
         splitI n = st
@@ -638,6 +640,7 @@ compiledPrims =
     , binop "/#" Div
     , binop "==#" Equals
     , binop "<#" Lesser
+    , binop ">=#" GreaterEq
     , ("print#", 1, [ Push 0, Eval, Print, Pack tag_Unit_unit 0, Update 1, Pop 1
                     , Unwind])
     ]
@@ -653,7 +656,7 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
 
         -- note that we don't count sc allocations in the stats
         allocateSc :: GmHeap -> CompiledSC -> (GmHeap, (Key, Addr))
-        allocateSc h (n,d,c) = (h', (NameKey n, a))
+        allocateSc h (n,d,c) = traceShow a (h', (NameKey n, a))
             where (h',a) = alloc h $ NGlobal d c
 
         -- >> [ref/compileSc]
