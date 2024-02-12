@@ -40,6 +40,12 @@ import Core2Core
 import Core
 ----------------------------------------------------------------------------------
 
+tag_Bool_True :: Int
+tag_Bool_True = 1
+
+tag_Bool_False :: Int
+tag_Bool_False = 0
+
 {-}
 
 hdbgProg = undefined
@@ -195,24 +201,24 @@ isFinal st = null $ st ^. gmCode
 
 step :: GmState -> GmState
 step st = case head (st ^. gmCode) of
-    Unwind         -> unwindI        
+    Unwind         -> unwindI
     PushGlobal n   -> pushGlobalI   n
     PushConstr t n -> pushConstrI t n
     PushInt    n   -> pushIntI      n
     Push       n   -> pushI         n
-    MkAp           -> mkApI          
+    MkAp           -> mkApI
     Slide      n   -> slideI        n
     Pop        n   -> popI          n
     Update     n   -> updateI       n
     Alloc      n   -> allocI        n
-    Eval           -> evalI          
-    Neg            -> negI           
-    Add            -> addI           
-    Sub            -> subI           
-    Mul            -> mulI           
-    Div            -> divI           
-    Equals         -> equalsI           
-    Lesser         -> lesserI           
+    Eval           -> evalI
+    Neg            -> negI
+    Add            -> addI
+    Sub            -> subI
+    Mul            -> mulI
+    Div            -> divI
+    Equals         -> equalsI
+    Lesser         -> lesserI
     Split      n   -> splitI        n
     Pack       t n -> packI       t n
     CaseJump    as -> caseJumpI    as
@@ -556,12 +562,13 @@ boxBool st p = st
     where
         h = st ^. gmHeap
         (h',a) = alloc h (NConstr p' [])
-        p' = if p then 1 else 0
+        p' = if p then tag_Bool_True else tag_Bool_False
 
 unboxBool :: Addr -> GmState -> Bool
 unboxBool a st = case hLookup a h of
-        Just (NConstr 1 []) -> True
-        Just (NConstr 0 []) -> False
+        Just (NConstr t [])
+            | t == tag_Bool_True  -> True
+            | t == tag_Bool_False -> False
         Just _              -> error "unboxInt received a non-int"
         Nothing             -> error "unboxInt received an invalid address"
     where h = st ^. gmHeap
