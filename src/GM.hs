@@ -89,7 +89,7 @@ data Instr = Unwind
            -- arith
            | Neg | Add | Sub | Mul | Div
            -- comparison
-           | Equals
+           | Equals | Lesser
            | Pack Tag Int -- Pack Tag Arity
            | CaseJump [(Tag, Code)]
            | Split Int
@@ -212,6 +212,7 @@ step st = case head (st ^. gmCode) of
     Mul            -> mulI           
     Div            -> divI           
     Equals         -> equalsI           
+    Lesser         -> lesserI           
     Split      n   -> splitI        n
     Pack       t n -> packI       t n
     CaseJump    as -> caseJumpI    as
@@ -411,8 +412,9 @@ step st = case head (st ^. gmCode) of
         mulI = primitive2 boxInt unboxInt (*) st
         divI = primitive2 boxInt unboxInt div st
 
-        equalsI :: GmState
+        lesserI, equalsI :: GmState
         equalsI = primitive2 boxBool unboxInt (==) st
+        lesserI = primitive2 boxBool unboxInt (<) st
 
         splitI :: Int -> GmState
         splitI n = st
@@ -595,6 +597,7 @@ compiledPrims =
     , binop "*#" Mul
     , binop "/#" Div
     , binop "==#" Equals
+    , binop "<#" Lesser
     ]
     where
         unop k i = (k, 1, [Push 0, Eval, i, Update 1, Pop 1, Unwind])
@@ -733,6 +736,7 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
         compileE g ("*#" :$ a :$ b)  = inlineOp2 g Mul    a b
         compileE g ("/#" :$ a :$ b)  = inlineOp2 g Div    a b
         compileE g ("==#" :$ a :$ b) = inlineOp2 g Equals a b
+        compileE g ("<#" :$ a :$ b)  = inlineOp2 g Lesser a b
 
         compileE g (Case e as) = compileE g e <> [CaseJump (compileD g as)]
 
