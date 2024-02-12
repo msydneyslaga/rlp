@@ -125,11 +125,11 @@ exprToCore (LitE l) = litToCore l
 letToCore :: forall es. (NameSupply :> es)
           => Rec -> [Rlp.Binding' RlpcPs] -> RlpExpr' RlpcPs -> Eff es Expr'
 letToCore r bs e = do
+    -- TODO: preserve binder order.
     (bs',as) <- getParts
-    e' <- appKendo (foldMap Kendo as) <=< exprToCore $ unXRec e
-    if null bs'
-        then pure e'
-        else pure $ Let r bs' e'
+    let insbs | null bs'  = pure
+              | otherwise = pure . Let r bs'
+    appKendo (foldMap Kendo (as `snoc` insbs)) <=< exprToCore $ unXRec e
   where
     -- partition & map the list of binders into:
     --  bs'   : the let-binds that may be directly translated to Core
