@@ -28,6 +28,7 @@ import Data.Fix
 import Data.Maybe                       (fromJust, fromMaybe)
 import Data.Functor.Bind
 import Data.Function                    (on)
+import GHC.Stack
 import Debug.Trace
 
 import Effectful.State.Static.Local
@@ -91,23 +92,13 @@ declToCore (DataD'' n as ds) = fold . getZipList $
         t' = foldl TyApp (TyCon n) (TyVar . dsNameToName <$> as)
 
 -- TODO: where-binds
-declToCore fd@(FunD'' n as e _) = mempty & programScDefs .~ [ScDef n' as' e'']
+declToCore fd@(FunD'' n as e _) = mempty & programScDefs .~ [ScDef n' as' e']
     where
         n' = dsNameToName n
-        -- e   : verbatim function body
-        -- e'  : function body w/ case-exprs matching pattern arguments
-        -- e'' : exprToCore e'
-        (e',as') = mapAccumL patArgsToCase (extract e) (names `zip` as)
-        e'' = runPureEff . runNameSupply n $ exprToCore e'
-        names = [ nolo $ "$x_" <> tshow n | n <- [0..] ]
-        tshow = T.pack . show
-
-patArgsToCase :: RlpExpr RlpcPs -> (IdP' RlpcPs, Pat' RlpcPs)
-        -> (RlpExpr RlpcPs, Name)
-patArgsToCase e (x,p) = (e', x') where
-    x' = dsNameToName (extract x)
-    e' = CaseE (VarE <$> x) [(alt, [])]
-    alt = AltA p (nolo e)
+        e' = runPureEff . runNameSupply n . exprToCore . unXRec $ e
+        as' = as <&> \case
+            (unXRec -> VarP k) -> dsNameToName k
+            _                  -> error "no patargs yet"
 
 type NameSupply = Labeled NameSupplyLabel (State [IdP RlpcPs])
 type NameSupplyLabel = "expr-name-supply"
@@ -172,7 +163,7 @@ caseify p (unXRec -> e) i =
     alt = conToRose (unXRec p) <&> foldFix (branchToCore i)
 
 -- TODO: where-binds
-caseAltToCore :: (NameSupply :> es)
+caseAltToCore :: (HasCallStack, NameSupply :> es)
               => (Alt RlpcPs, Where RlpcPs) -> Eff es Alter'
 caseAltToCore (AltA (unXRec -> p) e, wh) = do
     e' <- exprToCore . unXRec $ e
@@ -188,7 +179,7 @@ altToCore' (unXRec -> p) (unXRec -> e) = do
     e' <- exprToCore e
     conToRose p <&> foldFix (branchToCore e')
 
-conToRose :: forall es. (NameSupply :> es) => Pat RlpcPs -> Eff es Rose
+conToRose :: forall es. (HasCallStack, NameSupply :> es) => Pat RlpcPs -> Eff es Rose
 conToRose (ConP cn as) = Fix . Branch cn <$> patToForrest `traverse` as
     where
         patToForrest :: Pat' RlpcPs -> Eff es (Tree Rose)
@@ -197,7 +188,7 @@ conToRose (ConP cn as) = Fix . Branch cn <$> patToForrest `traverse` as
             Right <$> liftA2 (,) uniqueName br
           where
             br = unwrapFix <$> conToRose (unXRec p)
-conToRose _ = error "conToRose: not a ConP!"
+conToRose s = error $ "conToRose: not a ConP!: " <> show s
 
 branchToCore :: Expr' -> Branch Alter' -> Alter'
 branchToCore e (Branch cn as) = Alter (AltData cn) myBinds e'

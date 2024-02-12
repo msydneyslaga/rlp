@@ -241,6 +241,7 @@ Lit         :: { Lit' RlpcPs }
 
 Var         :: { Located PsName }
 Var         : varname                   { mkPsName $1 }
+            | varsym                    { mkPsName $1 }
 
 Con         :: { Located PsName }
             : conname                   { mkPsName $1 }

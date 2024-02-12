@@ -7,5 +7,5 @@ foldr f z l = case l of
 
 list = Cons 1 (Cons 2 (Cons 3 Nil))
 
-main = foldr f 0 list
+main = foldr (+#) 0 list
 
