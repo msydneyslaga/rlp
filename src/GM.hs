@@ -32,6 +32,11 @@ import Text.PrettyPrint             hiding ((<>))
 import Text.PrettyPrint.HughesPJ    (maybeParens)
 import Data.Foldable                (traverse_)
 import System.IO                    (Handle, hPutStrLn)
+-- TODO: an actual output system
+-- TODO: an actual output system
+-- TODO: an actual output system
+-- TODO: an actual output system
+import System.IO.Unsafe             (unsafePerformIO)
 import Data.String                  (IsString)
 import Data.Heap
 import Debug.Trace
@@ -39,6 +44,9 @@ import Compiler.RLPC
 import Core2Core
 import Core
 ----------------------------------------------------------------------------------
+
+tag_Unit_unit :: Int
+tag_Unit_unit = 0
 
 tag_Bool_True :: Int
 tag_Bool_True = 1
@@ -99,6 +107,7 @@ data Instr = Unwind
            | Pack Tag Int -- Pack Tag Arity
            | CaseJump [(Tag, Code)]
            | Split Int
+           | Print
            | Halt
            deriving (Show, Eq)
 
@@ -222,8 +231,32 @@ step st = case head (st ^. gmCode) of
     Split      n   -> splitI        n
     Pack       t n -> packI       t n
     CaseJump    as -> caseJumpI    as
+    Print          -> printI
     Halt           -> haltI
     where
+
+        printI :: GmState
+        printI = case hLookupUnsafe a h of
+            NNum n       -> (evilTempPrinter `seq` st)
+                          & gmCode .~ i
+                          & gmStack .~ s
+                where
+                    -- TODO: an actual output system
+                    -- TODO: an actual output system
+                    -- TODO: an actual output system
+                    -- TODO: an actual output system
+                    evilTempPrinter = unsafePerformIO (print n)
+            NConstr _ as -> st
+                          & gmCode .~ i' ++ i
+                          & gmStack .~ s'
+                where
+                    i' = mconcat $ replicate n [Eval,Print]
+                    n = length as
+                    s' = as ++ s
+          where
+            h = st ^. gmHeap
+            (a:s) = st ^. gmStack
+            Print : i = st ^. gmCode
 
         -- nuke the state
         haltI :: GmState
@@ -605,6 +638,8 @@ compiledPrims =
     , binop "/#" Div
     , binop "==#" Equals
     , binop "<#" Lesser
+    , ("print#", 1, [ Push 0, Eval, Print, Pack tag_Unit_unit 0, Update 1, Pop 1
+                    , Unwind])
     ]
     where
         unop k i = (k, 1, [Push 0, Eval, i, Update 1, Pop 1, Unwind])
