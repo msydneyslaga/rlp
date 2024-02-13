@@ -11,6 +11,7 @@ module GM
     , evalProgR
     , Node(..)
     , gmEvalProg
+    , Stats(..)
     , finalStateOf
     , resultOf
     , resultOfExpr
@@ -642,7 +643,7 @@ compiledPrims =
     , binop "<#" Lesser
     , binop ">=#" GreaterEq
     , ("print#", 1, [ Push 0, Eval, Print, Pack tag_Unit_unit 0, Update 1, Pop 1
-                    , Unwind])
+                    , Unwind ])
     ]
     where
         unop k i = (k, 1, [Push 0, Eval, i, Update 1, Pop 1, Unwind])
@@ -743,17 +744,16 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
         compileE _ (Lit l) = compileEL l
         compileE g (Let NonRec bs e) =
                 -- we use compileE instead of compileC
-                mconcat binders <> compileE g' e <> [Slide d]
+                mconcat binders <> compileE (trc g') e <> [Slide d]
             where
+                trc = traceWith (\s -> "compileE.g': "<>show s)
                 d = length bs
-                (g',binders) = mapAccumL compileBinder (argOffset (d-1) g) addressed
-                -- kinda gross. revisit this
-                addressed = bs `zip` reverse [0 .. d-1]
+                (g',binders) = mapAccumL compileBinder g bs
 
-                compileBinder :: Env -> (Binding', Int) -> (Env, Code)
-                compileBinder m (k := v, a) = (m',c)
+                compileBinder :: Env -> Binding' -> (Env, Code)
+                compileBinder m (k := v) = (m',c)
                     where
-                        m' = (NameKey k, a) : m
+                        m' = (NameKey k, 0) : argOffset 1 m
                         -- make note that we use m rather than m'!
                         c = compileC m v
 
@@ -796,7 +796,8 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
             where
                 n = length as
                 binds = (NameKey <$> as) `zip` [0..]
-                g' = binds ++ argOffset n g
+                g' = traceWith (\s -> "compileA.g': "<>show s) $
+                    binds ++ argOffset n g
                 c = compileE g' e
         compileA _ (Alter _ as e) = error "GM.compileA found an untagged\
                                           \ constructor, which should have\
