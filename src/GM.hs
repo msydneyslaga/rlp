@@ -103,7 +103,7 @@ data Instr = Unwind
            -- arith
            | Neg | Add | Sub | Mul | Div
            -- comparison
-           | Equals | Lesser
+           | Equals | Lesser | GreaterEq
            | Pack Tag Int -- Pack Tag Arity
            | CaseJump [(Tag, Code)]
            | Split Int
@@ -228,6 +228,7 @@ step st = case head (st ^. gmCode) of
     Div            -> divI
     Equals         -> equalsI
     Lesser         -> lesserI
+    GreaterEq      -> greaterEqI
     Split      n   -> splitI        n
     Pack       t n -> packI       t n
     CaseJump    as -> caseJumpI    as
@@ -451,9 +452,10 @@ step st = case head (st ^. gmCode) of
         mulI = primitive2 boxInt unboxInt (*) st
         divI = primitive2 boxInt unboxInt div st
 
-        lesserI, equalsI :: GmState
+        lesserI, greaterEqI, equalsI :: GmState
         equalsI = primitive2 boxBool unboxInt (==) st
         lesserI = primitive2 boxBool unboxInt (<) st
+        greaterEqI = primitive2 boxBool unboxInt (>=) st
 
         splitI :: Int -> GmState
         splitI n = st
@@ -638,6 +640,7 @@ compiledPrims =
     , binop "/#" Div
     , binop "==#" Equals
     , binop "<#" Lesser
+    , binop ">=#" GreaterEq
     , ("print#", 1, [ Push 0, Eval, Print, Pack tag_Unit_unit 0, Update 1, Pop 1
                     , Unwind])
     ]
@@ -743,7 +746,7 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
                 mconcat binders <> compileE g' e <> [Slide d]
             where
                 d = length bs
-                (g',binders) = mapAccumL compileBinder (argOffset d g) addressed
+                (g',binders) = mapAccumL compileBinder (argOffset (d-1) g) addressed
                 -- kinda gross. revisit this
                 addressed = bs `zip` reverse [0 .. d-1]
 
@@ -779,6 +782,7 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
         compileE g ("/#" :$ a :$ b)  = inlineOp2 g Div    a b
         compileE g ("==#" :$ a :$ b) = inlineOp2 g Equals a b
         compileE g ("<#" :$ a :$ b)  = inlineOp2 g Lesser a b
+        compileE g (">=#" :$ a :$ b)  = inlineOp2 g GreaterEq a b
 
         compileE g (Case e as) = compileE g e <> [CaseJump (compileD g as)]
 
