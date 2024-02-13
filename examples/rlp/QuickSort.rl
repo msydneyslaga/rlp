@@ -23,6 +23,7 @@ qsort l = case l of
             greater = filter (<# a) as
         in append (append (qsort lesser) (Cons a Nil)) (qsort greater)
 
+list :: List Int#
 list = Cons 9 (Cons 2 (Cons 3 (Cons 2
             (Cons 5 (Cons 2 (Cons 12 (Cons 89 Nil)))))))
 

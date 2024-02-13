@@ -744,9 +744,8 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
         compileE _ (Lit l) = compileEL l
         compileE g (Let NonRec bs e) =
                 -- we use compileE instead of compileC
-                mconcat binders <> compileE (trc g') e <> [Slide d]
+                mconcat binders <> compileE g' e <> [Slide d]
             where
-                trc = traceWith (\s -> "compileE.g': "<>show s)
                 d = length bs
                 (g',binders) = mapAccumL compileBinder g bs
 
@@ -796,8 +795,7 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
             where
                 n = length as
                 binds = (NameKey <$> as) `zip` [0..]
-                g' = traceWith (\s -> "compileA.g': "<>show s) $
-                    binds ++ argOffset n g
+                g' = binds ++ argOffset n g
                 c = compileE g' e
         compileA _ (Alter _ as e) = error "GM.compileA found an untagged\
                                           \ constructor, which should have\
