@@ -1,80 +1,65 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Data.Pretty
     ( Pretty(..)
-    , ISeq(..)
-    , precPretty
-    , prettyPrint
-    , prettyShow
-    , iShow
-    , iBracket
-    , withPrec
-    , bracketPrec
+    , rpretty
+    , ttext
+    -- * Pretty-printing lens combinators
+    , hsepOf, vsepOf
+    , vcatOf
+    , vlinesOf
+    , module Text.PrettyPrint
+    , maybeParens
     )
     where
 ----------------------------------------------------------------------------------
-import Data.String      (IsString(..))
+import Text.PrettyPrint             hiding ((<>))
+import Text.PrettyPrint.HughesPJ    hiding ((<>))
+import Text.Printf
+import Data.String                  (IsString(..))
+import Data.Text.Lens
+import Data.Monoid
+import Data.Text                    qualified as T
+import Control.Lens
 ----------------------------------------------------------------------------------
 
 class Pretty a where
-    pretty :: a -> ISeq
-    prettyPrec :: a -> Int -> ISeq
+    pretty :: a -> Doc
+    prettyPrec :: Int -> a -> Doc
 
     {-# MINIMAL pretty | prettyPrec #-}
-    pretty a = prettyPrec a 0
-    prettyPrec a _ = iBracket (pretty a)
+    pretty = prettyPrec 0
+    prettyPrec a _ = pretty a
 
-precPretty :: (Pretty a) => Int -> a -> ISeq
-precPretty = flip prettyPrec
+rpretty :: (IsString s, Pretty a) => a -> s
+rpretty = fromString . render . pretty
 
-prettyPrint :: (Pretty a) => a -> IO ()
-prettyPrint = putStr . squash . pretty
+instance Pretty String where
+    pretty = Text.PrettyPrint.text
 
-prettyShow :: (Pretty a) => a -> String
-prettyShow = squash . pretty
+instance Pretty T.Text where
+    pretty = Text.PrettyPrint.text . view unpacked
 
-data ISeq where
-    INil :: ISeq
-    IStr :: String -> ISeq
-    IAppend :: ISeq -> ISeq -> ISeq
-    IIndent :: ISeq -> ISeq
-    IBreak :: ISeq
+newtype Showing a = Showing a
 
-instance IsString ISeq where
-    fromString = IStr
+instance (Show a) => Pretty (Showing a) where
+    prettyPrec p (Showing a) = fromString $ showsPrec p a ""
 
-instance Semigroup ISeq where
-    (<>) = IAppend
+deriving via Showing Int instance Pretty Int
 
-instance Monoid ISeq where
-    mempty = INil
+--------------------------------------------------------------------------------
 
-squash :: ISeq -> String
-squash a = flatten 0 [(a,0)]
+ttext :: Pretty t => t -> Doc
+ttext = pretty
 
-flatten :: Int -> [(ISeq, Int)] -> String
-flatten _ []                      = ""
-flatten c ((INil,        i) : ss) = flatten c ss
-flatten c ((IStr s,      i) : ss) = s ++ flatten (c + length s) ss
-flatten c ((IAppend r s, i) : ss) = flatten c ((r,i) : (s,i) : ss)
-flatten _ ((IBreak,      i) : ss) = '\n' : replicate i ' ' ++ flatten i ss
-flatten c ((IIndent s,   i) : ss) = flatten c ((s,c) : ss)
+hsepOf :: Getting (Endo Doc) s Doc -> s -> Doc
+hsepOf l = foldrOf l (<+>) mempty
 
-iBracket :: ISeq -> ISeq
-iBracket s = IStr "(" <> s <> IStr ")"
+vsepOf :: Getting (Endo Doc) s Doc -> s -> Doc
+vsepOf l = foldrOf l ($+$) mempty
 
-withPrec :: Int -> ISeq -> Int -> ISeq
-withPrec n s p
-    | p > n     = iBracket s
-    | otherwise =          s
+vcatOf :: Getting (Endo Doc) s Doc -> s -> Doc
+vcatOf l = foldrOf l ($$) mempty
 
-bracketPrec :: Int -> Int -> ISeq -> ISeq
-bracketPrec n p s = withPrec n s p
+vlinesOf :: Getting (Endo Doc) s Doc -> s -> Doc
+vlinesOf l = foldrOf l (\a b -> a $+$ "" $+$ b) mempty
+-- hack(?) to separate chunks with a blankline
 
-iShow :: (Show a) => a -> ISeq
-iShow = IStr . show
-
-----------------------------------------------------------------------------------
-
-instance (Pretty a) => Pretty (Maybe a) where
-    prettyPrec (Just a) p = prettyPrec a p
-    prettyPrec Nothing  p = "<Nothing>"

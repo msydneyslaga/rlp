@@ -7,11 +7,12 @@ license:            GPL-2.0-only
 -- license-file:       LICENSE
 author:             crumbtoo
 maintainer:         crumb@disroot.org
--- copyright:
+copyright:          Madeleine Sydney Ślaga
 category:           Language
 build-type:         Simple
 extra-doc-files:    README.md
 -- extra-source-files:
+tested-with:        GHC==9.6.2
 
 common warnings
 --    ghc-options: -Wall -Wno-incomplete-uni-patterns -Wno-unused-top-binds
@@ -22,53 +23,89 @@ library
                     , TI
                     , GM
                     , Compiler.RLPC
+                    , Compiler.RlpcError
+                    , Compiler.JustRun
                     , Core.Syntax
                     , Core.Examples
                     , Core.Utils
                     , Core.TH
-
-    other-modules:    Data.Heap
+                    , Core.HindleyMilner
+                    , Control.Monad.Errorful
+                    , Rlp.Syntax
+                    -- , Rlp.Parse.Decls
+                    , Rlp.Parse
+                    , Rlp.Parse.Associate
+                    , Rlp.Lex
+                    , Rlp.Parse.Types
+                    , Rlp.TH
+                    , Compiler.Types
+                    , Data.Heap
                     , Data.Pretty
                     , Core.Parse
                     , Core.Lex
-                    , Control.Monad.Errorful
                     , Core2Core
-                    , RLP.Syntax
+                    , Rlp2Core
+                    , Control.Monad.Utils
 
     build-tool-depends: happy:happy, alex:alex
 
     -- other-extensions:
-    build-depends:    base ^>=4.18.0.0
-                    , containers
-                    , microlens
-                    , microlens-th
-                    , mtl
-                    , template-haskell
+    build-depends:    base >=4.17 && <4.20
                     -- required for happy
-                    , array
-                    , data-default-class
-                    , unordered-containers
-                    , hashable
-                    , pretty
-                    , recursion-schemes
-                    , megaparsec
-                    , text
+                    , array >= 0.5.5 && < 0.6
+                    , containers >= 0.6.7 && < 0.7
+                    , template-haskell >= 2.20.0 && < 2.21
+                    , pretty >= 1.1.3 && < 1.2
+                    , data-default >= 0.7.1 && < 0.8
+                    , data-default-class >= 0.1.2 && < 0.2
+                    , hashable >= 1.4.3 && < 1.5
+                    , mtl >= 2.3.1 && < 2.4
+                    , text >= 2.0.2 && < 2.1
+                    , megaparsec >= 9.6.1 && < 9.7
+                    , microlens >= 0.4.13 && < 0.5
+                    , microlens-mtl >= 0.2.0 && < 0.3
+                    , microlens-platform >= 0.4.3 && < 0.5
+                    , microlens-th >= 0.4.3 && < 0.5
+                    , unordered-containers >= 0.2.20 && < 0.3
+                    , recursion-schemes >= 5.2.2 && < 5.3
+                    , data-fix >= 0.3.2 && < 0.4
+                    , utf8-string >= 1.0.2 && < 1.1
+                    , extra >= 1.7.0 && < 2
+                    , semigroupoids
+                    , comonad
+                    , lens
+                    , text-ansi
+                    , microlens-pro ^>=0.2.0
+                    , effectful-core ^>=2.3.0.0
+                    , deriving-compat ^>=0.6.0
+                    , these >=0.2 && <2.0
 
     hs-source-dirs:   src
     default-language: GHC2021
 
+    default-extensions:
+        OverloadedStrings
+        TypeFamilies
+        LambdaCase
+        ViewPatterns
+        DataKinds
+        DerivingVia
+        StandaloneDeriving
+        DerivingStrategies
+
 executable rlpc
     import:           warnings
     main-is:          Main.hs
-    -- other-modules:
-    -- other-extensions:
-    build-depends: base ^>=4.18.0.0
+    other-modules:    RlpDriver
+                    , CoreDriver
+
+    build-depends: base >=4.17.0.0 && <4.20.0.0
                  , rlp
-                 , optparse-applicative
-                 , microlens
-                 , microlens-mtl
-                 , mtl
-                 , unordered-containers
+                 , optparse-applicative >= 0.18.1 && < 0.19
+                 , microlens-platform
+                 , mtl >= 2.3.1 && < 2.4
+                 , unordered-containers >= 0.2.20 && < 0.3
+                 , text >= 2.0.2 && < 2.1
 
     hs-source-dirs:   app
     default-language: GHC2021
@@ -84,7 +121,9 @@ test-suite rlp-test
                  , rlp
                  , QuickCheck
                  , hspec            ==2.*
+                 , microlens
     other-modules: Arith
                  , GMSpec
+                 , Core.HindleyMilnerSpec
     build-tool-depends: hspec-discover:hspec-discover
 

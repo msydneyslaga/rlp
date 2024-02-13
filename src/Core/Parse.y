@@ -3,23 +3,35 @@
 Module : Core.Parse
 Description : Parser for the Core language
 -}
+{-# LANGUAGE OverloadedStrings, ViewPatterns #-}
 module Core.Parse
     ( parseCore
     , parseCoreExpr
+    , parseCoreExprR
     , parseCoreProg
+    , parseCoreProgR
     , module Core.Lex -- temp convenience
-    , parseTmp
     , SrcError
     , Module
     )
     where
 
 import Control.Monad        ((>=>))
+import Control.Monad.Utils  (generalise)
 import Data.Foldable        (foldl')
+import Data.Functor.Identity
 import Core.Syntax
 import Core.Lex
 import Compiler.RLPC
+import Control.Monad
+import Lens.Micro
 import Data.Default.Class   (def)
+import Data.Hashable        (Hashable)
+import Data.List.Extra
+import Data.Text.IO         qualified as TIO
+import Data.Text            (Text)
+import Data.Text            qualified as T
+import Data.HashMap.Strict  qualified as H
 }
 
 %name parseCore Module
@@ -27,35 +39,37 @@ import Data.Default.Class   (def)
 %name parseCoreProg StandaloneProgram
 %tokentype { Located CoreToken }
 %error { parseError }
-%monad { RLPC SrcError }
+%monad { RLPC } { happyBind } { happyPure }
 
 %token
-      let             { Located _ _ _ TokenLet }
-      letrec          { Located _ _ _ TokenLetrec }
-      module          { Located _ _ _ TokenModule }
-      where           { Located _ _ _ TokenWhere }
-      case            { Located _ _ _ TokenCase }
-      of              { Located _ _ _ TokenOf }
-      pack            { Located _ _ _ TokenPack } -- temp
-      in              { Located _ _ _ TokenIn }
-      litint          { Located _ _ _ (TokenLitInt $$) }
-      varname         { Located _ _ _ (TokenVarName $$) }
-      varsym          { Located _ _ _ (TokenVarSym $$) }
-      conname         { Located _ _ _ (TokenConName $$) }
-      consym          { Located _ _ _ (TokenConSym $$) }
-      word            { Located _ _ _ (TokenWord $$) }
-      'λ'             { Located _ _ _ TokenLambda }
-      '->'            { Located _ _ _ TokenArrow }
-      '='             { Located _ _ _ TokenEquals }
-      '@'             { Located _ _ _ TokenTypeApp }
-      '('             { Located _ _ _ TokenLParen }
-      ')'             { Located _ _ _ TokenRParen }
-      '{'             { Located _ _ _ TokenLBrace }
-      '}'             { Located _ _ _ TokenRBrace }
-      '{-#'           { Located _ _ _ TokenLPragma }
-      '#-}'           { Located _ _ _ TokenRPragma }
-      ';'             { Located _ _ _ TokenSemicolon }
-      eof             { Located _ _ _ TokenEOF }
+      let             { Located _ TokenLet }
+      letrec          { Located _ TokenLetrec }
+      module          { Located _ TokenModule }
+      where           { Located _ TokenWhere }
+      case            { Located _ TokenCase }
+      of              { Located _ TokenOf }
+      pack            { Located _ TokenPack } -- temp
+      in              { Located _ TokenIn }
+      litint          { Located _ (TokenLitInt $$) }
+      varname         { Located _ (TokenVarName $$) }
+      varsym          { Located _ (TokenVarSym $$) }
+      conname         { Located _ (TokenConName $$) }
+      consym          { Located _ (TokenConSym $$) }
+      alttag          { Located _ (TokenAltTag $$) }
+      word            { Located _ (TokenWord $$) }
+      'λ'             { Located _ TokenLambda }
+      '->'            { Located _ TokenArrow }
+      '='             { Located _ TokenEquals }
+      '@'             { Located _ TokenTypeApp }
+      '('             { Located _ TokenLParen }
+      ')'             { Located _ TokenRParen }
+      '{'             { Located _ TokenLBrace }
+      '}'             { Located _ TokenRBrace }
+      '{-#'           { Located _ TokenLPragma }
+      '#-}'           { Located _ TokenRPragma }
+      ';'             { Located _ TokenSemicolon }
+      '::'            { Located _ TokenHasType }
+      eof             { Located _ TokenEOF }
 
 %%
 
@@ -71,16 +85,46 @@ StandaloneProgram :: { Program Name }
 StandaloneProgram : Program eof                 { $1 }
 
 Program         :: { Program Name }
-Program         : ScDefs                        { Program $1 }
+Program         : ScTypeSig ';' Program         { insTypeSig $1 $3 }
+                | ScTypeSig OptSemi             { singletonTypeSig $1 }
+                | ScDef     ';' Program         { insScDef $1 $3 }
+                | ScDef     OptSemi             { singletonScDef $1 }
+                | TLPragma  Program             {% doTLPragma $1 $2 }
+                | TLPragma                      {% doTLPragma $1 mempty }
+
+TLPragma        :: { Pragma }
+                : '{-#' Words '#-}'             { Pragma $2 }
+
+Words           :: { [Text] }
+                : Words word                    { $1 `snoc` $2 }
+                | word                          { [$1] }
+
+OptSemi         :: { () }
+OptSemi         : ';'                           { () }
+                | {- epsilon -}                 { () }
+
+ScTypeSig       :: { (Name, Type) }
+ScTypeSig       : Var '::' Type                 { ($1,$3) }
 
 ScDefs          :: { [ScDef Name] }
 ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
                 | ScDef ';'                     { [$1] }
                 | ScDef                         { [$1] }
-                | {- epsilon -}                 { [] }
 
 ScDef           :: { ScDef Name }
 ScDef           : Var ParList '=' Expr          { ScDef $1 $2 $4 }
+                -- hack to allow constructors to be compiled into scs
+                | Con ParList '=' Expr          { ScDef $1 $2 $4 }
+
+Type            :: { Type }
+Type            : Type1                         { $1 }
+
+Type1           :: { Type }
+Type1           : '(' Type ')'                  { $2 }
+                | Type1 '->' Type               { $1 :-> $3 }
+                -- do we want to allow symbolic names for tyvars and tycons?
+                | varname                       { TyVar $1 }
+                | conname                       { TyCon $1 }
 
 ParList         :: { [Name] }
 ParList         : Var ParList                   { $1 : $2 }
@@ -120,21 +164,14 @@ Alters          : Alter ';' Alters              { $1 : $3 }
                 | Alter                         { [$1] }
 
 Alter           :: { Alter Name }
-Alter           : litint ParList '->' Expr      { Alter (AltData $1) $2 $4 }
+Alter           : alttag ParList '->' Expr      { Alter (AltTag  $1) $2 $4 }
+                | Con    ParList '->' Expr      { Alter (AltData $1) $2 $4 }
 
 Expr1           :: { Expr Name }
-Expr1           : litint                        { LitE $ IntL $1 }
+Expr1           : litint                        { Lit $ IntL $1 }
                 | Id                            { Var $1 }
                 | PackCon                       { $1 }
-                | ExprPragma                    { $1 }
                 | '(' Expr ')'                  { $2 }
-
-ExprPragma      :: { Expr Name }
-ExprPragma      : '{-#' Words '#-}'      {% exprPragma $2 }
-
-Words           :: { [String] }
-Words           : word Words                    { $1 : $2 }
-                | word                          { [$1] }
 
 PackCon         :: { Expr Name }
 PackCon         : pack '{' litint litint '}'    { Con $3 $4 }
@@ -152,43 +189,73 @@ Id              : Var                                { $1 }
                 | Con                                { $1 }
 
 Var             :: { Name }
-Var             : '(' varsym ')'                    { $2 }
-                | varname                           { $1 }
+Var             : varname                           { $1 }
+                | varsym                            { $1 }
 
 Con             :: { Name }
-Con             : '(' consym ')'                    { $2 }
-                | conname                           { $1 }
+Con             : conname                           { $1 }
+                | consym                            { $1 }
 
 {
 
-parseError :: [Located CoreToken] -> RLPC SrcError a
-parseError (Located y x l _ : _) = addFatal err
-    where err = SrcError
-            { _errSpan       = (y,x,l)
-            , _errSeverity   = Error
-            , _errDiagnostic = SrcErrParse
-            }
+parseError :: [Located CoreToken] -> RLPC a
+parseError (Located _ t : _) =
+    error $ "<line>" <> ":" <> "<col>"
+         <> ": parse error at token `" <> show t <> "'"
 
-parseTmp :: IO (Module Name)
-parseTmp = do
-    s <- readFile "/tmp/t.hs"
-    case parse s of
-        Left e -> error (show e)
-        Right (ts,_) -> pure ts
+{-# WARNING parseError "unimpl" #-}
+
+exprPragma :: [String] -> RLPC (Expr Name)
+exprPragma ("AST" : e) = undefined
+exprPragma _           = undefined
+
+{-# WARNING exprPragma "unimpl" #-}
+
+astPragma :: [String] -> RLPC (Expr Name)
+astPragma _ = undefined
+
+{-# WARNING astPragma "unimpl" #-}
+
+insTypeSig :: (Hashable b) => (b, Type) -> Program b -> Program b
+insTypeSig ts = programTypeSigs %~ uncurry H.insert ts
+
+singletonTypeSig :: (Hashable b) => (b, Type) -> Program b
+singletonTypeSig ts = insTypeSig ts mempty
+
+insScDef :: (Hashable b) => ScDef b -> Program b -> Program b
+insScDef sc = programScDefs %~ (sc:)
+
+singletonScDef :: (Hashable b) => ScDef b -> Program b
+singletonScDef sc = insScDef sc mempty
+
+parseCoreExprR :: (Monad m) => [Located CoreToken] -> RLPCT m Expr'
+parseCoreExprR = hoistRlpcT generalise . parseCoreExpr
+
+parseCoreProgR :: forall m. (Monad m) => [Located CoreToken] -> RLPCT m Program'
+parseCoreProgR = ddumpast <=< (hoistRlpcT generalise . parseCoreProg)
     where
-        parse = evalRLPC def . (lexCore >=> parseCore)
+        ddumpast :: Program' -> RLPCT m Program'
+        ddumpast p = do
+            addDebugMsg "dump-parsed-core" . show $ p
+            pure p
 
-exprPragma :: [String] -> RLPC SrcError (Expr Name)
-exprPragma ("AST" : e) = astPragma e
-exprPragma _           = addFatal err
-    where err = SrcError
-            { _errSpan       = (0,0,0) -- TODO: span
-            , _errSeverity   = Warning
-            , _errDiagnostic = SrcErrUnknownPragma "" -- TODO: missing pragma
-            }
+happyBind :: RLPC a -> (a -> RLPC b) -> RLPC b
+happyBind m k = m >>= k
 
-astPragma :: [String] -> RLPC SrcError (Expr Name)
-astPragma = pure . read . unwords
+happyPure :: a -> RLPC a
+happyPure a = pure a
+
+doTLPragma :: Pragma -> Program' -> RLPC Program'
+-- TODO: warn unrecognised pragma
+doTLPragma (Pragma []) p = pure p
+
+doTLPragma (Pragma pr) p = case pr of
+    -- TODO: warn on overwrite
+    ["PackData", n, readt -> t, readt -> a] ->
+        pure $ p & programDataTags . at n ?~ (t,a)
+
+readt :: (Read a) => Text -> a
+readt = read . T.unpack
 
 }
 

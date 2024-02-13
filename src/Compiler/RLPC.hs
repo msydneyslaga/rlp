@@ -10,96 +10,116 @@ errors and the family of RLPC monads.
 {-# LANGUAGE TemplateHaskell #-}
 -- only used for mtl instances
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE DeriveGeneric, DerivingStrategies, DerivingVia #-}
+{-# LANGUAGE BlockArguments, ViewPatterns #-}
 module Compiler.RLPC
-    ( RLPC
-    , RLPCT
-    , RLPCIO
-    , RLPCOptions(RLPCOptions)
-    , addFatal
-    , addWound
-    , MonadErrorful
-    , Severity(..)
-    , Evaluator(..)
-    , evalRLPCT
-    , evalRLPCIO
-    , evalRLPC
-    , rlpcLogFile
-    , rlpcDebugOpts
-    , rlpcEvaluator
-    , rlpcInputFiles
-    , DebugFlag(..)
-    , whenFlag
-    , flagDDumpEval
-    , flagDDumpOpts
-    , flagDDumpAST
-    , def
+    (
+    -- * Rlpc Monad transformer
+      RLPCT(RLPCT),
+    -- ** Special cases
+      RLPC, RLPCIO
+    , liftIO
+    -- ** Running
+    , runRLPCT
+    , evalRLPCT, evalRLPCIO, evalRLPC
+    -- * Rlpc options
+    , Language(..), Evaluator(..)
+    , DebugFlag(..), CompilerFlag(..)
+    -- ** Lenses
+    , rlpcLogFile, rlpcDFlags, rlpcEvaluator, rlpcInputFiles, rlpcLanguage
+    -- * Misc. MTL-style functions
+    , liftErrorful, hoistRlpcT
+    -- * Misc. Rlpc Monad -related types
+    , RLPCOptions(RLPCOptions), IsRlpcError(..), RlpcError(..)
+    , MsgEnvelope(..), Severity(..)
+    , addDebugMsg
+    , whenDFlag, whenFFlag
+    -- * Misc. Utilities
+    , forFiles_, withSource
+    -- * Convenient re-exports
+    , addFatal, addWound, def
     )
     where
 ----------------------------------------------------------------------------------
 import Control.Arrow            ((>>>))
 import Control.Exception
+import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.State      (MonadState(state))
 import Control.Monad.Errorful
+import Control.Monad.IO.Class
+import Compiler.RlpcError
+import Compiler.Types
 import Data.Functor.Identity
 import Data.Default.Class
+import Data.Foldable
 import GHC.Generics             (Generic)
+import Data.Maybe
 import Data.Hashable            (Hashable)
 import Data.HashSet             (HashSet)
 import Data.HashSet             qualified as S
 import Data.Coerce
-import Lens.Micro
-import Lens.Micro.TH
+import Data.Text                (Text)
+import Data.Text                qualified as T
+import Data.Text.IO             qualified as T
+import System.IO
+import Text.ANSI                qualified as Ansi
+import Text.PrettyPrint         hiding ((<>))
+import Lens.Micro.Platform
+import Lens.Micro.Platform.Internal
+import System.Exit
 ----------------------------------------------------------------------------------
 
--- TODO: fancy errors
-newtype RLPCT e m a = RLPCT {
-        runRLPCT :: ReaderT RLPCOptions (ErrorfulT e m) a
+newtype RLPCT m a = RLPCT {
+        runRLPCT :: ReaderT RLPCOptions (ErrorfulT (MsgEnvelope RlpcError) m) a
     }
-    -- TODO: incorrect ussage of MonadReader. RLPC should have its own
-    -- environment access functions
-    deriving (Functor, Applicative, Monad, MonadReader RLPCOptions)
+    deriving ( Functor, Applicative, Monad
+             , MonadReader RLPCOptions, MonadErrorful (MsgEnvelope RlpcError))
 
-deriving instance (MonadIO m) => MonadIO (RLPCT e m)
+rlpc :: (IsRlpcError e, Monad m)
+     => (RLPCOptions -> (Maybe a, [MsgEnvelope e]))
+     -> RLPCT m a
+rlpc f = RLPCT . ReaderT $ \opt ->
+    ErrorfulT . pure $ f opt & _2 . each . mapped %~ liftRlpcError
 
-instance MonadTrans (RLPCT e) where
+type RLPC = RLPCT Identity
+
+type RLPCIO = RLPCT IO
+
+instance MonadTrans RLPCT where
     lift = RLPCT . lift . lift
 
-instance (MonadState s m) => MonadState s (RLPCT e m) where
-    state = lift . state
-
-type RLPC e = RLPCT e Identity
-
-type RLPCIO e = RLPCT e IO
-
-evalRLPCT :: RLPCOptions
-          -> RLPCT e m a
-          -> m (Either e (a, [e]))
-evalRLPCT o = runRLPCT >>> flip runReaderT o >>> runErrorfulT
+instance (MonadIO m) => MonadIO (RLPCT m) where
+    liftIO = lift . liftIO
 
 evalRLPC :: RLPCOptions
-         -> RLPC e a
-         -> Either e (a, [e])
-evalRLPC o m = coerce $ evalRLPCT o m
+         -> RLPC a
+         -> (Maybe a, [MsgEnvelope RlpcError])
+evalRLPC opt r = runRLPCT r
+               & flip runReaderT opt
+               & runErrorful
 
-evalRLPCIO :: (Exception e)
-           => RLPCOptions
-           -> RLPCIO e a
-           -> IO (a, [e])
-evalRLPCIO o m = do
-    m' <- evalRLPCT o m
-    case m' of
-        -- TODO: errors
-        Left e -> throwIO e
-        Right a -> pure a
-    
+evalRLPCT :: RLPCOptions
+          -> RLPCT m a
+          -> m (Maybe a, [MsgEnvelope RlpcError])
+evalRLPCT opt r = runRLPCT r
+                & flip runReaderT opt
+                & runErrorfulT
+
+liftErrorful :: (Monad m, IsRlpcError e) => ErrorfulT (MsgEnvelope e) m a -> RLPCT m a
+liftErrorful e = RLPCT $ lift (fmap liftRlpcError `mapErrorful` e)
+
+hoistRlpcT :: (forall a. m a -> n a)
+         -> RLPCT m a -> RLPCT n a
+hoistRlpcT f rma = RLPCT $ ReaderT $ \opt ->
+    ErrorfulT $ f $ evalRLPCT opt rma
 
 data RLPCOptions = RLPCOptions
     { _rlpcLogFile     :: Maybe FilePath
-    , _rlpcDebugOpts   :: DebugOpts
+    , _rlpcDFlags      :: HashSet DebugFlag
+    , _rlpcFFlags      :: HashSet CompilerFlag
     , _rlpcEvaluator   :: Evaluator
     , _rlpcHeapTrigger :: Int
+    , _rlpcLanguage    :: Maybe Language
     , _rlpcInputFiles  :: [FilePath]
     }
     deriving Show
@@ -107,58 +127,126 @@ data RLPCOptions = RLPCOptions
 data Evaluator = EvaluatorGM | EvaluatorTI
     deriving Show
 
-data Severity = Error
-              | Warning
-              | Debug
-              deriving Show
-
--- temporary until we have a new doc building system
-type ErrorDoc = String
-
-class Diagnostic e where
-    errorDoc :: e -> ErrorDoc
-
-instance (Monad m) => MonadErrorful e (RLPCT e m) where
-    addWound = RLPCT . lift . addWound
-    addFatal = RLPCT . lift . addFatal
+data Language = LanguageRlp | LanguageCore
+    deriving Show
 
 ----------------------------------------------------------------------------------
 
 instance Default RLPCOptions where
     def = RLPCOptions
         { _rlpcLogFile = Nothing
-        , _rlpcDebugOpts = mempty
+        , _rlpcDFlags = mempty
+        , _rlpcFFlags = mempty
         , _rlpcEvaluator = EvaluatorGM
         , _rlpcHeapTrigger = 200
         , _rlpcInputFiles = []
+        , _rlpcLanguage = Nothing
         }
 
-type DebugOpts = HashSet DebugFlag
+-- debug flags are passed with -dFLAG
+type DebugFlag = Text
 
-data DebugFlag = DDumpEval
-               | DDumpOpts
-               | DDumpAST
-               deriving (Show, Eq, Generic)
-
-instance Hashable DebugFlag
+type CompilerFlag = Text
 
 makeLenses ''RLPCOptions
 pure []
 
-whenFlag :: (MonadReader s m) => SimpleGetter s Bool -> m () -> m ()
-whenFlag l m = asks (^. l) >>= \a -> if a then m else pure ()
+addDebugMsg :: (Monad m, IsText e) => Text -> e -> RLPCT m ()
+addDebugMsg tag e = addWound . debugMsg tag $ Text [e ^. unpacked . packed]
 
--- there's probably a better way to write this. my current knowledge of lenses
--- is too weak.
-flagGetter :: DebugFlag -> SimpleGetter RLPCOptions Bool
-flagGetter d = to $ \s -> s ^. rlpcDebugOpts & S.member d
+-- TODO: rewrite this with prisms once microlens-pro drops :3
+whenDFlag :: (Monad m) => DebugFlag -> RLPCT m () -> RLPCT m ()
+whenDFlag f m = do
+    -- mfw no `At` instance for HashSet
+    fs <- view rlpcDFlags
+    let a = S.member f fs
+    when a m
 
-flagDDumpEval :: SimpleGetter RLPCOptions Bool
-flagDDumpEval = flagGetter DDumpEval
+whenFFlag :: (Monad m) => CompilerFlag -> RLPCT m () -> RLPCT m ()
+whenFFlag f m = do
+    -- mfw no `At` instance for HashSet
+    fs <- view rlpcFFlags
+    let a = S.member f fs
+    when a m
 
-flagDDumpOpts :: SimpleGetter RLPCOptions Bool
-flagDDumpOpts = flagGetter DDumpOpts
+--------------------------------------------------------------------------------
 
-flagDDumpAST :: SimpleGetter RLPCOptions Bool
-flagDDumpAST = flagGetter DDumpAST
+evalRLPCIO :: RLPCOptions -> RLPCIO a -> IO a
+evalRLPCIO opt r = do
+    (ma,es) <- evalRLPCT opt r
+    putRlpcErrs opt es
+    case ma of
+        Just x  -> pure x
+        Nothing -> die "Failed, no code compiled."
+
+putRlpcErrs :: RLPCOptions -> [MsgEnvelope RlpcError] -> IO ()
+putRlpcErrs opt es = case opt ^. rlpcLogFile of
+    Just lf -> withFile lf WriteMode putter
+    Nothing -> putter stderr
+  where
+    putter h = hPutStrLn h `traverse_` renderRlpcErrs opt es
+
+renderRlpcErrs :: RLPCOptions -> [MsgEnvelope RlpcError] -> [String]
+renderRlpcErrs opts = (if don'tBother then id else filter byTag)
+                  >>> fmap prettyRlpcMsg
+    where
+        dflags = opts ^. rlpcDFlags
+        don'tBother = "ALL" `S.member` (opts ^. rlpcDFlags)
+
+        byTag :: MsgEnvelope RlpcError -> Bool
+        byTag (view msgSeverity -> SevDebug t) =
+            t `S.member` dflags
+        byTag _ = True
+
+prettyRlpcMsg :: MsgEnvelope RlpcError -> String
+prettyRlpcMsg m@(view msgSeverity -> SevDebug _) = prettyRlpcDebugMsg m
+prettyRlpcMsg m                                  = render $ docRlpcErr m
+
+prettyRlpcDebugMsg :: MsgEnvelope RlpcError -> String
+prettyRlpcDebugMsg msg =
+        T.unpack . foldMap mkLine $ [ t' | t <- ts, t' <- T.lines t ]
+    where
+        mkLine s = "-d" <> tag <> ": " <> s <> "\n"
+        Text ts = msg ^. msgDiagnostic
+        SevDebug tag = msg ^. msgSeverity
+
+docRlpcErr :: MsgEnvelope RlpcError -> Doc
+docRlpcErr msg = header
+                 $$ nest 2 bullets
+                 $$ source
+    where
+        source = vcat $ zipWith (<+>) rule srclines
+            where
+                rule = repeat (ttext . Ansi.blue . Ansi.bold $ "|")
+                srclines = ["", "<problematic source code>", ""]
+        filename = msgColour "<input>"
+        pos = msgColour $ tshow (msg ^. msgSpan . srcspanLine)
+                       <> ":"
+                       <> tshow (msg ^. msgSpan . srcspanColumn)
+
+        header = ttext $ filename <> msgColour ":" <> pos <> msgColour ": "
+                        <> errorColour "error" <> msgColour ":"
+
+        bullets = let Text ts = msg ^. msgDiagnostic
+                  in vcat $ hang "•" 2 . ttext . msgColour <$> ts
+
+        msgColour = Ansi.white . Ansi.bold
+        errorColour = Ansi.red . Ansi.bold
+        ttext = text . T.unpack
+        tshow :: (Show a) => a -> Text
+        tshow = T.pack . show
+
+--------------------------------------------------------------------------------
+
+forFiles_ :: (Monad m)
+          => (FilePath -> RLPCT m a)
+          -> RLPCT m ()
+forFiles_ k = do
+    fs <- view rlpcInputFiles
+    forM_ fs k
+
+-- TODO: catch any exceptions, i.e. non-existent files should be handled by the
+-- compiler
+withSource :: (MonadIO m) => FilePath -> (Text -> RLPCT m a) -> RLPCT m a
+withSource f k = liftIO (T.readFile f) >>= k
 

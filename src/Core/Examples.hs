@@ -4,18 +4,18 @@ Description : Core examples (may eventually be unit tests)
 -}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Core.Examples
-    ( fac3
-    , sumList
-    , constDivZero
-    , idCase
-    ) where
+module Core.Examples where
 ----------------------------------------------------------------------------------
 import Core.Syntax
 import Core.TH
 ----------------------------------------------------------------------------------
 
--- TODO: my shitty lexer isn't inserting semicolons
+-- fac3 = undefined
+-- sumList = undefined
+-- constDivZero = undefined
+-- idCase = undefined
+
+---
 
 letrecExample :: Program'
 letrecExample = [coreProg|
@@ -76,12 +76,12 @@ negExample3 = [coreProg|
 
 arithExample1 :: Program'
 arithExample1 = [coreProg|
-    main = (+#) 3 (negate# 2);
+    main = +# 3 (negate# 2);
 |]
 
 arithExample2 :: Program'
 arithExample2 = [coreProg|
-    main = negate# ((+#) 2 ((*#) 5 3));
+    main = negate# (+# 2 (*# 5 3));
 |]
 
 ifExample1 :: Program'
@@ -96,7 +96,7 @@ ifExample2 = [coreProg|
 
 facExample :: Program'
 facExample = [coreProg|
-    fac n = if# ((==#) n 0) 1 ((*#) n (fac ((-#) n 1)));
+    fac n = if# (==# n 0) 1 (*# n (fac (-# n 1)));
     main = fac 3;
 |]
 
@@ -142,21 +142,21 @@ simple1 = [coreProg|
 caseBool1 :: Program'
 caseBool1 = [coreProg|
     _if c x y = case c of
-        { 1 -> x
-        ; 0 -> y
+        { <1> -> x
+        ; <0> -> y
         };
 
     false = Pack{0 0};
     true = Pack{1 0};
 
-    main = _if false ((+#) 2 3) ((*#) 4 5);
+    main = _if false (+# 2 3) (*# 4 5);
 |]
 
 fac3 :: Program'
 fac3 = [coreProg|
-    fac n = case (==#) n 0 of
-        { 1 -> 1
-        ; 0 -> (*#) n (fac ((-#) n 1))
+    fac n = case ==# n 0 of
+        { <1> -> 1
+        ; <0> -> *# n (fac (-# n 1))
         };
 
     main = fac 3;
@@ -170,8 +170,8 @@ sumList = [coreProg|
         cons x y = Pack{1 2} x y;
         list = cons 1 (cons 2 (cons 3 nil));
         sum l = case l of
-            { 0      -> 0
-            ; 1 x xs -> (+#) x (sum xs)
+            { <0>      -> 0
+            ; <1> x xs -> +# x (sum xs)
             };
         main = sum list;
     |]
@@ -179,7 +179,7 @@ sumList = [coreProg|
 constDivZero :: Program'
 constDivZero = [coreProg|
         k x y = x;
-        main = k 3 ((/#) 1 0);
+        main = k 3 (/# 1 0);
     |]
 
 idCase :: Program'
@@ -187,34 +187,60 @@ idCase = [coreProg|
         id x = x;
 
         main = id (case Pack{1 0} of
-            { 1 -> (+#) 2 3
+            { <1> -> +# 2 3
             })
     |]
 
-corePrelude :: Module Name
-corePrelude = Module (Just ("Prelude", [])) $
-    -- non-primitive defs
-    [coreProg|
-        id x = x;
-        k x y = x;
-        k1 x y = y;
-        s f g x = f x (g x);
-        compose f g x = f (g x);
-        twice f x = f (f x);
-        fst p = casePair# p k;
-        snd p = casePair# p k1;
-        head l = caseList# l abort# k;
-        tail l = caseList# l abort# k1;
-        _length_cc x xs = (+#) 1 (length xs);
-        length l = caseList# l 0 length_cc;
+-- NOTE: the GM primitive (==#) returns an untyped constructor with tag 1 for
+-- true, and 0 for false. See: GM.boxBool
+namedBoolCase :: Program'
+namedBoolCase = [coreProg|
+        {-# PackData True 1 0 #-}
+        {-# PackData False 0 0 #-}
+        main = case ==# 1 1 of
+            { True -> 123
+            ; False -> 456
+            }
     |]
-    <>
-    -- primitive constructors need some specialised wiring:
-    Program
-        [ ScDef "False" [] $ Con 0 0
-        , ScDef "True" [] $ Con 1 0
-        , ScDef "MkPair" [] $ Con 0 2
-        , ScDef "Nil" [] $ Con 1 0
-        , ScDef "Cons" [] $ Con 2 2
-        ]
+
+namedConsCase :: Program'
+namedConsCase = [coreProg|
+        {-# PackData Nil  0 0 #-}
+        {-# PackData Cons 1 2 #-}
+        foldr f z l = case l of
+            { Nil       -> z
+            ; Cons x xs -> f x (foldr f z xs)
+            };
+        list = Cons 1 (Cons 2 (Cons 3 Nil));
+        main = foldr (+#) 0 list
+    |]
+
+-- corePrelude :: Module Name
+-- corePrelude = Module (Just ("Prelude", [])) $
+--     -- non-primitive defs
+--     [coreProg|
+--         id x = x;
+--         k x y = x;
+--         k1 x y = y;
+--         s f g x = f x (g x);
+--         compose f g x = f (g x);
+--         twice f x = f (f x);
+--         fst p = casePair# p k;
+--         snd p = casePair# p k1;
+--         head l = caseList# l abort# k;
+--         tail l = caseList# l abort# k1;
+--         _length_cc x xs = (+#) 1 (length xs);
+--         length l = caseList# l 0 length_cc;
+--     |]
+--     <>
+--     -- primitive constructors need some specialised wiring:
+--     Program
+--         [ ScDef "False" [] $ Con 0 0
+--         , ScDef "True" [] $ Con 1 0
+--         , ScDef "MkPair" [] $ Con 0 2
+--         , ScDef "Nil" [] $ Con 1 0
+--         , ScDef "Cons" [] $ Con 2 2
+--         ]
+
+--}
 

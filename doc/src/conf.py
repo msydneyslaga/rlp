@@ -13,7 +13,7 @@ author = 'madeleine sydney slaga'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['sphinx.ext.imgmath']
+extensions = ['sphinx.ext.imgmath', 'sphinx.ext.graphviz']
 
 # templates_path = ['_templates']
 exclude_patterns = []
@@ -32,6 +32,7 @@ html_theme = 'alabaster'
 imgmath_latex_preamble = r'''
 \usepackage{amsmath}
 \usepackage{tabularray}
+\usepackage{syntax}
 
 \newcommand{\transrule}[2]
     {\begin{tblr}{|rrrlc|}

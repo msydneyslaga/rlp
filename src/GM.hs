@@ -8,8 +8,13 @@ Description : The G-Machine
 module GM
     ( hdbgProg
     , evalProg
+    , evalProgR
+    , GmState(..)
+    , gmCode, gmStack, gmDump, gmHeap, gmEnv, gmStats
     , Node(..)
+    , showState
     , gmEvalProg
+    , Stats(..)
     , finalStateOf
     , resultOf
     , resultOfExpr
@@ -22,18 +27,36 @@ import Data.Maybe                   (fromMaybe, mapMaybe)
 import Data.Monoid                  (Endo(..))
 import Data.Tuple                   (swap)
 import Lens.Micro
+import Lens.Micro.Extras            (view)
 import Lens.Micro.TH
+import Lens.Micro.Platform          (packed, unpacked)
+import Lens.Micro.Platform.Internal (IsText(..))
 import Text.Printf
 import Text.PrettyPrint             hiding ((<>))
 import Text.PrettyPrint.HughesPJ    (maybeParens)
 import Data.Foldable                (traverse_)
 import System.IO                    (Handle, hPutStrLn)
+-- TODO: an actual output system
+-- TODO: an actual output system
+-- TODO: an actual output system
+-- TODO: an actual output system
+import System.IO.Unsafe             (unsafePerformIO)
 import Data.String                  (IsString)
 import Data.Heap
 import Debug.Trace
+import Compiler.RLPC
 import Core2Core
 import Core
 ----------------------------------------------------------------------------------
+
+tag_Unit_unit :: Int
+tag_Unit_unit = 0
+
+tag_Bool_True :: Int
+tag_Bool_True = 1
+
+tag_Bool_False :: Int
+tag_Bool_False = 0
 
 {-}
 
@@ -70,6 +93,7 @@ data Key = NameKey Name
          | ConstrKey Tag Int
          deriving (Show, Eq)
 
+-- >> [ref/Instr]
 data Instr = Unwind
            | PushGlobal Name
            | PushConstr Tag Int
@@ -84,12 +108,14 @@ data Instr = Unwind
            -- arith
            | Neg | Add | Sub | Mul | Div
            -- comparison
-           | Equals
+           | Equals | Lesser | GreaterEq
            | Pack Tag Int -- Pack Tag Arity
            | CaseJump [(Tag, Code)]
            | Split Int
+           | Print
            | Halt
            deriving (Show, Eq)
+-- << [ref/Instr]
 
 data Node = NNum Int
           | NAp Addr Addr
@@ -132,7 +158,7 @@ evalProg p = res <&> (,sts)
         resAddr = final ^. gmStack ^? _head
         res = resAddr >>= flip hLookup h
 
-hdbgProg :: Program' -> Handle -> IO (Node, Stats)
+hdbgProg :: Program' -> Handle -> IO GmState
 hdbgProg p hio = do
     (renderOut . showState) `traverse_` states
     -- TODO: i'd like the statistics to be at the top of the file, but `sts`
@@ -140,7 +166,7 @@ hdbgProg p hio = do
     -- *can't* get partial logs in the case of a crash. this is in opposition to
     -- the above traversal which *will* produce partial logs. i love laziness :3
     renderOut . showStats $ sts
-    pure (res, sts)
+    pure final
     where
         renderOut r = hPutStrLn hio $ render r ++ "\n"
 
@@ -152,6 +178,21 @@ hdbgProg p hio = do
         -- the address of the result should be the one and only stack entry
         [resAddr] = final ^. gmStack
         res = hLookupUnsafe resAddr h
+
+evalProgR :: (Monad m) => Program' -> RLPCT m (Node, Stats)
+evalProgR p = do
+    (renderOut . showState) `traverse_` states
+    renderOut . showStats $ sts
+    pure (res, sts)
+    where
+        renderOut r = addDebugMsg "dump-eval" $ render r ++ "\n"
+        states = eval . compile $ p
+        final = last states
+
+        sts = final ^. gmStats
+        -- the address of the result should be the one and only stack entry
+        [resAddr] = final ^. gmStack
+        res = hLookupUnsafe resAddr (final ^. gmHeap)
 
 eval :: GmState -> [GmState]
 eval st = st : rest
@@ -175,28 +216,54 @@ isFinal st = null $ st ^. gmCode
 
 step :: GmState -> GmState
 step st = case head (st ^. gmCode) of
-    Unwind         -> unwindI        
+    Unwind         -> unwindI
     PushGlobal n   -> pushGlobalI   n
     PushConstr t n -> pushConstrI t n
     PushInt    n   -> pushIntI      n
     Push       n   -> pushI         n
-    MkAp           -> mkApI          
+    MkAp           -> mkApI
     Slide      n   -> slideI        n
     Pop        n   -> popI          n
     Update     n   -> updateI       n
     Alloc      n   -> allocI        n
-    Eval           -> evalI          
-    Neg            -> negI           
-    Add            -> addI           
-    Sub            -> subI           
-    Mul            -> mulI           
-    Div            -> divI           
-    Equals         -> equalsI           
+    Eval           -> evalI
+    Neg            -> negI
+    Add            -> addI
+    Sub            -> subI
+    Mul            -> mulI
+    Div            -> divI
+    Equals         -> equalsI
+    Lesser         -> lesserI
+    GreaterEq      -> greaterEqI
     Split      n   -> splitI        n
     Pack       t n -> packI       t n
     CaseJump    as -> caseJumpI    as
+    Print          -> printI
     Halt           -> haltI
     where
+
+        printI :: GmState
+        printI = case hLookupUnsafe a h of
+            NNum n       -> (evilTempPrinter `seq` st)
+                          & gmCode .~ i
+                          & gmStack .~ s
+                where
+                    -- TODO: an actual output system
+                    -- TODO: an actual output system
+                    -- TODO: an actual output system
+                    -- TODO: an actual output system
+                    evilTempPrinter = unsafePerformIO (print n)
+            NConstr _ as -> st
+                          & gmCode .~ i' ++ i
+                          & gmStack .~ s'
+                where
+                    i' = mconcat $ replicate n [Eval,Print]
+                    n = length as
+                    s' = as ++ s
+          where
+            h = st ^. gmHeap
+            (a:s) = st ^. gmStack
+            Print : i = st ^. gmCode
 
         -- nuke the state
         haltI :: GmState
@@ -281,7 +348,7 @@ step st = case head (st ^. gmCode) of
                 m = st ^. gmEnv
                 s = st ^. gmStack
                 h = st ^. gmHeap
-                n' = show n
+                n' = show n ^. packed
 
         -- Core Rule 2. (no sharing)
         -- pushIntI :: Int -> GmState
@@ -391,8 +458,10 @@ step st = case head (st ^. gmCode) of
         mulI = primitive2 boxInt unboxInt (*) st
         divI = primitive2 boxInt unboxInt div st
 
-        equalsI :: GmState
+        lesserI, greaterEqI, equalsI :: GmState
         equalsI = primitive2 boxBool unboxInt (==) st
+        lesserI = primitive2 boxBool unboxInt (<) st
+        greaterEqI = primitive2 boxBool unboxInt (>=) st
 
         splitI :: Int -> GmState
         splitI n = st
@@ -534,12 +603,13 @@ boxBool st p = st
     where
         h = st ^. gmHeap
         (h',a) = alloc h (NConstr p' [])
-        p' = if p then 1 else 0
+        p' = if p then tag_Bool_True else tag_Bool_False
 
 unboxBool :: Addr -> GmState -> Bool
 unboxBool a st = case hLookup a h of
-        Just (NConstr 1 []) -> True
-        Just (NConstr 0 []) -> False
+        Just (NConstr t [])
+            | t == tag_Bool_True  -> True
+            | t == tag_Bool_False -> False
         Just _              -> error "unboxInt received a non-int"
         Nothing             -> error "unboxInt received an invalid address"
     where h = st ^. gmHeap
@@ -575,6 +645,10 @@ compiledPrims =
     , binop "*#" Mul
     , binop "/#" Div
     , binop "==#" Equals
+    , binop "<#" Lesser
+    , binop ">=#" GreaterEq
+    , ("print#", 1, [ Push 0, Eval, Print, Pack tag_Unit_unit 0, Update 1, Pop 1
+                    , Unwind ])
     ]
     where
         unop k i = (k, 1, [Push 0, Eval, i, Update 1, Pop 1, Unwind])
@@ -582,7 +656,7 @@ compiledPrims =
         binop k i = (k, 2, [Push 1, Eval, Push 1, Eval, i, Update 2, Pop 2, Unwind])
 
 buildInitialHeap :: Program' -> (GmHeap, Env)
-buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
+buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compiledScs
     where
         compiledScs = fmap compileSc ss <> compiledPrims
 
@@ -612,12 +686,13 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
             | k `elem` domain  = [Push n]
             | otherwise        = [PushGlobal k]
             where
-                n = fromMaybe (error $ "undeclared var: " <> k) $ lookupN k g
+                n = fromMaybe err $ lookupN k g
+                err = error $ "undeclared var: " <> (k ^. unpacked)
                 domain = f `mapMaybe` g
                 f (NameKey n, _) = Just n
                 f _              = Nothing
 
-        compileC _ (LitE l)  = compileCL l
+        compileC _ (Lit l)   = compileCL l
 
         -- >> [ref/compileC]
         compileC g (App f x) = compileC g x
@@ -657,33 +732,32 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
         compileC _ (Con t n) = [PushConstr t n]
 
         compileC _ (Case _ _) =
-            error "case expressions may not appear in non-strict contexts :/"
+            error "GM compiler found a non-strict case expression, which should\
+                  \ have been floated by Core2Core.gmPrep. This is a bug!"
 
         compileC _ _ = error "yet to be implemented!"
 
-        compileCL :: Literal -> Code
+        compileCL :: Lit -> Code
         compileCL (IntL n) = [PushInt n]
 
-        compileEL :: Literal -> Code
+        compileEL :: Lit -> Code
         compileEL (IntL n) = [PushInt n]
 
         -- compile an expression in a strict context such that a pointer to the
         -- expression is left on top of the stack in WHNF
         compileE :: Env -> Expr' -> Code
-        compileE _ (LitE l) = compileEL l
+        compileE _ (Lit l) = compileEL l
         compileE g (Let NonRec bs e) =
                 -- we use compileE instead of compileC
                 mconcat binders <> compileE g' e <> [Slide d]
             where
                 d = length bs
-                (g',binders) = mapAccumL compileBinder (argOffset d g) addressed
-                -- kinda gross. revisit this
-                addressed = bs `zip` reverse [0 .. d-1]
+                (g',binders) = mapAccumL compileBinder g bs
 
-                compileBinder :: Env -> (Binding', Int) -> (Env, Code)
-                compileBinder m (k := v, a) = (m',c)
+                compileBinder :: Env -> Binding' -> (Env, Code)
+                compileBinder m (k := v) = (m',c)
                     where
-                        m' = (NameKey k, a) : m
+                        m' = (NameKey k, 0) : argOffset 1 m
                         -- make note that we use m rather than m'!
                         c = compileC m v
 
@@ -711,21 +785,27 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
         compileE g ("*#" :$ a :$ b)  = inlineOp2 g Mul    a b
         compileE g ("/#" :$ a :$ b)  = inlineOp2 g Div    a b
         compileE g ("==#" :$ a :$ b) = inlineOp2 g Equals a b
+        compileE g ("<#" :$ a :$ b)  = inlineOp2 g Lesser a b
+        compileE g (">=#" :$ a :$ b)  = inlineOp2 g GreaterEq a b
 
         compileE g (Case e as) = compileE g e <> [CaseJump (compileD g as)]
 
         compileE g e = compileC g e ++ [Eval]
 
         compileD :: Env -> [Alter'] -> [(Tag, Code)]
-        compileD g as = fmap (compileA g) as
+        compileD g = fmap (compileA g)
 
         compileA :: Env -> Alter' -> (Tag, Code)
-        compileA g (Alter (AltData t) as e) = (t, [Split n] <> c <> [Slide n])
+        compileA g (Alter (AltTag t) as e) = (t, [Split n] <> c <> [Slide n])
             where
                 n = length as
                 binds = (NameKey <$> as) `zip` [0..]
                 g' = binds ++ argOffset n g
                 c = compileE g' e
+        compileA _ (Alter _ as e) = error "GM.compileA found an untagged\
+                                          \ constructor, which should have\
+                                          \ been handled by Core2Core.gmPrep.\
+                                          \ This is a bug!"
 
         inlineOp1 :: Env -> Instr -> Expr' -> Code
         inlineOp1 g i a = compileE g a <> [i]
@@ -738,8 +818,8 @@ buildInitialHeap (Program ss) = mapAccumL allocateSc mempty compiledScs
         argOffset :: Int -> Env -> Env
         argOffset n = each . _2 %~ (+n)
 
-idPack :: Tag -> Int -> String
-idPack t n = printf "Pack{%d %d}" t n
+showCon :: (IsText a) => Tag -> Int -> a
+showCon t n = printf "Pack{%d %d}" t n ^. packed
 
 ----------------------------------------------------------------------------------
 
@@ -855,12 +935,12 @@ showNodeAt = showNodeAtP 0
 showNodeAtP :: Int -> GmState -> Addr -> Doc
 showNodeAtP p st a = case hLookup a h of
     Just (NNum n)        -> int n <> "#"
-    Just (NGlobal _ _)   -> text name
+    Just (NGlobal _ _)   -> textt name
         where
             g = st ^. gmEnv
             name = case lookup a (swap <$> g) of
                 Just (NameKey n)     -> n
-                Just (ConstrKey t n) -> idPack t n
+                Just (ConstrKey t n) -> showCon t n
                 _                    -> errTxtInvalidAddress
     -- TODO: left-associativity
     Just (NAp f x)       -> pprec $ showNodeAtP (p+1) st f
@@ -877,7 +957,7 @@ showNodeAtP p st a = case hLookup a h of
         pprec = maybeParens (p > 0)
 
 showSc :: GmState -> (Name, Addr) -> Doc
-showSc st (k,a) = "Supercomb " <> qquotes (text k) <> colon
+showSc st (k,a) = "Supercomb " <> qquotes (textt k) <> colon
                $$ code
     where
         code = case hLookup a (st ^. gmHeap) of
@@ -899,6 +979,9 @@ showInstr (CaseJump alts) = "CaseJump" $$ nest pprTabstop alternatives
         showAlt (t,c) = "<" <> int t <> ">" <> showCodeShort c
         alternatives = foldr (\a acc -> showAlt a $$ acc) mempty alts
 showInstr i = text $ show i
+
+textt :: (IsText a) => a -> Doc
+textt t = t ^. unpacked & text
 
 ----------------------------------------------------------------------------------
 
@@ -975,7 +1058,8 @@ resultOf p = do
         h = st ^. gmHeap
 
 resultOfExpr :: Expr' -> Maybe Node
-resultOfExpr e = resultOf $ Program
-    [ ScDef "main" [] e
-    ]
+resultOfExpr e = resultOf $
+    mempty & programScDefs .~
+                [ ScDef "main" [] e
+                ]
 

@@ -1,0 +1,24 @@
+-- repl extensions
+:set -XOverloadedStrings
+
+--------------------------------------------------------------------------------
+
+-- happy/alex: override :r to rebuild parsers
+:set -package process
+
+:{
+import System.Exit qualified
+import System.Process qualified
+
+_reload_and_make _ = do
+    p <- System.Process.spawnCommand "make -f Makefile_happysrcs"
+    r <- System.Process.waitForProcess p
+    case r of
+        System.Exit.ExitSuccess -> pure ":reload"
+        _                       -> pure ""
+:}
+
+:def! r _reload_and_make
+
+--------------------------------------------------------------------------------
+

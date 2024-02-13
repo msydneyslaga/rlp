@@ -6,6 +6,7 @@ module Arith
     ) where
 ----------------------------------------------------------------------------------
 import Data.Functor.Classes             (eq1)
+import Lens.Micro
 import Core.Syntax
 import GM
 import Test.QuickCheck
@@ -40,6 +41,7 @@ evalArith (a ::* b)   = evalArith a * evalArith b
 evalArith (a ::- b)   = evalArith a - evalArith b
 
 instance Arbitrary ArithExpr where
+    -- TODO: implement shrink
     arbitrary = gen 4
         where
             gen :: Int -> Gen ArithExpr
@@ -70,13 +72,13 @@ instance Arbitrary ArithExpr where
 --         coreResult  = evalCore (toCore e)
 
 toCore :: ArithExpr -> Program'
-toCore expr = Program
+toCore expr = mempty & programScDefs .~
         [ ScDef "id" ["x"] $ Var "x"
         , ScDef "main" [] $ go expr
         ]
     where
         go :: ArithExpr -> Expr'
-        go (IntA n)    = LitE (IntL n)
+        go (IntA n)    = Lit (IntL n)
         go (NegateA e) = "negate#" :$ go e
         go (IdA e)     = "id" :$ go e
         go (a :+ b)    = f "+#" a b

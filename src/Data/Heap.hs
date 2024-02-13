@@ -27,12 +27,28 @@ import Debug.Trace
 import Data.Map.Strict              qualified as M
 import Data.List                    (intersect)
 import GHC.Stack                    (HasCallStack)
+import Control.Lens
 ----------------------------------------------------------------------------------
 
 data Heap a = Heap [Addr] (Map Addr a)
     deriving Show
 
 type Addr = Int
+
+type instance Index (Heap a) = Addr
+type instance IxValue (Heap a) = a
+
+instance Ixed (Heap a) where
+    ix a k (Heap as m) = Heap as <$> M.alterF k' a m where
+        k' (Just v) = Just <$> k v
+        k' Nothing = pure Nothing
+
+instance At (Heap a) where
+    at ma k (Heap as m) = Heap as <$> M.alterF k ma m
+
+instance FoldableWithIndex Addr Heap where
+    ifoldr fi z (Heap _ m) = ifoldr fi z m
+    ifoldMap iam (Heap _ m) = ifoldMap iam m
 
 instance Semigroup (Heap a) where
     Heap ua ma <> Heap ub mb = Heap u m
@@ -54,7 +70,7 @@ instance Foldable Heap where
     length (Heap _ m) = M.size m
 
 instance Traversable Heap where
-    traverse t (Heap u m) = Heap u <$> (traverse t m)
+    traverse t (Heap u m) = Heap u <$> traverse t m
 
 ----------------------------------------------------------------------------------
 

@@ -3,8 +3,10 @@
 Module      : Core.Lex
 Description : Lexical analysis for the core language
 -}
+{-# LANGUAGE OverloadedStrings #-}
 module Core.Lex
     ( lexCore
+    , lexCoreR
     , lexCore'
     , CoreToken(..)
     , SrcError(..)
@@ -15,13 +17,20 @@ module Core.Lex
     where
 import Data.Char (chr)
 import Debug.Trace
+import Data.Text            (Text)
+import Data.Text            qualified as T
+import Data.String          (IsString(..))
+import Data.Functor.Identity
 import Core.Syntax
 import Compiler.RLPC
+import Compiler.Types
+-- TODO: unify Located definitions
+import Compiler.RlpcError
 import Lens.Micro
 import Lens.Micro.TH
 }
 
-%wrapper "monad"
+%wrapper "monad-strict-text"
 
 $whitechar = [ \t\n\r\f\v]
 $special   = [\(\)\,\;\[\]\{\}]
@@ -59,6 +68,8 @@ $white_no_nl = $white # $nl
 
 @decimal = $digit+
 
+@alttag    = "<" $digit+ ">"
+
 rlp :-
 
 <0>
@@ -68,6 +79,7 @@ rlp :-
     "{"                     { constTok TokenLBrace }
     "}"                     { constTok TokenRBrace }
     ";"                     { constTok TokenSemicolon }
+    "::"                    { constTok TokenHasType }
     "@"                     { constTok TokenTypeApp }
     "{-#"                   { constTok TokenLPragma `andBegin` pragma }
 
@@ -80,17 +92,19 @@ rlp :-
     "where"                 { constTok TokenWhere }
     "Pack"                  { constTok TokenPack } -- temp
 
-    "\\"                    { constTok TokenLambda }
+    "\"                     { constTok TokenLambda }
     "λ"                     { constTok TokenLambda }
     "="                     { constTok TokenEquals }
     "->"                    { constTok TokenArrow }
 
+    @alttag                 { lexWith ( TokenAltTag . read @Int . T.unpack
+                                      . T.drop 1 . T.init ) }
     @varname                { lexWith TokenVarName }
     @conname                { lexWith TokenConName }
     @varsym                 { lexWith TokenVarSym }
     @consym                 { lexWith TokenConSym }
 
-    @decimal                { lexWith (TokenLitInt . read @Int) }
+    @decimal                { lexWith (TokenLitInt . read @Int . T.unpack) }
 
     $white                  { skip }
     \n                      { skip }
@@ -107,11 +121,9 @@ rlp :-
 }
 
 {
-data Located a = Located Int Int Int a
-    deriving Show
 
 constTok :: t -> AlexInput -> Int -> Alex (Located t)
-constTok t (AlexPn _ y x,_,_,_) l = pure $ Located y x l t
+constTok t (AlexPn _ y x,_,_,_) l = pure $ nolo t
 
 data CoreToken = TokenLet
                | TokenLetrec
@@ -128,16 +140,18 @@ data CoreToken = TokenLet
                | TokenConName Name
                | TokenVarSym Name
                | TokenConSym Name
+               | TokenAltTag Tag
                | TokenEquals
                | TokenLParen
                | TokenRParen
                | TokenLBrace
                | TokenRBrace
                | TokenSemicolon
+               | TokenHasType
                | TokenTypeApp
                | TokenLPragma
                | TokenRPragma
-               | TokenWord String
+               | TokenWord Text
                | TokenEOF
                deriving Show
 
@@ -155,42 +169,51 @@ data SrcErrorType = SrcErrLexical String
 
 type Lexer = AlexInput -> Int -> Alex (Located CoreToken)
 
-lexWith :: (String -> CoreToken) -> Lexer
-lexWith f (AlexPn _ y x,_,_,s) l = pure $ Located y x l (f $ take l s)
+lexWith :: (Text -> CoreToken) -> Lexer
+lexWith f (AlexPn _ y x,_,_,s) l = pure . nolo . f . T.take l $ s
 
 -- | The main lexer driver.
-lexCore :: String -> RLPC SrcError [Located CoreToken]
+lexCore :: Text -> RLPC [Located CoreToken]
 lexCore s = case m of
-    Left e   -> addFatal err
-        where err = SrcError
-                { _errSpan       = (0,0,0) -- TODO: location
-                , _errSeverity   = Error
-                , _errDiagnostic = SrcErrLexical e
-                }
+    Left e   -> error "core lex error"
     Right ts -> pure ts
     where
         m = runAlex s lexStream
 
+lexCoreR :: forall m. (Applicative m) => Text -> RLPCT m [Located CoreToken]
+lexCoreR = hoistRlpcT generalise . lexCore
+    where
+        generalise :: forall a. Identity a -> m a
+        generalise (Identity a) = pure a
+
 -- | @lexCore@, but the tokens are stripped of location info. Useful for
 -- debugging
-lexCore' :: String -> RLPC SrcError [CoreToken]
+lexCore' :: Text -> RLPC [CoreToken]
 lexCore' s = fmap f <$> lexCore s
-    where f (Located _ _ _ t) = t
+    where f (Located _ t) = t
 
 lexStream :: Alex [Located CoreToken]
 lexStream = do
     l <- alexMonadScan
     case l of
-        Located _ _ _ TokenEOF  -> pure [l]
-        _                       -> (l:) <$> lexStream
+        Located _ TokenEOF -> pure [l]
+        _                  -> (l:) <$> lexStream
 
 data ParseError = ParErrLexical String
                 | ParErrParse
                 deriving Show
 
+-- TODO:
+instance IsRlpcError SrcError where
+    liftRlpcError = Text . pure . T.pack . show
+
+-- TODO:
+instance IsRlpcError ParseError where
+    liftRlpcError = Text . pure . T.pack . show
+
 alexEOF :: Alex (Located CoreToken)
 alexEOF = Alex $ \ st@(AlexState { alex_pos = AlexPn _ y x }) ->
-    Right (st, Located y x 0 TokenEOF)
+    Right (st, nolo $ TokenEOF)
 
 }
 

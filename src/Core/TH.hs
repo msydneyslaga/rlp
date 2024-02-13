@@ -5,62 +5,53 @@ Description : Core quasiquoters
 module Core.TH
     ( coreExpr
     , coreProg
-    , core
+    , coreExprT
+    , coreProgT
     )
     where
 ----------------------------------------------------------------------------------
 import Language.Haskell.TH
-import Language.Haskell.TH.Syntax hiding (Module)
+import Language.Haskell.TH.Syntax   hiding (Module)
 import Language.Haskell.TH.Quote
 import Control.Monad                ((>=>))
+import Control.Monad.IO.Class
+import Control.Arrow                ((>>>))
 import Compiler.RLPC
 import Data.Default.Class           (def)
+import Data.Text                    (Text)
+import Data.Text                    qualified as T
 import Core.Parse
 import Core.Lex
+import Core.Syntax
+import Core.HindleyMilner           (checkCoreProgR, checkCoreExprR)
 ----------------------------------------------------------------------------------
 
-core :: QuasiQuoter
-core = QuasiQuoter
-    { quoteExp = qCore
-    , quotePat = error "core quasiquotes may only be used in expressions"
-    , quoteType = error "core quasiquotes may only be used in expressions"
-    , quoteDec = error "core quasiquotes may only be used in expressions"
-    }
-
 coreProg :: QuasiQuoter
-coreProg = QuasiQuoter
-    { quoteExp = qCoreProg
-    , quotePat = error "core quasiquotes may only be used in expressions"
-    , quoteType = error "core quasiquotes may only be used in expressions"
-    , quoteDec = error "core quasiquotes may only be used in expressions"
-    }
+coreProg = mkqq $ lexCoreR >=> parseCoreProgR
 
 coreExpr :: QuasiQuoter
-coreExpr = QuasiQuoter
-    { quoteExp = qCoreExpr
+coreExpr = mkqq $ lexCoreR >=> parseCoreExprR
+
+-- | Type-checked @coreProg@
+coreProgT :: QuasiQuoter
+coreProgT = mkqq $ lexCoreR >=> parseCoreProgR >=> checkCoreProgR
+
+coreExprT :: QuasiQuoter
+coreExprT = mkqq $ lexCoreR >=> parseCoreExprR >=> checkCoreExprR g
+    where
+        g = [ ("+#", TyCon "Int#" :-> TyCon "Int#" :-> TyCon "Int#")
+            , ("id", TyCon "a" :-> TyCon "a")
+            , ("fix", (TyCon "a" :-> TyCon "a") :-> TyCon "a")
+            ]
+
+mkqq :: (Lift a) => (Text -> RLPCIO a) -> QuasiQuoter
+mkqq p = QuasiQuoter
+    { quoteExp = mkq p
     , quotePat = error "core quasiquotes may only be used in expressions"
     , quoteType = error "core quasiquotes may only be used in expressions"
     , quoteDec = error "core quasiquotes may only be used in expressions"
     }
 
-qCore :: String -> Q Exp
-qCore s = case parse s of
-    Left e       -> error (show e)
-    Right (m,ts) -> lift m
-    where
-        parse = evalRLPC def . (lexCore >=> parseCore)
-
-qCoreExpr :: String -> Q Exp
-qCoreExpr s = case parseExpr s of
-    Left e       -> error (show e)
-    Right (m,ts) -> lift m
-    where
-        parseExpr = evalRLPC def . (lexCore >=> parseCoreExpr)
-
-qCoreProg :: String -> Q Exp
-qCoreProg s = case parseProg s of
-    Left e       -> error (show e)
-    Right (m,ts) -> lift m
-    where
-        parseProg = evalRLPC def . (lexCore >=> parseCoreProg)
+mkq :: (Lift a) => (Text -> RLPCIO a) -> String -> Q Exp
+mkq parse s = liftIO $ evalRLPCIO def (parse $ T.pack s) >>= lift
 
