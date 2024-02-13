@@ -63,52 +63,13 @@ an assembly target. The goal of our new G-Machine is to compile a *linear
 sequence of instructions* which, **when executed**, build up a graph
 representing the code.
 
-**************************
-Trees and Vines, in Theory
-**************************
-
-Rather than instantiating an expression at runtime -- traversing the AST and
-building a graph -- we want to compile all expressions at compile-time,
-generating a linear sequence of instructions which may be executed to build the
-graph.
-
-**************************
-Evaluation: Slurping Vines
-**************************
-
-WIP.
-
-Laziness
---------
-
-WIP.
-
-* Instead of :code:`Slide (n+1); Unwind`, do :code:`Update n; Pop n; Unwind`
-
-****************************
-Compilation: Squashing Trees
-****************************
-
-WIP.
-
-Notice that we do not keep a (local) environment at run-time. The environment
-only exists at compile-time to map local names to stack indices. When compiling
-a supercombinator, the arguments are enumerated from zero (the top of the
-stack), and passed to :code:`compileR` as an environment.
+*************
+The G-Machine
+*************
 
 .. literalinclude:: /../../src/GM.hs
    :dedent:
-   :start-after: -- >> [ref/compileSc]
-   :end-before: -- << [ref/compileSc]
-   :caption: src/GM.hs
-
-Of course, variables being indexed relative to the top of the stack means that
-they will become inaccurate the moment we push or pop the stack a single time.
-The way around this is quite simple: simply offset the stack when w
-
-.. literalinclude:: /../../src/GM.hs
-   :dedent:
-   :start-after: -- >> [ref/compileC]
-   :end-before: -- << [ref/compileC]
+   :start-after: -- >> [ref/Instr]
+   :end-before: -- << [ref/Instr]
    :caption: src/GM.hs
 

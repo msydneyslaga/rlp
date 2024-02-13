@@ -93,6 +93,7 @@ data Key = NameKey Name
          | ConstrKey Tag Int
          deriving (Show, Eq)
 
+-- >> [ref/Instr]
 data Instr = Unwind
            | PushGlobal Name
            | PushConstr Tag Int
@@ -114,6 +115,7 @@ data Instr = Unwind
            | Print
            | Halt
            deriving (Show, Eq)
+-- << [ref/Instr]
 
 data Node = NNum Int
           | NAp Addr Addr
