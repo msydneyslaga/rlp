@@ -31,7 +31,9 @@ import Text.Printf
 import Text.PrettyPrint             hiding ((<>))
 import Text.PrettyPrint.HughesPJ    (maybeParens)
 import Data.Foldable                (traverse_)
-import System.IO                    (Handle, hPutStrLn)
+import Control.Concurrent
+import System.Exit
+import System.IO                    (Handle, hPutStrLn, stderr)
 -- TODO: an actual output system
 -- TODO: an actual output system
 -- TODO: an actual output system
@@ -173,8 +175,11 @@ hdbgProg p hio = do
         [resAddr] = final ^. gmStack
         res = hLookupUnsafe resAddr h
 
-evalProgR :: (Monad m) => Program' -> RLPCT m (Node, Stats)
+evalProgR :: Program' -> RLPCIO (Node, Stats)
 evalProgR p = do
+    -- me <- liftIO myThreadId
+    -- liftIO $ forkIO $ threadDelay (5 * 10^6) *> throwTo me ExitSuccess *> exitSuccess
+    -- states & traverseOf_ (each . gmCode) (liftIO . print)
     (renderOut . showState) `traverse_` states
     renderOut . showStats $ sts
     pure (res, sts)
@@ -193,11 +198,11 @@ eval st = st : rest
     where
         rest | isFinal st   = []
              | otherwise    = eval next
-        next = doAdmin (step st)
+        next = doAdmin (step . (\a -> (unsafePerformIO . hPutStrLn stderr . ('\n':) . render . showState $ a) `seq` a) $ st)
 
 doAdmin :: GmState -> GmState
 doAdmin st = st & gmStats . stsReductions %~ succ
-                & doGC
+                -- & doGC
     where
         -- TODO: use heapTrigger option in RLPCOptions
         heapTrigger = 50
@@ -407,7 +412,8 @@ step st = case head (st ^. gmCode) of
                 (e:s) = st ^. gmStack
                 an = s !! n
                 h = st ^. gmHeap
-                h' = h `seq` update an (NInd e) h
+                -- PROBLEM HERE:
+                h' = update an (NInd e) h
 
         popI :: Int -> GmState
         popI n = st
@@ -743,10 +749,10 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
         compileE _ (Lit l) = compileEL l
         compileE g (Let NonRec bs e) =
                 -- we use compileE instead of compileC
-                mconcat binders <> compileE g' e <> [Slide d]
+                traceShowId $ mconcat binders <> compileE g' e <> [Slide d]
             where
                 d = length bs
-                (g',binders) = mapAccumL compileBinder (argOffset d g) addressed
+                (g',binders) = mapAccumL compileBinder (argOffset (d-1) g) addressed
                 -- kinda gross. revisit this
                 addressed = bs `zip` reverse [0 .. d-1]
 
@@ -755,7 +761,7 @@ buildInitialHeap (view programScDefs -> ss) = mapAccumL allocateSc mempty compil
                     where
                         m' = (NameKey k, a) : m
                         -- make note that we use m rather than m'!
-                        c = compileC m v
+                        c = trace (printf "compileC %s %s" (show m) (show v)) $ compileC m v
 
         compileE g (Let Rec bs e) =
                 Alloc d : initialisers <> body <> [Slide d]

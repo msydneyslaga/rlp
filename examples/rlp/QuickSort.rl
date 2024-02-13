@@ -36,5 +36,5 @@ id x = x
 main = case list of
     Nil -> Nil
     Cons a as -> let lesser = filter (lt a) as
-                 in print# lesser
+                 in lesser
 

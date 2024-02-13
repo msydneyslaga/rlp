@@ -1,5 +1,8 @@
+profiling: True
 ignore-project: False
 library-profiling: True
 executable-profiling: True
+profiling-detail: all-functions
 tests: True
 benchmarks: True
+

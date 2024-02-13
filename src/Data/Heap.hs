@@ -1,3 +1,4 @@
+{-# LANGUAGE ImplicitParams #-}
 {-
 Module : Data.Heap
 Description : A model heap used by abstract machine
@@ -26,7 +27,10 @@ import Data.Map                     (Map, (!?))
 import Debug.Trace
 import Data.Map.Strict              qualified as M
 import Data.List                    (intersect)
-import GHC.Stack                    (HasCallStack)
+import Data.IORef
+import System.IO.Unsafe
+import Control.Monad
+import GHC.Stack
 import Control.Lens
 ----------------------------------------------------------------------------------
 
@@ -74,13 +78,19 @@ instance Traversable Heap where
 
 ----------------------------------------------------------------------------------
 
-alloc :: Heap a -> a -> (Heap a, Addr)
-alloc (Heap (u:us) m) v = (Heap us (M.insert u v m), u)
+godhelpme :: IORef Int
+godhelpme = unsafePerformIO $ newIORef 0
+
+alloc :: HasCallStack => Heap a -> a -> (Heap a, Addr)
+alloc (Heap (u:us) m) v = unsafePerformIO $ do
+    -- i <- readIORef godhelpme
+    -- when (i >= 60000) $ error "fuck"
+    -- modifyIORef godhelpme succ
+    pure (Heap us (M.insert u v m), u)
 alloc (Heap [] _)     _ = error "heap model ran out of memory..."
 
-update :: Addr -> a -> Heap a -> Heap a
+update :: HasCallStack => Addr -> a -> Heap a -> Heap a
 update k v (Heap u m) = Heap u (M.adjust (const v) k m)
--- update k v (Heap u m) = Heap u (M.adjust (undefined) k m)
 
 adjust :: Addr -> (a -> a) -> Heap a -> Heap a
 adjust k f (Heap u m) = Heap u (M.adjust f k m)
