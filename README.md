@@ -26,12 +26,14 @@ $ cabal test --test-show-details=direct
 #### TLDR
 
 ```sh
-# Compile and evaluate examples/factorial.cr, with evaluation info dumped to stderr
-$ rlpc -ddump-eval examples/factorial.cr
+# Compile and evaluate examples/rlp/QuickSort.rl
+$ rlpc examples/QuickSort.rl
 # Compile and evaluate t.cr, with evaluation info dumped to t.log
 $ rlpc -ddump-eval -l t.log t.cr
 # Compile and evaluate t.rl, dumping the desugared Core
 $ rlpc -ddump-desugared t.rl
+# Compile and evaluate t.rl with all compiler messages enabled
+$ rlpc -dALL t.rl
 ```
 
 #### Options
@@ -126,7 +128,7 @@ parsing remains.
     - [x] Garbage Collection
 - [ ] Stable documentation for the evaluation model
 
-### February Release Plan
+### ~~February Release Plan~~
 - [x] Beta rl' to Core
 - [x] UX improvements
     - [x] Actual compiler errors -- no more unexceptional `error` calls
@@ -134,12 +136,14 @@ parsing remains.
     - [x] Annotate the AST with token positions for errors (NOTE: As of Feb. 1,
       this has been done, but the locational info is not yet used in error messages)
 - [x] Compiler architecture diagram
-- [ ] More examples
+- [x] More examples
 
 ### March Release Plan
 - [ ] Tests
     - [ ] rl' parser
     - [ ] rl' lexer
+- [ ] Ditch TTG in favour of a simpler AST focusing on extendability via Fix, Free, 
+  Cofree, etc. rather than boilerplate-heavy type families
 
 ### Indefinite Release Plan
 
@@ -150,8 +154,6 @@ than the other release plans.
     - [ ] Complete all TODOs
     - [ ] Replace mtl with effectful
 - [ ] rl' type-checker
-- [ ] Ditch TTG in favour of a simpler AST focusing on extendability via Fix, Free, 
-  Cofree, etc. rather than boilerplate-heavy type families
 - [ ] Stable rl' to Core
 - [ ] Core polish
     - [ ] Better, stable parser
@@ -160,3 +162,4 @@ than the other release plans.
     - [ ] Less hacky pragmas
 - [ ] Choose a target. LLVM, JS, C, and WASM are currently top contenders
 - [ ] https://proglangdesign.net/wiki/challenges
+
