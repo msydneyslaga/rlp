@@ -26,15 +26,5 @@ qsort l = case l of
 list = Cons 9 (Cons 2 (Cons 3 (Cons 2
             (Cons 5 (Cons 2 (Cons 12 (Cons 89 Nil)))))))
 
-list2 = Cons 2 (Cons 3 Nil)
-
-lt :: Int# -> Int# -> Bool
-lt a = (>=# a)
-
-gte :: Int# -> Int# -> Bool
-gte a = (<# a)
-
-id x = x
-
 main = print# (qsort list)
 
