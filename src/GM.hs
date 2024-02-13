@@ -9,7 +9,10 @@ module GM
     ( hdbgProg
     , evalProg
     , evalProgR
+    , GmState(..)
+    , gmCode, gmStack, gmDump, gmHeap, gmEnv, gmStats
     , Node(..)
+    , showState
     , gmEvalProg
     , Stats(..)
     , finalStateOf
@@ -153,7 +156,7 @@ evalProg p = res <&> (,sts)
         resAddr = final ^. gmStack ^? _head
         res = resAddr >>= flip hLookup h
 
-hdbgProg :: Program' -> Handle -> IO (Node, Stats)
+hdbgProg :: Program' -> Handle -> IO GmState
 hdbgProg p hio = do
     (renderOut . showState) `traverse_` states
     -- TODO: i'd like the statistics to be at the top of the file, but `sts`
@@ -161,7 +164,7 @@ hdbgProg p hio = do
     -- *can't* get partial logs in the case of a crash. this is in opposition to
     -- the above traversal which *will* produce partial logs. i love laziness :3
     renderOut . showStats $ sts
-    pure (res, sts)
+    pure final
     where
         renderOut r = hPutStrLn hio $ render r ++ "\n"
 

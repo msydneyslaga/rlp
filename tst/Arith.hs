@@ -41,6 +41,7 @@ evalArith (a ::* b)   = evalArith a * evalArith b
 evalArith (a ::- b)   = evalArith a - evalArith b
 
 instance Arbitrary ArithExpr where
+    -- TODO: implement shrink
     arbitrary = gen 4
         where
             gen :: Int -> Gen ArithExpr

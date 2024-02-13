@@ -32,7 +32,7 @@ import Rlp.Parse
 import Rlp2Core
 ----------------------------------------------------------------------------------
 
-justHdbg :: String -> IO (Node, Stats)
+justHdbg :: String -> IO GmState
 justHdbg s = do
     p <- evalRLPCIO def (parseRlpProgR >=> desugarRlpProgR $ T.pack s)
     withFile "/tmp/t.log" WriteMode $ hdbgProg p
