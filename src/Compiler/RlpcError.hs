@@ -21,8 +21,7 @@ import Control.Monad.Errorful
 import Data.Text                (Text)
 import Data.Text                qualified as T
 import GHC.Exts                 (IsString(..))
-import Lens.Micro.Platform
-import Lens.Micro.Platform.Internal
+import Control.Lens
 import Compiler.Types
 ----------------------------------------------------------------------------------
 

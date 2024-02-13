@@ -61,21 +61,15 @@ library
                     , hashable >= 1.4.3 && < 1.5
                     , mtl >= 2.3.1 && < 2.4
                     , text >= 2.0.2 && < 2.1
-                    , megaparsec >= 9.6.1 && < 9.7
-                    , microlens >= 0.4.13 && < 0.5
-                    , microlens-mtl >= 0.2.0 && < 0.3
-                    , microlens-platform >= 0.4.3 && < 0.5
-                    , microlens-th >= 0.4.3 && < 0.5
                     , unordered-containers >= 0.2.20 && < 0.3
                     , recursion-schemes >= 5.2.2 && < 5.3
                     , data-fix >= 0.3.2 && < 0.4
                     , utf8-string >= 1.0.2 && < 1.1
-                    , extra >= 1.7.0 && < 2
-                    , semigroupoids
-                    , comonad
-                    , lens
-                    , text-ansi
-                    , microlens-pro ^>=0.2.0
+                    , extra >= 1.7.0 && <2
+                    , semigroupoids >=6.0 && <6.1
+                    , comonad >=5.0.0 && <6
+                    , lens >=5.2.3 && <6.0
+                    , text-ansi >=0.2.0 && <0.4
                     , effectful-core ^>=2.3.0.0
                     , deriving-compat ^>=0.6.0
                     , these >=0.2 && <2.0
@@ -102,9 +96,9 @@ executable rlpc
     build-depends: base >=4.17.0.0 && <4.20.0.0
                  , rlp
                  , optparse-applicative >= 0.18.1 && < 0.19
-                 , microlens-platform
                  , mtl >= 2.3.1 && < 2.4
                  , unordered-containers >= 0.2.20 && < 0.3
+                 , lens >=5.2.3 && <6.0
                  , text >= 2.0.2 && < 2.1
 
     hs-source-dirs:   app

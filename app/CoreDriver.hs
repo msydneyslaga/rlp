@@ -6,7 +6,7 @@ module CoreDriver
 import Compiler.RLPC
 import Control.Monad
 import Data.Text                    qualified as T
-import Lens.Micro.Platform
+import Control.Lens.Combinators
 
 import Core.Lex
 import Core.Parse

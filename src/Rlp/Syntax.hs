@@ -57,8 +57,7 @@ import Data.Functor.Identity
 import Data.Kind                    (Type)
 import GHC.Generics
 import Language.Haskell.TH.Syntax   (Lift)
-import Lens.Micro.Pro
-import Lens.Micro.Pro.TH
+import Control.Lens
 import Core.Syntax                  hiding (Lit, Type, Binding, Binding')
 import Core                         (HasRHS(..), HasLHS(..))
 ----------------------------------------------------------------------------------

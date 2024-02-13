@@ -13,7 +13,7 @@ import Data.Functor.Foldable
 import Data.Set                     (Set)
 import Data.Set                     qualified as S
 import Core.Syntax
-import Lens.Micro
+import Control.Lens
 import GHC.Exts                     (IsList(..))
 ----------------------------------------------------------------------------------
 

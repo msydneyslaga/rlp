@@ -16,9 +16,7 @@ module Core.HindleyMilner
     )
     where
 ----------------------------------------------------------------------------------
-import Lens.Micro
-import Lens.Micro.Mtl
-import Lens.Micro.Platform
+import Control.Lens             hiding (Context', Context)
 import Data.Maybe               (fromMaybe)
 import Data.Text                qualified as T
 import Data.Pretty              (rpretty)

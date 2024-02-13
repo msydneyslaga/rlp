@@ -64,8 +64,8 @@ import Data.Text.IO             qualified as T
 import System.IO
 import Text.ANSI                qualified as Ansi
 import Text.PrettyPrint         hiding ((<>))
-import Lens.Micro.Platform
-import Lens.Micro.Platform.Internal
+import Control.Lens
+import Data.Text.Lens           (packed, unpacked, IsText)
 import System.Exit
 ----------------------------------------------------------------------------------
 

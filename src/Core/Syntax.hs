@@ -60,8 +60,6 @@ import Data.Bifoldable              (bifoldr)
 import GHC.Generics                 (Generic, Generically(..))
 -- Lift instances for the Core quasiquoters
 import Language.Haskell.TH.Syntax   (Lift)
--- import Lens.Micro.TH                (makeLenses)
--- import Lens.Micro
 import Control.Lens
 ----------------------------------------------------------------------------------
 

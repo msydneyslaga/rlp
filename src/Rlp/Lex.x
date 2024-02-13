@@ -27,8 +27,7 @@ import Data.Text                (Text)
 import Data.Text                qualified as T
 import Data.Word
 import Data.Default
-import Lens.Micro.Mtl
-import Lens.Micro
+import Control.Lens
 
 import Debug.Trace
 import Rlp.Parse.Types

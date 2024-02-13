@@ -44,8 +44,7 @@ import Data.HashMap.Strict          qualified as H
 import Data.Void
 import Data.Word                    (Word8)
 import Data.Text                    qualified as T
-import Lens.Micro.TH
-import Lens.Micro
+import Control.Lens                 hiding ((<<~))
 import Rlp.Syntax
 import Compiler.Types
 --------------------------------------------------------------------------------

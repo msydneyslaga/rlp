@@ -20,8 +20,7 @@ import System.IO                (Handle, hPutStr)
 import Text.Printf              (printf, hPrintf)
 import Data.Proxy               (Proxy(..))
 import Data.Monoid              (Endo(..))
-import Lens.Micro
-import Lens.Micro.TH
+import Control.Lens
 import Data.Pretty
 import Data.Heap
 import Core.Examples

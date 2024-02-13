@@ -20,7 +20,7 @@ import Data.Functor.Identity
 import Data.Coerce
 import Data.HashSet                 (HashSet)
 import Data.HashSet                 qualified as H
-import Lens.Micro
+import Control.Lens
 ----------------------------------------------------------------------------------
 
 newtype ErrorfulT e m a = ErrorfulT { runErrorfulT :: m (Maybe a, [e]) }

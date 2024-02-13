@@ -13,7 +13,7 @@ import Rlp.Lex
 import Rlp.Syntax
 import Rlp.Parse.Types
 import Rlp.Parse.Associate
-import Lens.Micro.Platform
+import Control.Lens                 hiding (snoc, (.>), (<.), (<<~))
 import Data.List.Extra
 import Data.Fix
 import Data.Functor.Const

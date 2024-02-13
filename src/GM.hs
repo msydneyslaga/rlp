@@ -26,11 +26,8 @@ import Data.List                    (mapAccumL)
 import Data.Maybe                   (fromMaybe, mapMaybe)
 import Data.Monoid                  (Endo(..))
 import Data.Tuple                   (swap)
-import Lens.Micro
-import Lens.Micro.Extras            (view)
-import Lens.Micro.TH
-import Lens.Micro.Platform          (packed, unpacked)
-import Lens.Micro.Platform.Internal (IsText(..))
+import Control.Lens
+import Data.Text.Lens               (IsText, packed, unpacked)
 import Text.Printf
 import Text.PrettyPrint             hiding ((<>))
 import Text.PrettyPrint.HughesPJ    (maybeParens)

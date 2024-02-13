@@ -11,7 +11,7 @@ import Data.Functor.Const
 import Data.Functor
 import Data.Text                        qualified as T
 import Text.Printf
-import Lens.Micro
+import Control.Lens
 import Rlp.Parse.Types
 import Rlp.Syntax
 --------------------------------------------------------------------------------

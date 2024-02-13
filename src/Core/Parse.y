@@ -24,7 +24,7 @@ import Core.Syntax
 import Core.Lex
 import Compiler.RLPC
 import Control.Monad
-import Lens.Micro
+import Control.Lens         hiding (snoc)
 import Data.Default.Class   (def)
 import Data.Hashable        (Hashable)
 import Data.List.Extra

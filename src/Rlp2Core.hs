@@ -13,8 +13,6 @@ import Control.Monad.Utils
 import Control.Arrow
 import Control.Applicative
 import Control.Comonad
--- import Lens.Micro
--- import Lens.Micro.Internal
 import Control.Lens
 import Compiler.RLPC
 import Data.List                        (mapAccumL, partition)

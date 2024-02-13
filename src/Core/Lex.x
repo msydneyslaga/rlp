@@ -26,8 +26,7 @@ import Compiler.RLPC
 import Compiler.Types
 -- TODO: unify Located definitions
 import Compiler.RlpcError
-import Lens.Micro
-import Lens.Micro.TH
+import Control.Lens
 }
 
 %wrapper "monad-strict-text"

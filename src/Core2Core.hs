@@ -24,7 +24,6 @@ import Numeric                  (showHex)
 
 import Data.Pretty
 import Compiler.RLPC
--- import Lens.Micro.Platform
 import Control.Lens
 import Core.Syntax
 import Core.Utils

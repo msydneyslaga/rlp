@@ -19,7 +19,7 @@ import System.Exit              (exitSuccess)
 import Core
 import TI
 import GM
-import Lens.Micro.Platform
+import Control.Lens.Combinators hiding (argument)
 
 import CoreDriver               qualified
 import RlpDriver                qualified
