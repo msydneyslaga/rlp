@@ -11,6 +11,7 @@ module Compiler.JustRun
     ( justLexCore
     , justParseCore
     , justTypeCheckCore
+    , justHdbg
     )
     where
 ----------------------------------------------------------------------------------
@@ -20,13 +21,21 @@ import Core.HindleyMilner
 import Core.Syntax                      (Program')
 import Compiler.RLPC
 import Control.Arrow                    ((>>>))
-import Control.Monad                    ((>=>))
+import Control.Monad                    ((>=>), void)
 import Control.Comonad
 import Control.Lens
 import Data.Text                        qualified as T
 import Data.Function                    ((&))
+import System.IO
 import GM
+import Rlp.Parse
+import Rlp2Core
 ----------------------------------------------------------------------------------
+
+justHdbg :: String -> IO (Node, Stats)
+justHdbg s = do
+    p <- evalRLPCIO def (parseRlpProgR >=> desugarRlpProgR $ T.pack s)
+    withFile "/tmp/t.log" WriteMode $ hdbgProg p
 
 justLexCore :: String -> Either [MsgEnvelope RlpcError] [CoreToken]
 justLexCore s = lexCoreR (T.pack s)
