@@ -41,6 +41,12 @@ import Rlp.Syntax                       as Rlp
 import Rlp.Parse.Types                  (RlpcPs, PsName)
 --------------------------------------------------------------------------------
 
+desugarRlpProgR = undefined
+desugarRlpProg = undefined
+desugarRlpExpr = undefined
+
+{--
+
 type Tree a = Either Name (Name, Branch a)
 
 -- | Rose tree branch representing "nested" "patterns" in the Core language. That
@@ -233,4 +239,6 @@ typeToCore (VarT'' x)   = TyVar (dsNameToName x)
 -- | Forwards-compatiblity if IdP RlpDs is changed
 dsNameToName :: IdP RlpcPs -> Name
 dsNameToName = id
+
+-}
 

@@ -17,10 +17,12 @@ import Rlp.Parse
 --------------------------------------------------------------------------------
 
 rlpProg :: QuasiQuoter
-rlpProg = mkqq parseRlpProgR
+rlpProg = undefined
+-- rlpProg = mkqq parseRlpProgR
 
 rlpExpr :: QuasiQuoter
-rlpExpr = mkqq parseRlpExprR
+rlpExpr = undefined
+-- rlpExpr = mkqq parseRlpExprR
 
 mkq :: (Lift a) => (Text -> RLPCIO a) -> String -> Q Exp
 mkq parse = evalAndParse >=> lift where

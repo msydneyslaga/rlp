@@ -248,6 +248,11 @@ Con         :: { Located PsName }
 
 {
 
+parseRlpProgR = undefined
+parseRlpExprR = undefined
+    
+{--
+
 parseRlpExprR :: (Monad m) => Text -> RLPCT m (RlpExpr RlpcPs)
 parseRlpExprR s = liftErrorful $ pToErrorful parseRlpExpr st
     where
@@ -281,10 +286,6 @@ mkProgram ds = do
     pt <- use psOpTable
     pure $ RlpProgram (associate pt <$> ds)
 
-parseError :: (Located RlpToken, [String]) -> P a
-parseError ((Located ss t), exp) = addFatal $
-    errorMsg ss (RlpParErrUnexpectedToken t exp)
-
 mkInfixD :: Assoc -> Int -> PsName -> P (Decl' RlpcPs)
 mkInfixD a p n = do
     let opl :: Lens' ParseState (Maybe OpInfo)
@@ -307,6 +308,18 @@ tempInfixExprErr (Located a _) (Located b _) =
         [ "The rl' frontend is currently in beta. Support for infix expressions is minimal, sorry! :("
         , "In the mean time, don't mix any infix operators."
         ]
+
+--}
+
+mkPsName = undefined
+tempInfixExprErr = undefined
+extractName = undefined
+extractInt = undefined
+mkProgram = undefined
+
+parseError :: (Located RlpToken, [String]) -> P a
+parseError ((Located ss t), exp) = addFatal $
+    errorMsg ss (RlpParErrUnexpectedToken t exp)
 
 }
 

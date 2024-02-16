@@ -53,34 +53,9 @@ import Compiler.Types
 
 data RlpcPs
 
-type instance XRec RlpcPs a = Located a
-type instance IdP RlpcPs = PsName
-
-type instance XFunD RlpcPs = ()
-type instance XDataD RlpcPs = ()
-type instance XInfixD RlpcPs = ()
-type instance XTySigD RlpcPs = ()
-type instance XXDeclD RlpcPs = ()
-
-type instance XLetE RlpcPs = ()
-type instance XLetrecE RlpcPs = ()
-type instance XVarE RlpcPs = ()
-type instance XLamE RlpcPs = ()
-type instance XCaseE RlpcPs = ()
-type instance XIfE RlpcPs = ()
-type instance XAppE RlpcPs = ()
-type instance XLitE RlpcPs = ()
-type instance XParE RlpcPs = ()
-type instance XOAppE RlpcPs = ()
-type instance XXRlpExprE RlpcPs = ()
+type instance NameP RlpcPs = PsName
 
 type PsName = Text
-
-instance MapXRec RlpcPs where
-    mapXRec = fmap
-
-instance UnXRec RlpcPs where
-    unXRec = extract
 
 --------------------------------------------------------------------------------
 
@@ -281,13 +256,13 @@ initAlexInput s = AlexInput
 
 --------------------------------------------------------------------------------
 
-deriving instance Lift (RlpProgram RlpcPs)
+deriving instance Lift (Program RlpcPs)
 deriving instance Lift (Decl RlpcPs)
 deriving instance Lift (Pat RlpcPs)
 deriving instance Lift (Lit RlpcPs)
-deriving instance Lift (RlpExpr RlpcPs)
+deriving instance Lift (Expr RlpcPs)
 deriving instance Lift (Binding RlpcPs)
-deriving instance Lift (RlpType RlpcPs)
+deriving instance Lift (Ty RlpcPs)
 deriving instance Lift (Alt RlpcPs)
 deriving instance Lift (ConAlt RlpcPs)
 
