@@ -10,12 +10,18 @@ module Rlp.Syntax
     , Alt(..)
     , Ty(..)
     , Binding(..)
-    , Expr(..)
+    , Expr(..), Expr', ExprF(..)
     , Lit(..)
     , Pat(..)
     , Decl(..)
     , Program(..)
     , Where
+
+    -- * Re-exports
+    , Cofree(..)
+    , Trans.Cofree.CofreeF
+    , pattern (:<$)
+    , SrcSpan(..)
     )
     where
 ----------------------------------------------------------------------------------
@@ -29,10 +35,12 @@ import GHC.Generics
 import Language.Haskell.TH.Syntax   (Lift)
 import Control.Lens
 
+import Control.Comonad.Trans.Cofree qualified as Trans.Cofree
 import Control.Comonad.Cofree
 import Data.Functor.Foldable
 import Data.Functor.Foldable.TH     (makeBaseFunctor)
 
+import Compiler.Types               (SrcSpan(..))
 import Core.Syntax                  qualified as Core
 import Core                         (Rec(..), HasRHS(..), HasLHS(..))
 ----------------------------------------------------------------------------------
@@ -104,6 +112,9 @@ type Where p = [Binding p]
 
 data Assoc = InfixL | InfixR | Infix
     deriving (Lift, Show)
+
+pattern (:<$) :: a -> f b -> Trans.Cofree.CofreeF f a b
+pattern a :<$ b = a Trans.Cofree.:< b
 
 --------------------------------------------------------------------------------
 
