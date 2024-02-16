@@ -74,6 +74,11 @@ options = RLPCOptions
         <> metavar "rlp|core"
         <> help "the language to be compiled -- see README"
         )
+    <*> flag False True
+        (  long "render"
+        <> short 'r'
+        <> help "render a diagram of each GM state"
+        )
     <*> some (argument str $ metavar "FILES...")
     where
         infixr 9 #

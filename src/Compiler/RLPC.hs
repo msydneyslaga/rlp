@@ -120,6 +120,7 @@ data RLPCOptions = RLPCOptions
     , _rlpcEvaluator   :: Evaluator
     , _rlpcHeapTrigger :: Int
     , _rlpcLanguage    :: Maybe Language
+    , _rlpcRender      :: Bool
     , _rlpcInputFiles  :: [FilePath]
     }
     deriving Show
@@ -141,6 +142,7 @@ instance Default RLPCOptions where
         , _rlpcHeapTrigger = 200
         , _rlpcInputFiles = []
         , _rlpcLanguage = Nothing
+        , _rlpcRender = False
         }
 
 -- debug flags are passed with -dFLAG

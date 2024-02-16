@@ -22,6 +22,9 @@ library
     exposed-modules:  Core
                     , TI
                     , GM
+                    , GM.Visual
+                    , GM.Types
+                    , GM.Print
                     , Compiler.RLPC
                     , Compiler.RlpcError
                     , Compiler.JustRun
@@ -73,6 +76,9 @@ library
                     , effectful-core ^>=2.3.0.0
                     , deriving-compat ^>=0.6.0
                     , these >=0.2 && <2.0
+                    , diagrams
+                    , diagrams-lib
+                    , diagrams-cairo
 
     hs-source-dirs:   src
     default-language: GHC2021
