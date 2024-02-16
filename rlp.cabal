@@ -73,6 +73,7 @@ library
                     , effectful-core ^>=2.3.0.0
                     , deriving-compat ^>=0.6.0
                     , these >=0.2 && <2.0
+                    , free
 
     hs-source-dirs:   src
     default-language: GHC2021

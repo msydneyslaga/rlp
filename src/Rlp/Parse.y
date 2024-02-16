@@ -71,180 +71,175 @@ import Compiler.Types
 
 %%
 
-StandaloneProgram   :: { RlpProgram RlpcPs }
-StandaloneProgram   : '{' Decls  '}'        {% mkProgram $2 }
-                    | VL  DeclsV VR         {% mkProgram $2 }
+StandaloneProgram   :: { Program RlpcPs }
+StandaloneProgram   : '{' Decls  '}'        { undefined }
+                    | VL  DeclsV VR         { undefined }
 
-StandaloneExpr      :: { RlpExpr RlpcPs }
-                    : VL Expr VR            { extract $2 }
+StandaloneExpr      :: { Expr RlpcPs }
+                    : VL Expr VR            { undefined }
 
 VL  :: { () }
-VL  : vlbrace       { () }
+VL  : vlbrace       { undefined }
 
 VR  :: { () }
-VR  : vrbrace       { () }
-    | error         { () }
+VR  : vrbrace       { undefined }
+    | error         { undefined }
 
-Decls               :: { [Decl' RlpcPs] }
-Decls               : Decl ';' Decls        { $1 : $3 }
-                    | Decl ';'              { [$1] }
-                    | Decl                  { [$1] }
+Decls               :: { [Decl RlpcPs] }
+Decls               : Decl ';' Decls        { undefined }
+                    | Decl ';'              { undefined }
+                    | Decl                  { undefined }
 
-DeclsV              :: { [Decl' RlpcPs] }
-DeclsV              : Decl VS DeclsV        { $1 : $3 }
-                    | Decl VS               { [$1] }
-                    | Decl                  { [$1] }
+DeclsV              :: { [Decl RlpcPs] }
+DeclsV              : Decl VS DeclsV        { undefined }
+                    | Decl VS               { undefined }
+                    | Decl                  { undefined }
 
 VS                  :: { Located RlpToken }
-VS                  : ';'                   { $1 }
-                    | vsemi                 { $1 }
+VS                  : ';'                   { undefined }
+                    | vsemi                 { undefined }
 
-Decl        :: { Decl' RlpcPs }
-            : FunDecl                   { $1 }
-            | TySigDecl                 { $1 }
-            | DataDecl                  { $1 }
-            | InfixDecl                 { $1 }
+Decl        :: { Decl RlpcPs }
+            : FunDecl                   { undefined }
+            | TySigDecl                 { undefined }
+            | DataDecl                  { undefined }
+            | InfixDecl                 { undefined }
 
-TySigDecl   :: { Decl' RlpcPs }
-            : Var '::' Type             { (\e -> TySigD [extract e]) <<~ $1 <~> $3 }
+TySigDecl   :: { Decl RlpcPs }
+            : Var '::' Type             { undefined }
 
-InfixDecl   :: { Decl' RlpcPs }
-            : InfixWord litint InfixOp  { $1 =>> \w ->
-                                          InfixD (extract $1) (extractInt $ extract $2)
-                                          (extract $3) }
+InfixDecl   :: { Decl RlpcPs }
+            : InfixWord litint InfixOp  { undefined }
 
 InfixWord   :: { Located Assoc }
-            : infixl                    { $1 \$> InfixL }
-            | infixr                    { $1 \$> InfixR }
-            | infix                     { $1 \$> Infix  }
+            : infixl                    { undefined }
+            | infixr                    { undefined }
+            | infix                     { undefined }
 
-DataDecl    :: { Decl' RlpcPs }
-            : data Con TyParams '=' DataCons    { $1 \$> DataD (extract $2) $3 $5 }
+DataDecl    :: { Decl RlpcPs }
+            : data Con TyParams '=' DataCons    { undefined }
 
 TyParams    :: { [PsName] }
-            : {- epsilon -}             { [] }
-            | TyParams varname          { $1 `snoc` (extractName . extract $ $2) }
+            : {- epsilon -}             { undefined }
+            | TyParams varname          { undefined }
 
 DataCons    :: { [ConAlt RlpcPs] }
-            : DataCons '|' DataCon      { $1 `snoc` $3 }
-            | DataCon                   { [$1] }
+            : DataCons '|' DataCon      { undefined }
+            | DataCon                   { undefined }
 
 DataCon     :: { ConAlt RlpcPs }
-            : Con Type1s                { ConAlt (extract $1) $2 }
+            : Con Type1s                { undefined }
 
-Type1s      :: { [RlpType' RlpcPs] }
-            : {- epsilon -}             { [] }
-            | Type1s Type1              { $1 `snoc` $2 }
+Type1s      :: { [Ty RlpcPs] }
+            : {- epsilon -}             { undefined }
+            | Type1s Type1              { undefined }
 
-Type1       :: { RlpType' RlpcPs }
-            : '(' Type ')'              { $2 }
-            | conname                   { fmap ConT (mkPsName $1) }
-            | varname                   { fmap VarT (mkPsName $1) }
+Type1       :: { Ty RlpcPs }
+            : '(' Type ')'              { undefined }
+            | conname                   { undefined }
+            | varname                   { undefined }
 
-Type        :: { RlpType' RlpcPs }
-            : Type '->' Type            { FunT <<~ $1 <~> $3 }
-            | TypeApp                   { $1 }
+Type        :: { Ty RlpcPs }
+            : Type '->' Type            { undefined }
+            | TypeApp                   { undefined }
 
-TypeApp     :: { RlpType' RlpcPs }
-            : Type1                     { $1 }
-            | TypeApp Type1             { AppT <<~ $1 <~> $2 }
+TypeApp     :: { Ty RlpcPs }
+            : Type1                     { undefined }
+            | TypeApp Type1             { undefined }
 
-FunDecl     :: { Decl' RlpcPs }
-FunDecl     : Var Params '=' Expr       { $4 =>> \e ->
-                                          FunD (extract $1) $2 e Nothing }
+FunDecl     :: { Decl RlpcPs }
+FunDecl     : Var Params '=' Expr       { undefined }
 
-Params      :: { [Pat' RlpcPs] }
-Params      : {- epsilon -}             { [] }
-            | Params Pat1               { $1 `snoc` $2 }
+Params      :: { [Pat RlpcPs] }
+Params      : {- epsilon -}             { undefined }
+            | Params Pat1               { undefined }
 
-Pat         :: { Pat' RlpcPs }
-            : Con Pat1s                 { $1 =>> \cn ->
-                                          ConP (extract $1) $2 }
-            | Pat1                      { $1 }
+Pat         :: { Pat RlpcPs }
+            : Con Pat1s                 { undefined }
+            | Pat1                      { undefined }
 
-Pat1s       :: { [Pat' RlpcPs] }
-            : Pat1s Pat1                { $1 `snoc` $2 }
-            | Pat1                      { [$1] }
+Pat1s       :: { [Pat RlpcPs] }
+            : Pat1s Pat1                { undefined }
+            | Pat1                      { undefined }
 
-Pat1        :: { Pat' RlpcPs }
-            : Con                       { fmap (`ConP` []) $1 }
-            | Var                       { fmap VarP $1 }
-            | Lit                       { LitP <<= $1 }
-            | '(' Pat ')'               { $1 .> $2 <. $3 }
+Pat1        :: { Pat RlpcPs }
+            : Con                       { undefined }
+            | Var                       { undefined }
+            | Lit                       { undefined }
+            | '(' Pat ')'               { undefined }
 
-Expr        :: { RlpExpr' RlpcPs }
+Expr        :: { Expr RlpcPs }
             -- infixities delayed till next release :(
-            -- : Expr1 InfixOp Expr        { $2 =>> \o ->
-            --                              OAppE (extract o) $1 $3 }
-            : TempInfixExpr             { $1 }
-            | LetExpr                   { $1 }
-            | CaseExpr                  { $1 }
-            | AppExpr                   { $1 }
+            -- : Expr1 InfixOp Expr        { undefined }
+            : TempInfixExpr             { undefined }
+            | LetExpr                   { undefined }
+            | CaseExpr                  { undefined }
+            | AppExpr                   { undefined }
 
-TempInfixExpr :: { RlpExpr' RlpcPs }
-TempInfixExpr : Expr1 InfixOp TempInfixExpr {% tempInfixExprErr $1 $3 }
-              | Expr1 InfixOp Expr1 { $2 =>> \o ->
-                                      OAppE (extract o) $1 $3 }
+TempInfixExpr :: { Expr RlpcPs }
+TempInfixExpr : Expr1 InfixOp TempInfixExpr { undefined }
+              | Expr1 InfixOp Expr1 { undefined }
 
-AppExpr     :: { RlpExpr' RlpcPs }
-            : Expr1                     { $1 }
-            | AppExpr Expr1             { AppE <<~ $1 <~> $2 }
+AppExpr     :: { Expr RlpcPs }
+            : Expr1                     { undefined }
+            | AppExpr Expr1             { undefined }
 
-LetExpr     :: { RlpExpr' RlpcPs }
-            : let layout1(Binding) in Expr      { $1 \$> LetE $2 $4 }
-            | letrec layout1(Binding) in Expr   { $1 \$> LetrecE $2 $4 }
+LetExpr     :: { Expr RlpcPs }
+            : let layout1(Binding) in Expr      { undefined }
+            | letrec layout1(Binding) in Expr   { undefined }
 
-CaseExpr    :: { RlpExpr' RlpcPs }
-            : case Expr of layout0(CaseAlt)
-                { CaseE <<~ $2 <#> $4 }
+CaseExpr    :: { Expr RlpcPs }
+            : case Expr of layout0(CaseAlt)     { undefined }
 
 -- TODO: where-binds
 CaseAlt     :: { (Alt RlpcPs, Where RlpcPs) }
-            : Alt                           { ($1, []) }
+            : Alt                           { undefined }
 
 Alt         :: { Alt RlpcPs }
-            : Pat '->' Expr                 { AltA $1 $3 }
+            : Pat '->' Expr                 { undefined }
 
 -- layout0(p : β) :: [β]
-layout0(p)  : '{' layout_list0(';',p) '}'   { $2 }
-            | VL  layout_list0(VS,p)  VR    { $2 }
+layout0(p)  : '{' layout_list0(';',p) '}'   { undefined }
+            | VL  layout_list0(VS,p)  VR    { undefined }
 
 -- layout_list0(sep : α, p : β) :: [β]
-layout_list0(sep,p) : p                          { [$1] }
-                    | layout_list1(sep,p) sep p  { $1 `snoc` $3 }
-                    | {- epsilon -}              { [] }
+layout_list0(sep,p) : p                          { undefined }
+                    | layout_list1(sep,p) sep p  { undefined }
+                    | {- epsilon -}              { undefined }
 
 -- layout1(p : β) :: [β]
-layout1(p)  : '{' layout_list1(';',p) '}'   { $2 }
-            | VL  layout_list1(VS,p) VR     { $2 }
+layout1(p)  : '{' layout_list1(';',p) '}'   { undefined }
+            | VL  layout_list1(VS,p) VR     { undefined }
 
 -- layout_list1(sep : α, p : β) :: [β]
-layout_list1(sep,p) : p                          { [$1] }
-                    | layout_list1(sep,p) sep p  { $1 `snoc` $3 }
+layout_list1(sep,p) : p                          { undefined }
+                    | layout_list1(sep,p) sep p  { undefined }
 
-Binding     :: { Binding' RlpcPs }
-            : Pat '=' Expr              { PatB <<~ $1 <~> $3 }
+Binding     :: { Binding RlpcPs }
+            : Pat '=' Expr              { undefined }
 
-Expr1       :: { RlpExpr' RlpcPs }
-            : '(' Expr ')'              { $1 .> $2 <. $3 }
-            | Lit                       { fmap LitE $1 }
-            | Var                       { fmap VarE $1 }
-            | Con                       { fmap VarE $1 }
+Expr1       :: { Expr RlpcPs }
+            : '(' Expr ')'              { undefined }
+            | Lit                       { undefined }
+            | Var                       { undefined }
+            | Con                       { undefined }
 
 InfixOp     :: { Located PsName }
-            : consym                    { mkPsName $1 }
-            | varsym                    { mkPsName $1 }
+            : consym                    { undefined }
+            | varsym                    { undefined }
 
 -- TODO: microlens-pro save me microlens-pro (rewrite this with prisms)
-Lit         :: { Lit' RlpcPs }
-            : litint                    { $1 <&> (IntL . (\ (TokenLitInt n) -> n)) }
+Lit         :: { Lit RlpcPs }
+            : litint                    { undefined }
 
 Var         :: { Located PsName }
-Var         : varname                   { mkPsName $1 }
-            | varsym                    { mkPsName $1 }
+Var         : varname                   { undefined }
+            | varsym                    { undefined }
 
 Con         :: { Located PsName }
-            : conname                   { mkPsName $1 }
+            : conname                   { undefined }
+
+--}
 
 {
 
@@ -253,12 +248,12 @@ parseRlpExprR = undefined
     
 {--
 
-parseRlpExprR :: (Monad m) => Text -> RLPCT m (RlpExpr RlpcPs)
+parseRlpExprR :: (Monad m) => Text -> RLPCT m (Expr RlpcPs)
 parseRlpExprR s = liftErrorful $ pToErrorful parseRlpExpr st
     where
         st = programInitState s
 
-parseRlpProgR :: (Monad m) => Text -> RLPCT m (RlpProgram RlpcPs)
+parseRlpProgR :: (Monad m) => Text -> RLPCT m (Program RlpcPs)
 parseRlpProgR s = do
     a <- liftErrorful $ pToErrorful parseRlpProg st
     addDebugMsg @_ @String "dump-parsed" $ show a
@@ -281,12 +276,12 @@ extractInt :: RlpToken -> Int
 extractInt (TokenLitInt n) = n
 extractInt _ = error "extractInt: ugh"
 
-mkProgram :: [Decl' RlpcPs] -> P (RlpProgram RlpcPs)
+mkProgram :: [Decl RlpcPs] -> P (Program RlpcPs)
 mkProgram ds = do
     pt <- use psOpTable
-    pure $ RlpProgram (associate pt <$> ds)
+    pure $ Program (associate pt <$> ds)
 
-mkInfixD :: Assoc -> Int -> PsName -> P (Decl' RlpcPs)
+mkInfixD :: Assoc -> Int -> PsName -> P (Decl RlpcPs)
 mkInfixD a p n = do
     let opl :: Lens' ParseState (Maybe OpInfo)
         opl = psOpTable . at n
@@ -302,7 +297,7 @@ mkInfixD a p n = do
 intOfToken :: Located RlpToken -> Int
 intOfToken (Located _ (TokenLitInt n)) = n
 
-tempInfixExprErr :: RlpExpr' RlpcPs -> RlpExpr' RlpcPs -> P a
+tempInfixExprErr :: Expr RlpcPs -> Expr RlpcPs -> P a
 tempInfixExprErr (Located a _) (Located b _) =
     addFatal $ errorMsg (a <> b) $ RlpParErrOther
         [ "The rl' frontend is currently in beta. Support for infix expressions is minimal, sorry! :("

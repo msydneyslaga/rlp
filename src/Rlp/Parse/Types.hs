@@ -256,13 +256,13 @@ initAlexInput s = AlexInput
 
 --------------------------------------------------------------------------------
 
-deriving instance Lift (Program RlpcPs)
-deriving instance Lift (Decl RlpcPs)
-deriving instance Lift (Pat RlpcPs)
-deriving instance Lift (Lit RlpcPs)
-deriving instance Lift (Expr RlpcPs)
-deriving instance Lift (Binding RlpcPs)
-deriving instance Lift (Ty RlpcPs)
-deriving instance Lift (Alt RlpcPs)
-deriving instance Lift (ConAlt RlpcPs)
+-- deriving instance Lift (Program RlpcPs)
+-- deriving instance Lift (Decl RlpcPs)
+-- deriving instance Lift (Pat RlpcPs)
+-- deriving instance Lift (Lit RlpcPs)
+-- deriving instance Lift (Expr RlpcPs)
+-- deriving instance Lift (Binding RlpcPs)
+-- deriving instance Lift (Ty RlpcPs)
+-- deriving instance Lift (Alt RlpcPs)
+-- deriving instance Lift (ConAlt RlpcPs)
 
