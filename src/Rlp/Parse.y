@@ -98,12 +98,12 @@ TySigDecl   :: { Decl RlpcPs }
             : Var '::' Type             { undefined }
 
 InfixDecl   :: { Decl RlpcPs }
-            : InfixWord litint InfixOp  { undefined }
+            : InfixWord litint InfixOp  { mkInfixD $1 ($2 ^. _litint) $3 }
 
 InfixWord   :: { Located Assoc }
-            : infixl                    { undefined }
-            | infixr                    { undefined }
-            | infix                     { undefined }
+            : infixl                    { $1 \$> InfixL }
+            | infixr                    { $1 \$> InfixR }
+            | infix                     { $1 \$> Infix }
 
 DataDecl    :: { Decl RlpcPs }
             : data Con TyParams '=' DataCons    { undefined }
@@ -213,7 +213,7 @@ Expr1       :: { Expr RlpcPs }
             | Var                       { undefined }
             | Con                       { undefined }
 
-InfixOp     :: { Located PsName }
+InfixOp     :: { PsName }
             : consym                    { undefined }
             | varsym                    { undefined }
 
@@ -234,7 +234,20 @@ Con         :: { PsName }
 
 parseRlpProgR = undefined
 parseRlpExprR = undefined
-    
+
+mkInfixD :: Assoc -> Int -> PsName -> P (Decl RlpcPs)
+mkInfixD a p ln@(Located ss n) = do
+    let opl :: Lens' ParseState (Maybe OpInfo)
+        opl = psOpTable . at n
+    opl <~ (use opl >>= \case
+        Just o  -> addWoundHere l e >> pure (Just o) where
+            e = RlpParErrDuplicateInfixD n
+            l = T.length n
+        Nothing -> pure (Just (a,p))
+        )
+    pos <- use (psInput . aiPos)
+    pure $ InfixD a p ln
+
 {--
 
 parseRlpExprR :: (Monad m) => Text -> RLPCT m (Expr RlpcPs)
@@ -270,19 +283,6 @@ mkProgram ds = do
     pt <- use psOpTable
     pure $ Program (associate pt <$> ds)
 
-mkInfixD :: Assoc -> Int -> PsName -> P (Decl RlpcPs)
-mkInfixD a p n = do
-    let opl :: Lens' ParseState (Maybe OpInfo)
-        opl = psOpTable . at n
-    opl <~ (use opl >>= \case
-        Just o  -> addWoundHere l e >> pure (Just o) where
-            e = RlpParErrDuplicateInfixD n
-            l = T.length n
-        Nothing -> pure (Just (a,p))
-        )
-    pos <- use (psInput . aiPos)
-    pure $ Located (spanFromPos pos 0) (InfixD a p n)
-
 intOfToken :: Located RlpToken -> Int
 intOfToken (Located _ (TokenLitInt n)) = n
 
@@ -294,6 +294,11 @@ tempInfixExprErr (Located a _) (Located b _) =
         ]
 
 --}
+
+_litint :: Getter (Located RlpToken) Int
+_litint = to extract
+        . singular _TokenLitInt
+        . to IntL
 
 mkPsName = undefined
 tempInfixExprErr = undefined

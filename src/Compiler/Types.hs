@@ -5,6 +5,7 @@ module Compiler.Types
     ( SrcSpan(..)
     , srcSpanLine, srcSpanColumn, srcSpanAbs, srcSpanLen
     , Located(..)
+    , GetLocation(srcspan)
     , HasLocation(location)
     , _Located
     , nolo

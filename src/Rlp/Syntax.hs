@@ -13,7 +13,7 @@ module Rlp.Syntax
     , Expr(..), Expr', ExprF(..)
     , Lit(..)
     , Pat(..)
-    , Decl(..)
+    , Decl(..), Decl'
     , Program(..)
     , Where
 
@@ -121,4 +121,5 @@ makeBaseFunctor ''Expr
 makeLenses ''Program
 
 type Expr' p = Cofree (ExprF p)
+type Decl' p = Cofree (Const (Decl p))
 
