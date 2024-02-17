@@ -71,11 +71,11 @@ import Compiler.Types
 
 %%
 
-StandaloneProgram   :: { Program RlpcPs }
+StandaloneProgram   :: { Program RlpcPs SrcSpan }
 StandaloneProgram   : layout0(Decl)         { Program $1 }
 
 StandaloneExpr      :: { Expr RlpcPs }
-                    : VL Expr VR            { $2 }
+                    : VL Expr VR            { undefined }
 
 VL  :: { () }
 VL  : vlbrace       { () }
@@ -88,24 +88,24 @@ VS                  :: { () }
 VS                  : ';'                   { () }
                     | vsemi                 { () }
 
-Decl        :: { Decl RlpcPs }
-            : FunDecl                   { undefined }
-            | TySigDecl                 { undefined }
-            | DataDecl                  { undefined }
-            | InfixDecl                 { undefined }
+Decl        :: { Decl RlpcPs SrcSpan }
+            : FunDecl                   { $1 }
+            | TySigDecl                 { $1 }
+            | DataDecl                  { $1 }
+            | InfixDecl                 { $1 }
 
-TySigDecl   :: { Decl RlpcPs }
-            : Var '::' Type             { undefined }
+TySigDecl   :: { Decl RlpcPs SrcSpan }
+            : Var '::' Type             { TySigD [$1] $3 }
 
-InfixDecl   :: { Decl RlpcPs }
-            : InfixWord litint InfixOp  { mkInfixD $1 ($2 ^. _litint) $3 }
+InfixDecl   :: { Decl RlpcPs SrcSpan }
+            : InfixWord litint InfixOp  {% mkInfixD $1 ($2 ^. _litint) $3 }
 
-InfixWord   :: { Located Assoc }
-            : infixl                    { $1 \$> InfixL }
-            | infixr                    { $1 \$> InfixR }
-            | infix                     { $1 \$> Infix }
+InfixWord   :: { Assoc }
+            : infixl                    { InfixL }
+            | infixr                    { InfixR }
+            | infix                     { Infix }
 
-DataDecl    :: { Decl RlpcPs }
+DataDecl    :: { Decl RlpcPs SrcSpan }
             : data Con TyParams '=' DataCons    { undefined }
 
 TyParams    :: { [PsName] }
@@ -136,7 +136,7 @@ TypeApp     :: { Ty RlpcPs }
             : Type1                     { undefined }
             | TypeApp Type1             { undefined }
 
-FunDecl     :: { Decl RlpcPs }
+FunDecl     :: { Decl RlpcPs SrcSpan }
 FunDecl     : Var Params '=' Expr       { FunD $1 $2 $4 Nothing }
 
 Params      :: { [Pat RlpcPs] }
@@ -157,7 +157,7 @@ Pat1        :: { Pat RlpcPs }
             | Lit                       { undefined }
             | '(' Pat ')'               { undefined }
 
-Expr        :: { Expr RlpcPs }
+Expr        :: { Expr' RlpcPs SrcSpan }
             -- infixities delayed till next release :(
             -- : Expr1 InfixOp Expr        { undefined }
             : TempInfixExpr             { undefined }
@@ -235,7 +235,7 @@ Con         :: { PsName }
 parseRlpProgR = undefined
 parseRlpExprR = undefined
 
-mkInfixD :: Assoc -> Int -> PsName -> P (Decl RlpcPs)
+mkInfixD :: Assoc -> Int -> PsName -> P (Decl RlpcPs SrcSpan)
 mkInfixD a p ln@(Located ss n) = do
     let opl :: Lens' ParseState (Maybe OpInfo)
         opl = psOpTable . at n
@@ -278,7 +278,7 @@ extractInt :: RlpToken -> Int
 extractInt (TokenLitInt n) = n
 extractInt _ = error "extractInt: ugh"
 
-mkProgram :: [Decl RlpcPs] -> P (Program RlpcPs)
+mkProgram :: [Decl RlpcPs SrcSpan] -> P (Program RlpcPs SrcSpan)
 mkProgram ds = do
     pt <- use psOpTable
     pure $ Program (associate pt <$> ds)
@@ -298,7 +298,6 @@ tempInfixExprErr (Located a _) (Located b _) =
 _litint :: Getter (Located RlpToken) Int
 _litint = to extract
         . singular _TokenLitInt
-        . to IntL
 
 mkPsName = undefined
 tempInfixExprErr = undefined

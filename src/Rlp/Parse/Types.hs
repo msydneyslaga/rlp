@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ImplicitParams, ViewPatterns, PatternSynonyms #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Rlp.Parse.Types
     (
     -- * Trees That Grow
@@ -26,6 +27,7 @@ module Rlp.Parse.Types
     where
 --------------------------------------------------------------------------------
 import Core.Syntax                  (Name)
+import Text.Show.Deriving
 import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Errorful

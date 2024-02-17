@@ -16,7 +16,7 @@ import Rlp.Parse.Types
 import Rlp.Syntax
 --------------------------------------------------------------------------------
 
-associate :: OpTable -> Decl RlpcPs -> Decl RlpcPs
+associate :: OpTable -> Decl RlpcPs a -> Decl RlpcPs a
 associate _ p = p
 
 {-# WARNING associate "unimplemented" #-}
