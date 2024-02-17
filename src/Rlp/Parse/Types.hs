@@ -17,7 +17,7 @@ module Rlp.Parse.Types
     , RlpToken(..), AlexInput(..), Position(..), spanFromPos, LexerAction
     , Located(..), PsName
     -- ** Lenses
-    , aiPrevChar, aiSource, aiBytes, aiPos, posLine, posColumn
+    , _TokenLitInt, aiPrevChar, aiSource, aiBytes, aiPos, posLine, posColumn
 
     -- * Error handling
     , MsgEnvelope(..), RlpcError(..), RlpParseError(..)
@@ -53,7 +53,7 @@ data RlpcPs
 
 type instance NameP RlpcPs = PsName
 
-type PsName = Text
+type PsName = Located Text
 
 --------------------------------------------------------------------------------
 
@@ -124,6 +124,11 @@ data RlpToken
     | TokenRBraceV
     | TokenEOF
     deriving (Show)
+
+_TokenLitInt :: Prism' RlpToken Int
+_TokenLitInt = prism TokenLitInt $ \case
+    TokenLitInt n -> Right n
+    x             -> Left x
 
 newtype P a = P {
         runP :: ParseState

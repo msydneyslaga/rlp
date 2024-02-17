@@ -72,32 +72,21 @@ import Compiler.Types
 %%
 
 StandaloneProgram   :: { Program RlpcPs }
-StandaloneProgram   : '{' Decls  '}'        { undefined }
-                    | VL  DeclsV VR         { undefined }
+StandaloneProgram   : layout0(Decl)         { Program $1 }
 
 StandaloneExpr      :: { Expr RlpcPs }
-                    : VL Expr VR            { undefined }
+                    : VL Expr VR            { $2 }
 
 VL  :: { () }
-VL  : vlbrace       { undefined }
+VL  : vlbrace       { () }
 
 VR  :: { () }
-VR  : vrbrace       { undefined }
-    | error         { undefined }
+VR  : vrbrace       { () }
+    | error         { () }
 
-Decls               :: { [Decl RlpcPs] }
-Decls               : Decl ';' Decls        { undefined }
-                    | Decl ';'              { undefined }
-                    | Decl                  { undefined }
-
-DeclsV              :: { [Decl RlpcPs] }
-DeclsV              : Decl VS DeclsV        { undefined }
-                    | Decl VS               { undefined }
-                    | Decl                  { undefined }
-
-VS                  :: { Located RlpToken }
-VS                  : ';'                   { undefined }
-                    | vsemi                 { undefined }
+VS                  :: { () }
+VS                  : ';'                   { () }
+                    | vsemi                 { () }
 
 Decl        :: { Decl RlpcPs }
             : FunDecl                   { undefined }
@@ -148,7 +137,7 @@ TypeApp     :: { Ty RlpcPs }
             | TypeApp Type1             { undefined }
 
 FunDecl     :: { Decl RlpcPs }
-FunDecl     : Var Params '=' Expr       { undefined }
+FunDecl     : Var Params '=' Expr       { FunD $1 $2 $4 Nothing }
 
 Params      :: { [Pat RlpcPs] }
 Params      : {- epsilon -}             { undefined }
@@ -199,21 +188,21 @@ Alt         :: { Alt RlpcPs }
             : Pat '->' Expr                 { undefined }
 
 -- layout0(p : β) :: [β]
-layout0(p)  : '{' layout_list0(';',p) '}'   { undefined }
-            | VL  layout_list0(VS,p)  VR    { undefined }
+layout0(p)  : '{' layout_list0(';',p) '}'   { $2 }
+            | VL  layout_list0(VS,p)  VR    { $2 }
 
 -- layout_list0(sep : α, p : β) :: [β]
-layout_list0(sep,p) : p                          { undefined }
-                    | layout_list1(sep,p) sep p  { undefined }
-                    | {- epsilon -}              { undefined }
+layout_list0(sep,p) : p                          { [$1] }
+                    | layout_list1(sep,p) sep p  { $1 `snoc` $3 }
+                    | {- epsilon -}              { [] }
 
 -- layout1(p : β) :: [β]
-layout1(p)  : '{' layout_list1(';',p) '}'   { undefined }
-            | VL  layout_list1(VS,p) VR     { undefined }
+layout1(p)  : '{' layout_list1(';',p) '}'   { $2 }
+            | VL  layout_list1(VS,p) VR     { $2 }
 
 -- layout_list1(sep : α, p : β) :: [β]
-layout_list1(sep,p) : p                          { undefined }
-                    | layout_list1(sep,p) sep p  { undefined }
+layout_list1(sep,p) : p                          { [$1] }
+                    | layout_list1(sep,p) sep p  { $1 `snoc` $3 }
 
 Binding     :: { Binding RlpcPs }
             : Pat '=' Expr              { undefined }
@@ -230,16 +219,16 @@ InfixOp     :: { Located PsName }
 
 -- TODO: microlens-pro save me microlens-pro (rewrite this with prisms)
 Lit         :: { Lit RlpcPs }
-            : litint                    { undefined }
+            : litint                    { $1 ^. to extract
+                                              . singular _TokenLitInt
+                                              . to IntL }
 
-Var         :: { Located PsName }
+Var         :: { PsName }
 Var         : varname                   { undefined }
             | varsym                    { undefined }
 
-Con         :: { Located PsName }
+Con         :: { PsName }
             : conname                   { undefined }
-
---}
 
 {
 

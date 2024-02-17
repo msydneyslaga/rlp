@@ -1,11 +1,15 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances, QuantifiedConstraints #-}
 module Compiler.Types
     ( SrcSpan(..)
     , srcSpanLine, srcSpanColumn, srcSpanAbs, srcSpanLen
     , Located(..)
+    , HasLocation(location)
     , _Located
-    , located
     , nolo
+
+    , (<~>), (~>)
 
     -- * Re-exports
     , Comonad
@@ -14,19 +18,38 @@ module Compiler.Types
     )
     where
 --------------------------------------------------------------------------------
+import Language.Haskell.TH.Syntax   (Lift)
+
 import Control.Comonad
+import Control.Comonad.Cofree
 import Data.Functor.Apply
 import Data.Functor.Bind
+import Data.Semigroup.Foldable
+import Data.Kind
 import Control.Lens                 hiding ((<<~))
-import Language.Haskell.TH.Syntax   (Lift)
+
+import Data.List.NonEmpty           (NonEmpty)
 --------------------------------------------------------------------------------
 
 -- | Token wrapped with a span (line, column, absolute, length)
 data Located a = Located SrcSpan a
     deriving (Show, Lift, Functor)
 
-located :: Lens (Located a) (Located b) a b
-located = lens extract ($>)
+class GetLocation s where
+    srcspan :: s -> SrcSpan
+
+class HasLocation s where
+    location :: Lens' s SrcSpan
+
+(<~>) :: a -> b -> SrcSpan
+(<~>) = undefined
+
+infixl 5 <~>
+
+(~>) :: a -> b -> b
+(~>) = undefined
+
+infixl 4 ~>
 
 instance Apply Located where
     liftF2 f (Located sa p) (Located sb q)
@@ -77,4 +100,23 @@ instance Semigroup SrcSpan where
             GT -> max sb (aa + sa - ab)
 
 makePrisms ''Located
+
+--------------------------------------------------------------------------------
+
+instance (GetLocation a) => GetLocation (NonEmpty a) where
+    srcspan = foldMap1 srcspan
+
+instance GetLocation SrcSpan where
+    srcspan = id
+
+instance (Functor f) => GetLocation (Cofree f SrcSpan) where
+    srcspan = extract
+
+--------------------------------------------------------------------------------
+
+instance HasLocation SrcSpan where
+    location = id
+
+instance (Functor f) => HasLocation (Cofree f SrcSpan) where
+    location = _extract
 

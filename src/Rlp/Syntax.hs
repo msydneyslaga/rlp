@@ -40,12 +40,11 @@ import Control.Comonad.Cofree
 import Data.Functor.Foldable
 import Data.Functor.Foldable.TH     (makeBaseFunctor)
 
-import Compiler.Types               (SrcSpan(..))
+import Compiler.Types               (SrcSpan(..), Located(..))
 import Core.Syntax                  qualified as Core
 import Core                         (Rec(..), HasRHS(..), HasLHS(..))
 ----------------------------------------------------------------------------------
 
-type PsName = Text
 type family NameP p
 
 data Program p = Program
