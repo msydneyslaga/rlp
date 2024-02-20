@@ -5,15 +5,17 @@ module Rlp.Parse
     , parseRlpProgR
     , parseRlpExpr
     , parseRlpExprR
+    , runP'
     )
     where
 import Compiler.RlpcError
 import Compiler.RLPC
+import Control.Comonad.Cofree
 import Rlp.Lex
 import Rlp.Syntax
 import Rlp.Parse.Types
 import Rlp.Parse.Associate
-import Control.Lens                 hiding (snoc, (.>), (<.), (<<~))
+import Control.Lens                 hiding (snoc, (.>), (<.), (<<~), (:<))
 import Data.List.Extra
 import Data.Fix
 import Data.Functor.Const
@@ -74,8 +76,8 @@ import Compiler.Types
 StandaloneProgram   :: { Program RlpcPs SrcSpan }
 StandaloneProgram   : layout0(Decl)         { Program $1 }
 
-StandaloneExpr      :: { Expr RlpcPs }
-                    : VL Expr VR            { undefined }
+StandaloneExpr      :: { Expr' RlpcPs SrcSpan }
+                    : VL Expr VR            { $2 }
 
 VL  :: { () }
 VL  : vlbrace       { () }
@@ -106,45 +108,45 @@ InfixWord   :: { Assoc }
             | infix                     { Infix }
 
 DataDecl    :: { Decl RlpcPs SrcSpan }
-            : data Con TyParams '=' DataCons    { undefined }
+            : data Con TyParams '=' DataCons    { DataD $2 $3 $5 }
 
 TyParams    :: { [PsName] }
-            : {- epsilon -}             { undefined }
-            | TyParams varname          { undefined }
+            : {- epsilon -}             { [] }
+            | TyParams varname          { $1 `snoc` extractName $2 }
 
 DataCons    :: { [ConAlt RlpcPs] }
-            : DataCons '|' DataCon      { undefined }
-            | DataCon                   { undefined }
+            : DataCons '|' DataCon      { $1 `snoc` $3 }
+            | DataCon                   { [$1] }
 
 DataCon     :: { ConAlt RlpcPs }
-            : Con Type1s                { undefined }
+            : Con Type1s                { ConAlt $1 $2 }
 
 Type1s      :: { [Ty RlpcPs] }
-            : {- epsilon -}             { undefined }
-            | Type1s Type1              { undefined }
+            : {- epsilon -}             { [] }
+            | Type1s Type1              { $1 `snoc` $2 }
 
 Type1       :: { Ty RlpcPs }
-            : '(' Type ')'              { undefined }
-            | conname                   { undefined }
-            | varname                   { undefined }
+            : '(' Type ')'              { $2 }
+            | conname                   { ConT (extractName $1) }
+            | varname                   { VarT (extractName $1) }
 
 Type        :: { Ty RlpcPs }
-            : Type '->' Type            { undefined }
-            | TypeApp                   { undefined }
+            : Type '->' Type            { FunT $1 $3 }
+            | TypeApp                   { $1 }
 
 TypeApp     :: { Ty RlpcPs }
-            : Type1                     { undefined }
-            | TypeApp Type1             { undefined }
+            : Type1                     { $1 }
+            | TypeApp Type1             { AppT $1 $2 }
 
 FunDecl     :: { Decl RlpcPs SrcSpan }
 FunDecl     : Var Params '=' Expr       { FunD $1 $2 $4 Nothing }
 
 Params      :: { [Pat RlpcPs] }
-Params      : {- epsilon -}             { undefined }
-            | Params Pat1               { undefined }
+Params      : {- epsilon -}             { [] }
+            | Params Pat1               { $1 `snoc` $2 }
 
 Pat         :: { Pat RlpcPs }
-            : Con Pat1s                 { undefined }
+            : Con Pat1s                 { $1 }
             | Pat1                      { undefined }
 
 Pat1s       :: { [Pat RlpcPs] }
@@ -160,18 +162,18 @@ Pat1        :: { Pat RlpcPs }
 Expr        :: { Expr' RlpcPs SrcSpan }
             -- infixities delayed till next release :(
             -- : Expr1 InfixOp Expr        { undefined }
-            : TempInfixExpr             { undefined }
-            | LetExpr                   { undefined }
-            | CaseExpr                  { undefined }
-            | AppExpr                   { undefined }
+            : AppExpr                   { $1 }
+            -- | TempInfixExpr             { undefined }
+            -- | LetExpr                   { undefined }
+            -- | CaseExpr                  { undefined }
 
-TempInfixExpr :: { Expr RlpcPs }
+TempInfixExpr :: { Expr' RlpcPs SrcSpan }
 TempInfixExpr : Expr1 InfixOp TempInfixExpr { undefined }
-              | Expr1 InfixOp Expr1 { undefined }
+              | Expr1 InfixOp Expr1         { undefined }
 
-AppExpr     :: { Expr RlpcPs }
-            : Expr1                     { undefined }
-            | AppExpr Expr1             { undefined }
+AppExpr     :: { Expr' RlpcPs SrcSpan }
+            : Expr1                     { $1 }
+            | AppExpr Expr1             { comb2 AppEF $1 $2 }
 
 LetExpr     :: { Expr RlpcPs }
             : let layout1(Binding) in Expr      { undefined }
@@ -205,17 +207,17 @@ layout_list1(sep,p) : p                          { [$1] }
                     | layout_list1(sep,p) sep p  { $1 `snoc` $3 }
 
 Binding     :: { Binding RlpcPs }
-            : Pat '=' Expr              { undefined }
+            : Pat '=' Expr              { PatB $1 (collapse . strip $ $3) }
 
-Expr1       :: { Expr RlpcPs }
-            : '(' Expr ')'              { undefined }
-            | Lit                       { undefined }
-            | Var                       { undefined }
-            | Con                       { undefined }
+Expr1       :: { Expr' RlpcPs SrcSpan }
+            : '(' Expr ')'              { $2 }
+            | Lit                       { nolo' $ LitEF $1 }
+            | Var                       { case $1 of Located ss _ -> ss :< VarEF $1 }
+            | Con                       { case $1 of Located ss _ -> ss :< VarEF $1 }
 
 InfixOp     :: { PsName }
-            : consym                    { undefined }
-            | varsym                    { undefined }
+            : consym                    { extractName $1 }
+            | varsym                    { extractName $1 }
 
 -- TODO: microlens-pro save me microlens-pro (rewrite this with prisms)
 Lit         :: { Lit RlpcPs }
@@ -224,11 +226,11 @@ Lit         :: { Lit RlpcPs }
                                               . to IntL }
 
 Var         :: { PsName }
-Var         : varname                   { undefined }
-            | varsym                    { undefined }
+Var         : varname                   { $1 <&> view (singular _TokenVarName) }
+            | varsym                    { $1 <&> view (singular _TokenVarSym) }
 
 Con         :: { PsName }
-            : conname                   { undefined }
+            : conname                   { $1 <&> view (singular _TokenConName) }
 
 {
 
@@ -301,9 +303,14 @@ _litint = to extract
 
 mkPsName = undefined
 tempInfixExprErr = undefined
-extractName = undefined
 extractInt = undefined
 mkProgram = undefined
+
+extractName :: Located RlpToken -> PsName
+extractName (Located ss (TokenVarSym n)) = Located ss n
+extractName (Located ss (TokenVarName n)) = Located ss n
+extractName (Located ss (TokenConName n)) = Located ss n
+extractName (Located ss (TokenConSym n)) = Located ss n
 
 parseError :: (Located RlpToken, [String]) -> P a
 parseError ((Located ss t), exp) = addFatal $

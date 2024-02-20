@@ -5,6 +5,7 @@
 module Rlp.Syntax.Types
     (
       NameP
+    , SimpleP
     , Assoc(..)
     , ConAlt(..)
     , Alt(..)
@@ -20,7 +21,6 @@ module Rlp.Syntax.Types
     -- * Re-exports
     , Cofree(..)
     , Trans.Cofree.CofreeF
-    , pattern (:<$)
     , SrcSpan(..)
     )
     where
@@ -35,7 +35,7 @@ import Data.Fix
 import Data.Kind                    (Type)
 import GHC.Generics
 import Language.Haskell.TH.Syntax   (Lift)
-import Control.Lens
+import Control.Lens                 hiding ((:<))
 
 import Control.Comonad.Trans.Cofree qualified as Trans.Cofree
 import Control.Comonad.Cofree
@@ -46,6 +46,10 @@ import Compiler.Types               (SrcSpan(..), Located(..))
 import Core.Syntax                  qualified as Core
 import Core                         (Rec(..), HasRHS(..), HasLHS(..))
 ----------------------------------------------------------------------------------
+
+data SimpleP
+
+type instance NameP SimpleP = String
 
 type family NameP p
 
@@ -68,7 +72,10 @@ data ConAlt p = ConAlt (NameP p) [Ty p]
 deriving instance (Lift (NameP p)) => Lift (ConAlt p)
 deriving instance (Show (NameP p)) => Show (ConAlt p)
 
-data Ty p = TyCon (NameP p)
+data Ty p = ConT (NameP p)
+          | VarT (NameP p)
+          | FunT (Ty p) (Ty p)
+          | AppT (Ty p) (Ty p)
 
 deriving instance (Show (NameP p)) => Show (Ty p)
 deriving instance (Lift (NameP p)) => Lift (Ty p)
@@ -100,9 +107,6 @@ type Where p = [Binding p]
 data Assoc = InfixL | InfixR | Infix
     deriving (Lift, Show)
 
-pattern (:<$) :: a -> f b -> Trans.Cofree.CofreeF f a b
-pattern a :<$ b = a Trans.Cofree.:< b
-
 makeBaseFunctor ''Expr
 
 deriving instance (Show (NameP p), Show a) => Show (ExprF p a)
@@ -123,4 +127,11 @@ type Expr' p = Cofree (ExprF p)
 
 makeLenses ''Program
 
+loccof :: Iso' (Cofree f SrcSpan) (Located (f (Cofree f SrcSpan)))
+loccof = iso sa bt where
+    sa :: Cofree f SrcSpan -> Located (f (Cofree f SrcSpan))
+    sa (ss :< as) = Located ss as
+
+    bt :: Located (f (Cofree f SrcSpan)) -> Cofree f SrcSpan
+    bt (Located ss as) = ss :< as
 

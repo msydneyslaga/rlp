@@ -18,7 +18,8 @@ module Rlp.Parse.Types
     , RlpToken(..), AlexInput(..), Position(..), spanFromPos, LexerAction
     , Located(..), PsName
     -- ** Lenses
-    , _TokenLitInt, aiPrevChar, aiSource, aiBytes, aiPos, posLine, posColumn
+    , _TokenLitInt, _TokenVarName, _TokenConName, _TokenVarSym
+    , aiPrevChar, aiSource, aiBytes, aiPos, posLine, posColumn
 
     -- * Error handling
     , MsgEnvelope(..), RlpcError(..), RlpParseError(..)
@@ -93,10 +94,10 @@ data RlpToken
     -- literals
     = TokenLitInt Int
     -- identifiers
-    | TokenVarName Name
-    | TokenConName Name
-    | TokenVarSym Name
-    | TokenConSym Name
+    | TokenVarName Text
+    | TokenConName Text
+    | TokenVarSym Text
+    | TokenConSym Text
     -- reserved words
     | TokenData
     | TokenCase
@@ -131,6 +132,26 @@ _TokenLitInt :: Prism' RlpToken Int
 _TokenLitInt = prism TokenLitInt $ \case
     TokenLitInt n -> Right n
     x             -> Left x
+
+_TokenVarName :: Prism' RlpToken Text
+_TokenVarName = prism TokenVarName $ \case
+    TokenVarName n -> Right n
+    x              -> Left x
+
+_TokenVarSym :: Prism' RlpToken Text
+_TokenVarSym = prism TokenVarSym $ \case
+    TokenVarSym n -> Right n
+    x              -> Left x
+
+_TokenConName :: Prism' RlpToken Text
+_TokenConName = prism TokenConName $ \case
+    TokenConName n -> Right n
+    x              -> Left x
+
+_TokenConSym :: Prism' RlpToken Text
+_TokenConSym = prism TokenConSym $ \case
+    TokenConSym n -> Right n
+    x              -> Left x
 
 newtype P a = P {
         runP :: ParseState
@@ -260,6 +281,7 @@ initAlexInput s = AlexInput
     }
 
 --------------------------------------------------------------------------------
+
 
 -- deriving instance Lift (Program RlpcPs)
 -- deriving instance Lift (Decl RlpcPs)
