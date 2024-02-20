@@ -183,9 +183,8 @@ CaseExpr    :: { Expr' RlpcPs SrcSpan }
             : case Expr of layout0(Alt)     { nolo' $ CaseEF $2 $4 }
 
 -- TODO: where-binds
-Alt         :: { Alt RlpcPs }
-            : Pat '->' Expr                 { AltA $1 (collapse . strip $ $3)
-                                                Nothing }
+Alt         :: { Alt' RlpcPs SrcSpan }
+            : Pat '->' Expr                 { undefined }
 
 -- layout0(p : β) :: [β]
 layout0(p)  : '{' layout_list0(';',p) '}'   { $2 }
@@ -204,8 +203,8 @@ layout1(p)  : '{' layout_list1(';',p) '}'   { $2 }
 layout_list1(sep,p) : p                          { [$1] }
                     | layout_list1(sep,p) sep p  { $1 `snoc` $3 }
 
-Binding     :: { Binding RlpcPs }
-            : Pat '=' Expr              { PatB $1 (collapse . strip $ $3) }
+Binding     :: { Binding RlpcPs (Cofree (ExprF RlpcPs) SrcSpan) }
+            : Pat '=' Expr              { undefined }
 
 Expr1       :: { Expr' RlpcPs SrcSpan }
             : '(' Expr ')'              { $2 }
@@ -232,7 +231,10 @@ Con         :: { PsName }
 
 {
 
-parseRlpProgR :: Text -> RLPCT m (Program )
+parseRlpProgR :: Text -> RLPCT m (Program RlpcPs SrcSpan)
+parseRlpProgR = undefined
+
+parseRlpExprR :: Text -> RLPCT m (Expr' RlpcPs SrcSpan)
 parseRlpExprR = undefined
 
 mkInfixD :: Assoc -> Int -> PsName -> P (Decl RlpcPs SrcSpan)

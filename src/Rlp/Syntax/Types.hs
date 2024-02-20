@@ -8,10 +8,10 @@ module Rlp.Syntax.Types
     , SimpleP
     , Assoc(..)
     , ConAlt(..)
-    , Alt(..)
+    , Alt(..), Alt'
     , Ty(..)
-    , Binding(..)
-    , Expr(..), Expr', ExprF(..)
+    , Binding(..), Binding'
+    , Expr', ExprF(..)
     , Rec(..)
     , Lit(..)
     , Pat(..)
@@ -54,19 +54,16 @@ type instance NameP SimpleP = String
 
 type family NameP p
 
-data Expr p = LetE   Rec [Binding p] (Expr p)
-            | VarE   (NameP p)
-            | LamE   [Pat p] (Expr p)
-            | CaseE  (Expr p) [Alt p]
-            | IfE    (Expr p) (Expr p) (Expr p)
-            | AppE   (Expr p) (Expr p)
-            | LitE   (Lit p)
-            | ParE   (Expr p)
-            | InfixE (NameP p) (Expr p) (Expr p)
-            deriving (Generic)
-
-deriving instance (Lift (NameP p)) => Lift (Expr p)
-deriving instance (Show (NameP p)) => Show (Expr p)
+data ExprF p a = LetEF   Rec [Binding p a] a
+               | VarEF   (NameP p)
+               | LamEF   [Pat p] a
+               | CaseEF  a [Alt p a]
+               | IfEF    a a a
+               | AppEF   a a
+               | LitEF   (Lit p)
+               | ParEF   a
+               | InfixEF (NameP p) a a
+               deriving (Functor, Foldable, Traversable)
 
 data ConAlt p = ConAlt (NameP p) [Ty p]
 
@@ -88,30 +85,36 @@ data Pat p = VarP (NameP p)
 deriving instance (Lift (NameP p)) => Lift (Pat p)
 deriving instance (Show (NameP p)) => Show (Pat p)
 
-data Binding p = PatB (Pat p) (Expr p)
-
-deriving instance (Lift (NameP p)) => Lift (Binding p)
-deriving instance (Show (NameP p)) => Show (Binding p)
-
 data Lit p = IntL Int
     deriving Show
 
 deriving instance (Lift (NameP p)) => Lift (Lit p)
 
-data Alt p = AltA (Pat p) (Expr p) (Maybe (Where p))
-
-deriving instance (Show (NameP p)) => Show (Alt p)
-deriving instance (Lift (NameP p)) => Lift (Alt p)
-
-type Where p = [Binding p]
-
 data Assoc = InfixL | InfixR | Infix
     deriving (Lift, Show)
 
-makeBaseFunctor ''Expr
-
 deriving instance (Show (NameP p), Show a) => Show (ExprF p a)
 deriving instance (Lift (NameP p), Lift a) => Lift (ExprF p a)
+
+data Binding p a = PatB (Pat p) (ExprF p a)
+    deriving (Functor, Foldable, Traversable)
+
+deriving instance (Lift (NameP p), Lift a) => Lift (Binding p a)
+deriving instance (Show (NameP p), Show a) => Show (Binding p a)
+
+type Binding' p a = Binding p (Cofree (ExprF p) a)
+
+type Where p a = [Binding p a]
+
+data Alt p a = AltA (Pat p) (ExprF p a) (Maybe (Where p a))
+    deriving (Functor, Foldable, Traversable)
+
+deriving instance (Show (NameP p), Show a) => Show (Alt p a)
+deriving instance (Lift (NameP p), Lift a) => Lift (Alt p a)
+
+type Expr p = Fix (ExprF p)
+
+type Alt' p a = Alt p (Cofree (ExprF p) a)
 
 --------------------------------------------------------------------------------
 
@@ -119,7 +122,7 @@ data Program p a = Program
     { _programDecls :: [Decl p a]
     }
 
-data Decl p a = FunD   (NameP p) [Pat p] (Expr' p a) (Maybe (Where p))
+data Decl p a = FunD   (NameP p) [Pat p] (Expr' p a) (Maybe (Where p a))
               | TySigD [NameP p] (Ty p)
               | DataD  (NameP p) [NameP p] [ConAlt p]
               | InfixD Assoc Int (NameP p)
