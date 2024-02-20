@@ -127,6 +127,8 @@ data Decl p a = FunD   (NameP p) [Pat p] (Expr' p a) (Maybe (Where p a))
               | DataD  (NameP p) [NameP p] [ConAlt p]
               | InfixD Assoc Int (NameP p)
 
+type Decl' p a = Decl p (Cofree (ExprF p) a)
+
 type Expr' p = Cofree (ExprF p)
 
 makeLenses ''Program

@@ -74,7 +74,7 @@ import Compiler.Types
 %%
 
 StandaloneProgram   :: { Program RlpcPs SrcSpan }
-StandaloneProgram   : layout0(Decl)         { Program $1 }
+StandaloneProgram   : layout0(Decl)         {% mkProgram $1 }
 
 StandaloneExpr      :: { Expr' RlpcPs SrcSpan }
                     : VL Expr VR            { $2 }
@@ -168,7 +168,7 @@ Expr        :: { Expr' RlpcPs SrcSpan }
             | CaseExpr                  { $1 }
 
 TempInfixExpr :: { Expr' RlpcPs SrcSpan }
-TempInfixExpr : Expr1 InfixOp TempInfixExpr {% tempInfixExprErr }
+TempInfixExpr : Expr1 InfixOp TempInfixExpr {% tempInfixExprErr $1 $3 }
               | Expr1 InfixOp Expr1         { nolo' $ InfixEF $2 $1 $3 }
 
 AppExpr     :: { Expr' RlpcPs SrcSpan }
@@ -184,7 +184,7 @@ CaseExpr    :: { Expr' RlpcPs SrcSpan }
 
 -- TODO: where-binds
 Alt         :: { Alt' RlpcPs SrcSpan }
-            : Pat '->' Expr                 { undefined }
+            : Pat '->' Expr                 { AltA $1 (view _unwrap $3) Nothing }
 
 -- layout0(p : β) :: [β]
 layout0(p)  : '{' layout_list0(';',p) '}'   { $2 }
@@ -203,8 +203,8 @@ layout1(p)  : '{' layout_list1(';',p) '}'   { $2 }
 layout_list1(sep,p) : p                          { [$1] }
                     | layout_list1(sep,p) sep p  { $1 `snoc` $3 }
 
-Binding     :: { Binding RlpcPs (Cofree (ExprF RlpcPs) SrcSpan) }
-            : Pat '=' Expr              { undefined }
+Binding     :: { Binding' RlpcPs SrcSpan }
+            : Pat '=' Expr              { PatB $1 (view _unwrap $3) }
 
 Expr1       :: { Expr' RlpcPs SrcSpan }
             : '(' Expr ')'              { $2 }
@@ -231,11 +231,18 @@ Con         :: { PsName }
 
 {
 
-parseRlpProgR :: Text -> RLPCT m (Program RlpcPs SrcSpan)
-parseRlpProgR = undefined
+parseRlpProgR :: (Monad m) => Text -> RLPCT m (Program RlpcPs SrcSpan)
+parseRlpProgR s = do
+    a <- liftErrorful $ pToErrorful parseRlpProg st
+    addDebugMsg @_ @String "dump-parsed" $ show a
+    pure a
+  where
+    st = programInitState s
 
-parseRlpExprR :: Text -> RLPCT m (Expr' RlpcPs SrcSpan)
-parseRlpExprR = undefined
+parseRlpExprR :: (Monad m) => Text -> RLPCT m (Expr' RlpcPs SrcSpan)
+parseRlpExprR s = liftErrorful $ pToErrorful parseRlpExpr st
+    where
+        st = programInitState s
 
 mkInfixD :: Assoc -> Int -> PsName -> P (Decl RlpcPs SrcSpan)
 mkInfixD a p ln@(Located ss n) = do
@@ -301,10 +308,17 @@ _litint :: Getter (Located RlpToken) Int
 _litint = to extract
         . singular _TokenLitInt
 
-mkPsName = undefined
-tempInfixExprErr = undefined
-extractInt = undefined
-mkProgram = undefined
+tempInfixExprErr :: Expr' RlpcPs SrcSpan -> Expr' RlpcPs SrcSpan -> P a
+tempInfixExprErr (a :< _) (b :< _) =
+    addFatal $ errorMsg (a <> b) $ RlpParErrOther
+        [ "The rl' frontend is currently in beta. Support for infix expressions is minimal, sorry! :("
+        , "In the mean time, don't mix any infix operators."
+        ]
+
+mkProgram :: [Decl RlpcPs SrcSpan] -> P (Program RlpcPs SrcSpan)
+mkProgram ds = do
+    pt <- use psOpTable
+    pure $ Program (associate pt <$> ds)
 
 extractName :: Located RlpToken -> PsName
 extractName (Located ss (TokenVarSym n)) = Located ss n
