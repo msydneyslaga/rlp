@@ -146,48 +146,46 @@ Params      : {- epsilon -}             { [] }
             | Params Pat1               { $1 `snoc` $2 }
 
 Pat         :: { Pat RlpcPs }
-            : Con Pat1s                 { $1 }
-            | Pat1                      { undefined }
+            : Con Pat1s                 { ConP $1 $2 }
+            | Pat1                      { $1 }
 
 Pat1s       :: { [Pat RlpcPs] }
-            : Pat1s Pat1                { undefined }
-            | Pat1                      { undefined }
+            : Pat1s Pat1                { $1 `snoc` $2 }
+            | Pat1                      { [$1] }
 
 Pat1        :: { Pat RlpcPs }
-            : Con                       { undefined }
-            | Var                       { undefined }
-            | Lit                       { undefined }
-            | '(' Pat ')'               { undefined }
+            : Con                       { ConP $1 [] }
+            | Var                       { VarP $1 }
+            | Lit                       { LitP $1 }
+            | '(' Pat ')'               { $2 }
 
 Expr        :: { Expr' RlpcPs SrcSpan }
             -- infixities delayed till next release :(
             -- : Expr1 InfixOp Expr        { undefined }
             : AppExpr                   { $1 }
-            -- | TempInfixExpr             { undefined }
-            -- | LetExpr                   { undefined }
-            -- | CaseExpr                  { undefined }
+            | TempInfixExpr             { $1 }
+            | LetExpr                   { $1 }
+            | CaseExpr                  { $1 }
 
 TempInfixExpr :: { Expr' RlpcPs SrcSpan }
-TempInfixExpr : Expr1 InfixOp TempInfixExpr { undefined }
-              | Expr1 InfixOp Expr1         { undefined }
+TempInfixExpr : Expr1 InfixOp TempInfixExpr {% tempInfixExprErr }
+              | Expr1 InfixOp Expr1         { nolo' $ InfixEF $2 $1 $3 }
 
 AppExpr     :: { Expr' RlpcPs SrcSpan }
             : Expr1                     { $1 }
             | AppExpr Expr1             { comb2 AppEF $1 $2 }
 
-LetExpr     :: { Expr RlpcPs }
-            : let layout1(Binding) in Expr      { undefined }
-            | letrec layout1(Binding) in Expr   { undefined }
+LetExpr     :: { Expr' RlpcPs SrcSpan }
+            : let layout1(Binding) in Expr      { nolo' $ LetEF NonRec $2 $4 }
+            | letrec layout1(Binding) in Expr   { nolo' $ LetEF Rec $2 $4 }
 
-CaseExpr    :: { Expr RlpcPs }
-            : case Expr of layout0(CaseAlt)     { undefined }
+CaseExpr    :: { Expr' RlpcPs SrcSpan }
+            : case Expr of layout0(Alt)     { nolo' $ CaseEF $2 $4 }
 
 -- TODO: where-binds
-CaseAlt     :: { (Alt RlpcPs, Where RlpcPs) }
-            : Alt                           { undefined }
-
 Alt         :: { Alt RlpcPs }
-            : Pat '->' Expr                 { undefined }
+            : Pat '->' Expr                 { AltA $1 (collapse . strip $ $3)
+                                                Nothing }
 
 -- layout0(p : β) :: [β]
 layout0(p)  : '{' layout_list0(';',p) '}'   { $2 }
@@ -234,7 +232,7 @@ Con         :: { PsName }
 
 {
 
-parseRlpProgR = undefined
+parseRlpProgR :: Text -> RLPCT m (Program )
 parseRlpExprR = undefined
 
 mkInfixD :: Assoc -> Int -> PsName -> P (Decl RlpcPs SrcSpan)

@@ -12,6 +12,7 @@ module Rlp.Syntax.Types
     , Ty(..)
     , Binding(..)
     , Expr(..), Expr', ExprF(..)
+    , Rec(..)
     , Lit(..)
     , Pat(..)
     , Decl(..)
