@@ -27,7 +27,7 @@ module Compiler.RLPC
     -- ** Lenses
     , rlpcLogFile, rlpcDFlags, rlpcEvaluator, rlpcInputFiles, rlpcLanguage
     -- * Misc. MTL-style functions
-    , liftErrorful, hoistRlpcT
+    , liftErrorful, liftMaybe, hoistRlpcT
     -- * Misc. Rlpc Monad -related types
     , RLPCOptions(RLPCOptions), IsRlpcError(..), RlpcError(..)
     , MsgEnvelope(..), Severity(..)
@@ -107,6 +107,9 @@ evalRLPCT opt r = runRLPCT r
 
 liftErrorful :: (Monad m, IsRlpcError e) => ErrorfulT (MsgEnvelope e) m a -> RLPCT m a
 liftErrorful e = RLPCT $ lift (fmap liftRlpcError `mapErrorful` e)
+
+liftMaybe :: (Monad m) => Maybe a -> RLPCT m a
+liftMaybe m = RLPCT . lift . ErrorfulT . pure $ (m, [])
 
 hoistRlpcT :: (forall a. m a -> n a)
          -> RLPCT m a -> RLPCT n a

@@ -2,8 +2,6 @@ module Core.Utils
     ( programRhss
     , programGlobals
     , isAtomic
-    -- , insertModule
-    , extractProgram
     , freeVariables
     )
     where
@@ -27,15 +25,6 @@ isAtomic :: Expr b -> Bool
 isAtomic (Var _)  = True
 isAtomic (Lit _)  = True
 isAtomic _        = False
-
-----------------------------------------------------------------------------------
-
--- TODO: export list awareness
--- insertModule :: Module b -> Program b -> Program b
--- insertModule (Module _ p) = programScDefs %~ (<>m)
-
-extractProgram :: Module b -> Program b
-extractProgram (Module _ p) = p
 
 ----------------------------------------------------------------------------------
 

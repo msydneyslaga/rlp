@@ -116,7 +116,7 @@ floatNonStrictCases g = goE
             goE e
             traverse_ goE altBodies
             pure e'
-        goC (f :$ x)            = (:$) <$> goC f <*> goC x
+        goC (App f x)           = App <$> goC f <*> goC x
         goC (Let r bs e)        = Let r <$> bs' <*> goE e
             where bs' = travBs goC bs
         goC (Lit l)             = pure (Lit l)
@@ -132,6 +132,7 @@ floatNonStrictCases g = goE
                     & traverse goC
                     & const (pure bs)
         -- ^ ??? what the fuck?
+        -- ^ 24/02/22: what is this shit lol?
 
 -- when provided with a case expr, floatCase will float the case into a
 -- supercombinator of its free variables. the sc is returned along with an
