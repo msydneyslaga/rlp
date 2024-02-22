@@ -120,7 +120,7 @@ Type            :: { Kind -> Type }
 
 Type1           :: { Kind -> Type }
 Type1           : '(' Type ')'                  { $2 }
-                | varname                       { \k -> TyVar $ MkVar $1 k }
+                | varname                       { \k -> TyVar $1 }
                 | conname                       { \k -> TyCon $ MkTyCon $1 k }
 
 ParList         :: { [PsName] }
@@ -229,13 +229,19 @@ parseCoreExprR :: (Monad m) => [Located CoreToken] -> RLPCT m (Expr Var)
 parseCoreExprR = liftMaybe . snd . flip runP def . parseCoreExpr
 
 parseCoreProgR :: forall m. (Monad m)
-               => [Located CoreToken] -> RLPCT m (Program PsName)
-parseCoreProgR s = ddumpast =<< (liftMaybe . snd $ runP (parseCoreProg s) def)
-    where
-        ddumpast :: (Program PsName) -> RLPCT m (Program PsName)
-        ddumpast p = do
-            addDebugMsg "dump-parsed-core" . show $ p
-            pure p
+               => [Located CoreToken] -> RLPCT m (Program Var)
+parseCoreProgR s = do
+    let p = runP (parseCoreProg s) def
+    case p of
+        (st, Just a) -> do
+            let a' = finishTyping st a
+            ddumpast a'
+            pure a'
+  where
+    ddumpast :: Show a => Program a -> RLPCT m (Program a)
+    ddumpast p = do
+        addDebugMsg "dump-parsed-core" . show $ p
+        pure p
 
 happyBind :: RLPC a -> (a -> RLPC b) -> RLPC b
 happyBind m k = m >>= k
@@ -254,8 +260,6 @@ doTLPragma (Pragma pr) p = case pr of
 
 readt :: (Read a) => Text -> a
 readt = read . T.unpack
-
-type PsName = Either Name Var
 
 }
 

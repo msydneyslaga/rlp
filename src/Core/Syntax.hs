@@ -75,7 +75,7 @@ data ExprF b a = VarF Name
 type Expr b = Fix (ExprF b)
 
 data Type = TyFun
-          | TyVar Var
+          | TyVar Name
           | TyApp Type Type
           | TyCon TyCon
           | TyForall Var Type
@@ -369,6 +369,7 @@ instance Lift b => Lift1 (ExprF b) where
     lift1 (CaseF e as)  = liftCon2 'CaseF (lift e) (lift as)
     lift1 (TypeF t)     = liftCon 'TypeF (lift t)
     lift1 (LitF l)      = liftCon 'LitF (lift l)
+    lift1 (ConF t a)    = liftCon2 'ConF (lift t) (lift a)
 
 deriving instance (Show b, Show a) => Show (ExprF b a)
 deriving instance Show b => Show (Binding b)

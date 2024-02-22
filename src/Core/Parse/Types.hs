@@ -3,6 +3,8 @@ module Core.Parse.Types
     ( P(..)
     , psTyVars
     , def
+    , PsName
+    , finishTyping
     )
     where
 --------------------------------------------------------------------------------
@@ -46,4 +48,11 @@ instance Default PState where
     def = undefined
 
 makeLenses ''PState
+
+type PsName = Either Name Var
+
+--------------------------------------------------------------------------------
+
+finishTyping :: PState -> Program PsName -> Program Var
+finishTyping = undefined
 

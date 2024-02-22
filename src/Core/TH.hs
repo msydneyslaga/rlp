@@ -39,9 +39,11 @@ coreProgT = mkqq $ lexCoreR >=> parseCoreProgR >=> checkCoreProgR
 coreExprT :: QuasiQuoter
 coreExprT = mkqq $ lexCoreR >=> parseCoreExprR >=> checkCoreExprR g
     where
-        g = [ ("+#", TyCon "Int#" :-> TyCon "Int#" :-> TyCon "Int#")
-            , ("id", TyCon "a" :-> TyCon "a")
-            , ("fix", (TyCon "a" :-> TyCon "a") :-> TyCon "a")
+        g = [ ("+#", TyInt :-> TyInt :-> TyInt)
+            , ("id", TyForall (MkVar "a" TyKindType) $
+                    TyVar "a" :-> TyVar "a")
+            , ("fix", TyForall (MkVar "a" TyKindType) $
+                    (TyVar "a" :-> TyVar "a") :-> TyVar "a")
             ]
 
 mkqq :: (Lift a) => (Text -> RLPCIO a) -> QuasiQuoter
