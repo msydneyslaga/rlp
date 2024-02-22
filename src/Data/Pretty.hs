@@ -27,7 +27,7 @@ class Pretty a where
 
     {-# MINIMAL pretty | prettyPrec #-}
     pretty = prettyPrec 0
-    prettyPrec a _ = pretty a
+    prettyPrec = const pretty
 
 rpretty :: (IsString s, Pretty a) => a -> s
 rpretty = fromString . render . pretty
