@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ImplicitParams, ViewPatterns, PatternSynonyms #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Rlp.Parse.Types
     (
     -- * Trees That Grow
@@ -17,9 +18,8 @@ module Rlp.Parse.Types
     , RlpToken(..), AlexInput(..), Position(..), spanFromPos, LexerAction
     , Located(..), PsName
     -- ** Lenses
+    , _TokenLitInt, _TokenVarName, _TokenConName, _TokenVarSym
     , aiPrevChar, aiSource, aiBytes, aiPos, posLine, posColumn
-
-    , (<<~), (<~>)
 
     -- * Error handling
     , MsgEnvelope(..), RlpcError(..), RlpParseError(..)
@@ -28,6 +28,7 @@ module Rlp.Parse.Types
     where
 --------------------------------------------------------------------------------
 import Core.Syntax                  (Name)
+import Text.Show.Deriving
 import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Errorful
@@ -53,34 +54,9 @@ import Compiler.Types
 
 data RlpcPs
 
-type instance XRec RlpcPs a = Located a
-type instance IdP RlpcPs = PsName
+type instance NameP RlpcPs = PsName
 
-type instance XFunD RlpcPs = ()
-type instance XDataD RlpcPs = ()
-type instance XInfixD RlpcPs = ()
-type instance XTySigD RlpcPs = ()
-type instance XXDeclD RlpcPs = ()
-
-type instance XLetE RlpcPs = ()
-type instance XLetrecE RlpcPs = ()
-type instance XVarE RlpcPs = ()
-type instance XLamE RlpcPs = ()
-type instance XCaseE RlpcPs = ()
-type instance XIfE RlpcPs = ()
-type instance XAppE RlpcPs = ()
-type instance XLitE RlpcPs = ()
-type instance XParE RlpcPs = ()
-type instance XOAppE RlpcPs = ()
-type instance XXRlpExprE RlpcPs = ()
-
-type PsName = Text
-
-instance MapXRec RlpcPs where
-    mapXRec = fmap
-
-instance UnXRec RlpcPs where
-    unXRec = extract
+type PsName = Located Text
 
 --------------------------------------------------------------------------------
 
@@ -118,10 +94,10 @@ data RlpToken
     -- literals
     = TokenLitInt Int
     -- identifiers
-    | TokenVarName Name
-    | TokenConName Name
-    | TokenVarSym Name
-    | TokenConSym Name
+    | TokenVarName Text
+    | TokenConName Text
+    | TokenVarSym Text
+    | TokenConSym Text
     -- reserved words
     | TokenData
     | TokenCase
@@ -151,6 +127,31 @@ data RlpToken
     | TokenRBraceV
     | TokenEOF
     deriving (Show)
+
+_TokenLitInt :: Prism' RlpToken Int
+_TokenLitInt = prism TokenLitInt $ \case
+    TokenLitInt n -> Right n
+    x             -> Left x
+
+_TokenVarName :: Prism' RlpToken Text
+_TokenVarName = prism TokenVarName $ \case
+    TokenVarName n -> Right n
+    x              -> Left x
+
+_TokenVarSym :: Prism' RlpToken Text
+_TokenVarSym = prism TokenVarSym $ \case
+    TokenVarSym n -> Right n
+    x              -> Left x
+
+_TokenConName :: Prism' RlpToken Text
+_TokenConName = prism TokenConName $ \case
+    TokenConName n -> Right n
+    x              -> Left x
+
+_TokenConSym :: Prism' RlpToken Text
+_TokenConSym = prism TokenConSym $ \case
+    TokenConSym n -> Right n
+    x              -> Left x
 
 newtype P a = P {
         runP :: ParseState
@@ -281,13 +282,14 @@ initAlexInput s = AlexInput
 
 --------------------------------------------------------------------------------
 
-deriving instance Lift (RlpProgram RlpcPs)
-deriving instance Lift (Decl RlpcPs)
-deriving instance Lift (Pat RlpcPs)
-deriving instance Lift (Lit RlpcPs)
-deriving instance Lift (RlpExpr RlpcPs)
-deriving instance Lift (Binding RlpcPs)
-deriving instance Lift (RlpType RlpcPs)
-deriving instance Lift (Alt RlpcPs)
-deriving instance Lift (ConAlt RlpcPs)
+
+-- deriving instance Lift (Program RlpcPs)
+-- deriving instance Lift (Decl RlpcPs)
+-- deriving instance Lift (Pat RlpcPs)
+-- deriving instance Lift (Lit RlpcPs)
+-- deriving instance Lift (Expr RlpcPs)
+-- deriving instance Lift (Binding RlpcPs)
+-- deriving instance Lift (Ty RlpcPs)
+-- deriving instance Lift (Alt RlpcPs)
+-- deriving instance Lift (ConAlt RlpcPs)
 

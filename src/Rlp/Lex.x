@@ -8,6 +8,7 @@ module Rlp.Lex
     , Located(..)
     , lexToken
     , lexStream
+    , lexStream'
     , lexDebug
     , lexCont
     , popLexState
@@ -29,6 +30,7 @@ import Data.Word
 import Data.Default
 import Control.Lens
 
+import Compiler.Types
 import Debug.Trace
 import Rlp.Parse.Types
 }
@@ -274,11 +276,12 @@ lexCont :: (Located RlpToken -> P a) -> P a
 lexCont = (lexToken >>=)
 
 lexStream :: P [RlpToken]
-lexStream = do
-    t <- lexToken
-    case t of
-        Located _ TokenEOF -> pure [TokenEOF]
-        Located _ t        -> (t:) <$> lexStream
+lexStream = fmap extract <$> lexStream'
+
+lexStream' :: P [Located RlpToken]
+lexStream' = lexToken >>= \case
+    t@(Located _ TokenEOF) -> pure [t]
+    t        -> (t:) <$> lexStream'
 
 lexDebug :: (Located RlpToken -> P a) -> P a
 lexDebug k = do

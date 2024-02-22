@@ -220,9 +220,9 @@ docRlpcErr msg = header
                 rule = repeat (ttext . Ansi.blue . Ansi.bold $ "|")
                 srclines = ["", "<problematic source code>", ""]
         filename = msgColour "<input>"
-        pos = msgColour $ tshow (msg ^. msgSpan . srcspanLine)
+        pos = msgColour $ tshow (msg ^. msgSpan . srcSpanLine)
                        <> ":"
-                       <> tshow (msg ^. msgSpan . srcspanColumn)
+                       <> tshow (msg ^. msgSpan . srcSpanColumn)
 
         header = ttext $ filename <> msgColour ":" <> pos <> msgColour ": "
                         <> errorColour "error" <> msgColour ":"

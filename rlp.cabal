@@ -32,6 +32,8 @@ library
                     , Core.HindleyMilner
                     , Control.Monad.Errorful
                     , Rlp.Syntax
+                    , Rlp.Syntax.Backstage
+                    , Rlp.Syntax.Types
                     -- , Rlp.Parse.Decls
                     , Rlp.Parse
                     , Rlp.Parse.Associate
@@ -73,6 +75,7 @@ library
                     , effectful-core ^>=2.3.0.0
                     , deriving-compat ^>=0.6.0
                     , these >=0.2 && <2.0
+                    , free >=5.2
 
     hs-source-dirs:   src
     default-language: GHC2021
@@ -116,8 +119,10 @@ test-suite rlp-test
                  , QuickCheck
                  , hspec            ==2.*
                  , microlens
+                 , lens >=5.2.3 && <6.0
     other-modules: Arith
                  , GMSpec
                  , Core.HindleyMilnerSpec
+                 , Compiler.TypesSpec
     build-tool-depends: hspec-discover:hspec-discover
 
