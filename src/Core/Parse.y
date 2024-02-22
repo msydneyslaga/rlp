@@ -12,7 +12,6 @@ module Core.Parse
     , parseCoreProgR
     , module Core.Lex -- temp convenience
     , SrcError
-    , Module
     )
     where
 
@@ -34,7 +33,6 @@ import Data.Text            qualified as T
 import Data.HashMap.Strict  qualified as H
 }
 
-%name parseCore Module
 %name parseCoreExpr StandaloneExpr
 %name parseCoreProg StandaloneProgram
 %tokentype { Located CoreToken }
@@ -44,7 +42,6 @@ import Data.HashMap.Strict  qualified as H
 %token
       let             { Located _ TokenLet }
       letrec          { Located _ TokenLetrec }
-      module          { Located _ TokenModule }
       where           { Located _ TokenWhere }
       case            { Located _ TokenCase }
       of              { Located _ TokenOf }
@@ -73,18 +70,14 @@ import Data.HashMap.Strict  qualified as H
 
 %%
 
-Module          :: { Module Name }
-Module          : module conname where Program Eof { Module (Just ($2, [])) $4 }
-                | Program Eof                      { Module Nothing $1 }
-
 Eof             :: { () }
 Eof             : eof           { () }
                 | error         { () }
 
-StandaloneProgram :: { Program Name }
+StandaloneProgram :: { Program Var }
 StandaloneProgram : Program eof                 { $1 }
 
-Program         :: { Program Name }
+Program         :: { Program Var }
 Program         : ScTypeSig ';' Program         { insTypeSig $1 $3 }
                 | ScTypeSig OptSemi             { singletonTypeSig $1 }
                 | ScDef     ';' Program         { insScDef $1 $3 }
@@ -104,97 +97,99 @@ OptSemi         : ';'                           { () }
                 | {- epsilon -}                 { () }
 
 ScTypeSig       :: { (Name, Type) }
-ScTypeSig       : Var '::' Type                 { ($1,$3) }
+ScTypeSig       : Id '::' Type                  { ($1, $3 TyKindType) }
 
-ScDefs          :: { [ScDef Name] }
+ScDefs          :: { [ScDef PsName] }
 ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
                 | ScDef ';'                     { [$1] }
                 | ScDef                         { [$1] }
 
-ScDef           :: { ScDef Name }
-ScDef           : Var ParList '=' Expr          { ScDef $1 $2 $4 }
-                -- hack to allow constructors to be compiled into scs
-                | Con ParList '=' Expr          { ScDef $1 $2 $4 }
+ScDef           :: { ScDef PsName }
+ScDef           : Id ParList '=' Expr          { ScDef ($1,Nothing) $2 $4 }
 
-Type            :: { Type }
-Type            : Type1                         { $1 }
+Type            :: { [(Name, Kind)] -> Kind -> Type }
+                : Type1 '->' Type   { \cases
+                                        g TyKindType ->
+                                          $1 g TyKindType :-> $3 g TyKindType
+                                        _ _ -> error "kind mismatch" }
+                | Type1                         { $1 }
 
-Type1           :: { Type }
+-- do we want to allow symbolic names for tyvars and tycons?
+
+Type1           :: { [(Name, Kind)] -> Kind -> Type }
 Type1           : '(' Type ')'                  { $2 }
-                | Type1 '->' Type               { $1 :-> $3 }
-                -- do we want to allow symbolic names for tyvars and tycons?
-                | varname                       { TyVar $1 }
-                | conname                       { TyCon $1 }
+                | varname                       { \k -> TyVar $ MkVar $1 k }
+                | conname                       { \k -> TyCon $ MkTyCon $1 k }
 
-ParList         :: { [Name] }
-ParList         : Var ParList                   { $1 : $2 }
+ParList         :: { [PsName] }
+ParList         : varname ParList               { ($1, Nothing) : $2 }
                 | {- epsilon -}                 { [] }
 
-StandaloneExpr  :: { Expr Name }
+StandaloneExpr  :: { Expr Var }
 StandaloneExpr  : Expr eof                      { $1 }
 
-Expr            :: { Expr Name }
+Expr            :: { Expr Var }
 Expr            : LetExpr                       { $1 }
                 | 'λ' Binders '->' Expr         { Lam $2 $4 }
                 | Application                   { $1 }
                 | CaseExpr                      { $1 }
                 | Expr1                         { $1 }
 
-LetExpr         :: { Expr Name }
+LetExpr         :: { Expr Var }
 LetExpr         : let    '{'   Bindings '}'    in Expr { Let NonRec $3 $6 }
                 | letrec '{'   Bindings '}'    in Expr { Let Rec $3 $6 }
 
-Binders         :: { [Name] }
+Binders         :: { [Var] }
 Binders         : Var Binders                  { $1 : $2 }
                 | Var                          { [$1] }
 
-Application     :: { Expr Name }
-Application     : Expr1 AppArgs                { foldl' App $1 $2 }
+Application     :: { Expr Var }
+Application     : Application AppArg           { App $1 $2 }
+                | Expr1       AppArg           { App $1 $2 }
 
-AppArgs         :: { [Expr Name] }
-AppArgs         : Expr1 AppArgs                 { $1 : $2 }
-                | Expr1                         { [$1] }
+AppArg          :: { Expr Var }
+                : '@' Type1                     { Type ($2 [] TyKindInferred) }
+                | Expr1                         { $1 }
 
-CaseExpr        :: { Expr Name }
+CaseExpr        :: { Expr Var }
 CaseExpr        : case Expr of '{' Alters '}'   { Case $2 $5 }
 
-Alters          :: { [Alter Name] }
+Alters          :: { [Alter Var] }
 Alters          : Alter ';' Alters              { $1 : $3 }
                 | Alter ';'                     { [$1] }
                 | Alter                         { [$1] }
 
-Alter           :: { Alter Name }
-Alter           : alttag ParList '->' Expr      { Alter (AltTag  $1) $2 $4 }
-                | Con    ParList '->' Expr      { Alter (AltData $1) $2 $4 }
+Alter           :: { Alter Var }
+Alter           : alttag  AltParList '->' Expr     { Alter (AltTag  $1) $2 $4 }
+                | conname AltParList '->' Expr     { Alter (AltData $1) $2 $4 }
 
-Expr1           :: { Expr Name }
+AltParList      :: { [Var] }
+                : Var AltParList                { $1 : $2 }
+                | {- epsilon -}                 { [] }
+
+Expr1           :: { Expr Var }
 Expr1           : litint                        { Lit $ IntL $1 }
                 | Id                            { Var $1 }
                 | PackCon                       { $1 }
                 | '(' Expr ')'                  { $2 }
 
-PackCon         :: { Expr Name }
+PackCon         :: { Expr Var }
 PackCon         : pack '{' litint litint '}'    { Con $3 $4 }
 
-Bindings        :: { [Binding Name] }
+Bindings        :: { [Binding Var] }
 Bindings        : Binding ';' Bindings          { $1 : $3 }
                 | Binding ';'                   { [$1] }
                 | Binding                       { [$1] }
 
-Binding         :: { Binding Name }
+Binding         :: { Binding Var }
 Binding         : Var '=' Expr                  { $1 := $3 }
 
 Id              :: { Name }
-Id              : Var                                { $1 }
-                | Con                                { $1 }
+                : varname                           { $1 }
+                | conname                           { $1 }
 
-Var             :: { Name }
-Var             : varname                           { $1 }
-                | varsym                            { $1 }
-
-Con             :: { Name }
-Con             : conname                           { $1 }
-                | consym                            { $1 }
+Var             :: { Var }
+Var             : '(' varname '::' Type ')'         { MkVar $2 ($4 [] TyKindType) }
 
 {
 
@@ -205,13 +200,13 @@ parseError (Located _ t : _) =
 
 {-# WARNING parseError "unimpl" #-}
 
-exprPragma :: [String] -> RLPC (Expr Name)
+exprPragma :: [String] -> RLPC (Expr Var)
 exprPragma ("AST" : e) = undefined
 exprPragma _           = undefined
 
 {-# WARNING exprPragma "unimpl" #-}
 
-astPragma :: [String] -> RLPC (Expr Name)
+astPragma :: [String] -> RLPC (Expr Var)
 astPragma _ = undefined
 
 {-# WARNING astPragma "unimpl" #-}
@@ -228,13 +223,13 @@ insScDef sc = programScDefs %~ (sc:)
 singletonScDef :: (Hashable b) => ScDef b -> Program b
 singletonScDef sc = insScDef sc mempty
 
-parseCoreExprR :: (Monad m) => [Located CoreToken] -> RLPCT m Expr'
+parseCoreExprR :: (Monad m) => [Located CoreToken] -> RLPCT m (Expr Var)
 parseCoreExprR = hoistRlpcT generalise . parseCoreExpr
 
-parseCoreProgR :: forall m. (Monad m) => [Located CoreToken] -> RLPCT m Program'
+parseCoreProgR :: forall m. (Monad m) => [Located CoreToken] -> RLPCT m (Program Var)
 parseCoreProgR = ddumpast <=< (hoistRlpcT generalise . parseCoreProg)
     where
-        ddumpast :: Program' -> RLPCT m Program'
+        ddumpast :: (Program Var) -> RLPCT m (Program Var)
         ddumpast p = do
             addDebugMsg "dump-parsed-core" . show $ p
             pure p
@@ -256,6 +251,8 @@ doTLPragma (Pragma pr) p = case pr of
 
 readt :: (Read a) => Text -> a
 readt = read . T.unpack
+
+type PsName = (Name, Maybe Type)
 
 }
 

@@ -8,38 +8,31 @@ Description : Core ASTs and the like
 -- for recursion-schemes
 {-# LANGUAGE DeriveTraversable, TypeFamilies #-}
 module Core.Syntax
-    ( Expr(..)
-    , ExprF(..)
-    , ExprF'(..)
-    , Type(..)
-    , pattern TyInt
-    , Lit(..)
-    , pattern (:$)
-    , pattern (:@)
-    , pattern (:->)
-    , Binding(..)
-    , AltCon(..)
-    , pattern (:=)
-    , Rec(..)
-    , Alter(..)
-    , Name
-    , Tag
-    , ScDef(..)
-    , Module(..)
-    , Program(..)
-    , Program'
+    (
+    -- * Core AST
+      ExprF(..), ExprF'
+    , ScDef(..), ScDef'
+    , Program(..), Program'
+    , Type(..), Kind, pattern (:->), pattern TyInt
+    , Alter(..), Alter', AltCon(..)
+    , Rec(..), Lit(..)
     , Pragma(..)
-    , unliftScDef
-    , programScDefs
-    , programTypeSigs
-    , programDataTags
-    , Expr'
-    , ScDef'
-    , Alter'
-    , Binding'
-    , HasRHS(_rhs)
-    , HasLHS(_lhs)
+    -- ** Variables and identifiers
+    , Name, Var(..), TyCon(..), Tag
+    , Binding(..), pattern (:=)
+    , type Binding'
+    -- ** Working with the fixed point of ExprF
+    , Expr, Expr'
+    , pattern Con, pattern Var, pattern App, pattern Lam, pattern Let
+    , pattern Case, pattern Type, pattern Lit
+
+    -- * Misc
     , Pretty(pretty)
+
+    -- * Optics
+    , programScDefs, programTypeSigs, programDataTags
+    , formalising
+    , HasRHS(_rhs), HasLHS(_lhs)
     )
     where
 ----------------------------------------------------------------------------------
@@ -47,8 +40,6 @@ import Data.Coerce
 import Data.Pretty
 import Data.List                    (intersperse)
 import Data.Function                ((&))
-import Data.Functor.Foldable
-import Data.Functor.Foldable.TH     (makeBaseFunctor)
 import Data.String
 import Data.HashMap.Strict          (HashMap)
 import Data.HashMap.Strict          qualified as H
@@ -56,40 +47,74 @@ import Data.Hashable
 import Data.Text                    qualified as T
 import Data.Char
 import Data.These
-import Data.Bifoldable              (bifoldr)
 import GHC.Generics                 (Generic, Generically(..))
+import Text.Show.Deriving
+
+import Data.Fix                     hiding (cata, ana)
+import Data.Bifoldable              (bifoldr)
+import Data.Functor.Foldable
+import Data.Functor.Foldable.TH     (makeBaseFunctor)
+
 -- Lift instances for the Core quasiquoters
-import Language.Haskell.TH.Syntax   (Lift)
+import Misc.Lift1
 import Control.Lens
 ----------------------------------------------------------------------------------
 
-data Expr b = Var Name
-            | Con Tag Int -- ^ Con Tag Arity
-            | Case (Expr b) [Alter b]
-            | Lam [b] (Expr b)
-            | Let Rec [Binding b] (Expr b)
-            | App (Expr b) (Expr b)
-            | Lit Lit
-            deriving (Show, Read, Lift)
+data ExprF b a = VarF Name
+               | ConF Tag Int -- ^ Con Tag Arity
+               | CaseF a [Alter b]
+               | LamF [b] a
+               | LetF Rec [Binding b] a
+               | AppF a a
+               | LitF Lit
+               | TypeF Type
+               deriving (Functor, Foldable, Traversable)
 
-deriving instance (Eq b) => Eq (Expr b)
+type Expr b = Fix (ExprF b)
 
 data Type = TyFun
-          | TyVar Name
+          | TyVar Var
           | TyApp Type Type
-          | TyCon Name
-          deriving (Show, Read, Lift, Eq)
+          | TyCon TyCon
+          | TyForall Var Type
+          | TyKindType
+          | TyKindInferred
+          deriving (Show, Eq, Lift)
+
+type Kind = Type
+
+data TyCon = MkTyCon Name Kind
+    deriving (Eq, Show, Lift)
+
+data Var = MkVar Name Type
+    deriving (Eq, Show, Lift)
+
+pattern Con :: Tag -> Int -> Expr b
+pattern Con t a = Fix (ConF t a)
+
+pattern Var :: Name -> Expr b
+pattern Var b = Fix (VarF b)
+
+pattern App :: Expr b -> Expr b -> Expr b
+pattern App f x = Fix (AppF f x)
+
+pattern Lam :: [b] -> Expr b -> Expr b
+pattern Lam bs e = Fix (LamF bs e)
+
+pattern Let :: Rec -> [Binding b] -> Expr b -> Expr b
+pattern Let r bs e = Fix (LetF r bs e)
+
+pattern Case :: Expr b -> [Alter b] -> Expr b
+pattern Case e as = Fix (CaseF e as)
+
+pattern Type :: Type -> Expr b
+pattern Type t = Fix (TypeF t)
+
+pattern Lit :: Lit -> Expr b
+pattern Lit t = Fix (LitF t)
 
 pattern TyInt :: Type
-pattern TyInt = TyCon "Int#"
-
-infixl 2 :$
-pattern (:$) :: Expr b -> Expr b -> Expr b 
-pattern f :$ x = App f x
-
-infixl 2 :@
-pattern (:@) :: Type -> Type -> Type
-pattern f :@ x = TyApp f x
+pattern TyInt = TyCon (MkTyCon "Int#" TyKindType)
 
 infixr 1 :->
 pattern (:->) :: Type -> Type -> Type
@@ -97,46 +122,39 @@ pattern a :-> b = TyApp (TyApp TyFun a) b
 
 {-# COMPLETE Binding :: Binding #-}
 {-# COMPLETE (:=) :: Binding #-}
-data Binding b = Binding b (Expr b)
-    deriving (Show, Read, Lift)
 
-deriving instance (Eq b) => Eq (Binding b)
+data Binding b = Binding b (Expr b)
 
 infixl 1 :=
 pattern (:=) :: b -> Expr b -> Binding b
 pattern k := v = Binding k v
 
 data Alter b = Alter AltCon [b] (Expr b)
-    deriving (Show, Read, Lift)
-
-deriving instance (Eq b) => Eq (Alter b)
 
 newtype Pragma = Pragma [T.Text]
 
 data Rec = Rec
          | NonRec
-         deriving (Show, Read, Eq, Lift)
+         deriving (Show, Eq, Lift)
 
 data AltCon = AltData Name
             | AltTag Tag
             | AltLit Lit
             | AltDefault
-            deriving (Show, Read, Eq, Lift)
+            deriving (Show, Eq, Lift)
 
 newtype Lit = IntL Int
-    deriving (Show, Read, Eq, Lift)
+    deriving (Show, Eq, Lift)
 
 type Name = T.Text
 type Tag = Int
 
 data ScDef b = ScDef b [b] (Expr b)
-    deriving (Show, Lift)
 
 unliftScDef :: ScDef b -> Expr b
 unliftScDef (ScDef _ as e) = Lam as e
 
 data Module b = Module (Maybe (Name, [Name])) (Program b)
-    deriving (Show, Lift)
 
 data Program b = Program
     { _programScDefs   :: [ScDef b]
@@ -144,12 +162,12 @@ data Program b = Program
     , _programDataTags :: HashMap b (Tag, Int)
     -- ^ map constructors to their tag and arity
     }
-    deriving (Show, Lift, Generic)
+    deriving (Generic)
     deriving (Semigroup, Monoid)
         via Generically (Program b)
 
 makeLenses ''Program
-makeBaseFunctor ''Expr
+-- makeBaseFunctor ''Expr
 pure []
 
 -- this is a weird optic, stronger than Lens and Prism, but weaker than Iso.
@@ -168,13 +186,6 @@ type Binding' = Binding Name
 
 instance IsString (Expr b) where
     fromString = Var . fromString
-
-instance IsString Type where
-    fromString "" = error "IsString Type string may not be empty"
-    fromString s
-        | isUpper c     = TyCon . fromString $ s
-        | otherwise     = TyVar . fromString $ s
-        where (c:_) = s
 
 ----------------------------------------------------------------------------------
 
@@ -214,14 +225,39 @@ instance HasLHS (Binding b) (Binding b) b b where
         (\ (k := _) -> k)
         (\ (_ := e) k' -> k' := e)
 
+-- | This is not a valid isomorphism for expressions containing lambdas whose
+-- bodies are themselves lambdas with multiple arguments:
+--
+-- >>> [coreExpr|\x -> \y z -> x|] ^. from (from formalising)
+-- Lam ["x"] (Lam ["y"] (Lam ["z"] (Var "x")))
+-- >>> [coreExpr|\x -> \y z -> x|]
+-- Lam ["x"] (Lam ["y","z"] (Var "x"))
+--
+-- For this reason, it's best to consider 'formalising' as if it were two
+-- unrelated unidirectional getters.
+
+formalising :: Iso (Expr a) (Expr b) (Expr a) (Expr b)
+formalising = iso sa bt where
+    sa :: Expr a -> Expr a
+    sa = ana \case
+        Lam [b] e    -> LamF [b] e
+        Lam (b:bs) e -> LamF [b] (Lam bs e)
+        x            -> project x
+
+    bt :: Expr b -> Expr b
+    bt = cata \case
+        LamF [b] (Lam bs e) -> Lam (b:bs) e
+        x                   -> embed x
+
 --------------------------------------------------------------------------------
 
--- TODO: print type sigs with corresponding scdefs
--- TODO: emit pragmas for datatags
 instance (Hashable b, Pretty b) => Pretty (Program b) where
-    pretty p = ifoldrOf (programDataTags . ifolded) cataDataTag mempty p
-           $+$ vlinesOf (programJoinedDefs . to prettyGroup) p
+    pretty p = (datatags <> "\n")
+           $+$ defs
         where
+            datatags = ifoldrOf (programDataTags . ifolded) cataDataTag mempty p
+            defs = vlinesOf (programJoinedDefs . to prettyGroup) p
+
             programJoinedDefs :: Fold (Program b) (These (b, Type) (ScDef b))
             programJoinedDefs = folding $ \p ->
                 foldMapOf programTypeSigs thisTs p
@@ -234,7 +270,10 @@ instance (Hashable b, Pretty b) => Pretty (Program b) where
                 H.singleton (sc ^. _lhs . _1) (That sc)
 
             prettyGroup :: These (b, Type) (ScDef b) -> Doc
-            prettyGroup = bifoldr ($$) ($$) mempty . bimap prettyTySig pretty
+            prettyGroup = bifoldr vcatWithSemi vcatWithSemi mempty
+                        . bimap prettyTySig pretty
+
+            vcatWithSemi a b = (a <+> ";") $$ b
 
             prettyTySig (n,t) = hsep [ttext n, "::", pretty t]
 
@@ -257,7 +296,7 @@ instance Pretty Type where
         prettyPrec 1 f <+> prettyPrec 2 x
 
 instance (Pretty b) => Pretty (ScDef b) where
-    pretty sc = hsep [name, as, "=", hang empty 1 e, ";"]
+    pretty sc = hsep [name, as, "=", hang empty 1 e]
         where
             name = ttext $ sc ^. _lhs . _1
             as = sc & hsepOf (_lhs . _2 . each . to ttext)
@@ -297,4 +336,27 @@ explicitLayout :: (Pretty a) => [a] -> Doc
 explicitLayout as = vcat inner <+> "}" where
     inner = zipWith (<+>) delims (pretty <$> as)
     delims = "{" : repeat ";"
+
+instance Pretty TyCon
+instance Pretty Var
+
+--------------------------------------------------------------------------------
+
+deriveShow1 ''ExprF
+
+instance Lift b => Lift1 (ExprF b) where
+    lift1 (VarF k)      = liftCon 'VarF (lift k)
+    lift1 (AppF f x)    = liftCon2 'AppF (lift f) (lift x)
+    lift1 (LamF b e)    = liftCon2 'LamF (lift b) (lift e)
+    lift1 (LetF r bs e) = liftCon3 'LetF (lift r) (lift bs) (lift e)
+    lift1 (CaseF e as)  = liftCon2 'CaseF (lift e) (lift as)
+    lift1 (TypeF t)     = liftCon 'TypeF (lift t)
+    lift1 (LitF l)      = liftCon 'LitF (lift l)
+
+deriving instance (Show b, Show a) => Show (ExprF b a)
+deriving instance Show b => Show (Binding b)
+deriving instance Show b => Show (Alter b)
+
+deriving instance Lift b => Lift (Binding b)
+deriving instance Lift b => Lift (Alter b)
 

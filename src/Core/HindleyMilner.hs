@@ -35,6 +35,12 @@ import Text.Printf
 import Core.Syntax
 ----------------------------------------------------------------------------------
 
+infer = undefined
+check = undefined
+checkCoreProg = undefined
+checkCoreProgR = undefined
+checkCoreExprR = undefined
+
 -- | Annotated typing context -- I have a feeling we're going to want this in the
 -- future.
 type Context b = [(b, Type)]
@@ -73,6 +79,8 @@ instance IsRlpcError TypeError where
 -- | Synonym for @Errorful [TypeError]@. This means an @HMError@ action may
 -- throw any number of fatal or nonfatal errors. Run with @runErrorful@.
 type HMError = Errorful TypeError
+
+{--
 
 -- | Assert that an expression unifies with a given type
 --
@@ -276,3 +284,4 @@ demoContext =
     , ("False", TyCon "Bool")
     ]
 
+--}
