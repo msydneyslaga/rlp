@@ -19,7 +19,7 @@ module Core.Syntax
     , Pragma(..)
     -- ** Variables and identifiers
     , Name, Var(..), TyCon(..), Tag
-    , Binding(..), pattern (:=)
+    , Binding(..), pattern (:=), pattern (:$)
     , type Binding'
     -- ** Working with the fixed point of ExprF
     , Expr, Expr'
@@ -33,6 +33,7 @@ module Core.Syntax
     , programScDefs, programTypeSigs, programDataTags
     , formalising
     , HasRHS(_rhs), HasLHS(_lhs)
+    , HasBinders(_binders)
     )
     where
 ----------------------------------------------------------------------------------
@@ -49,6 +50,7 @@ import Data.Char
 import Data.These
 import GHC.Generics                 (Generic, Generically(..))
 import Text.Show.Deriving
+import Data.Eq.Deriving
 
 import Data.Fix                     hiding (cata, ana)
 import Data.Bifoldable              (bifoldr)
@@ -88,6 +90,9 @@ data TyCon = MkTyCon Name Kind
 
 data Var = MkVar Name Type
     deriving (Eq, Show, Lift)
+
+instance Hashable Var where
+    hashWithSalt s (MkVar n _) = hashWithSalt s n
 
 pattern Con :: Tag -> Int -> Expr b
 pattern Con t a = Fix (ConF t a)
@@ -129,6 +134,10 @@ infixl 1 :=
 pattern (:=) :: b -> Expr b -> Binding b
 pattern k := v = Binding k v
 
+infixl 2 :$
+pattern (:$) :: Expr b -> Expr b -> Expr b
+pattern f :$ x = App f x
+
 data Alter b = Alter AltCon [b] (Expr b)
 
 newtype Pragma = Pragma [T.Text]
@@ -159,7 +168,7 @@ data Module b = Module (Maybe (Name, [Name])) (Program b)
 data Program b = Program
     { _programScDefs   :: [ScDef b]
     , _programTypeSigs :: HashMap b Type
-    , _programDataTags :: HashMap b (Tag, Int)
+    , _programDataTags :: HashMap Name (Tag, Int)
     -- ^ map constructors to their tag and arity
     }
     deriving (Generic)
@@ -188,6 +197,14 @@ instance IsString (Expr b) where
     fromString = Var . fromString
 
 ----------------------------------------------------------------------------------
+
+class HasBinders s t a b | s -> a, t -> b, s b -> t, t a -> s where
+    _binders :: Traversal s t a b
+
+instance HasBinders (Expr b) (Expr b') b b' where
+    _binders k = cata go where
+        go :: Applicative f => ExprF b (f (Expr b')) -> f (Expr b')
+        go = undefined
 
 class HasRHS s t a b | s -> a, t -> b, s b -> t, t a -> s where
     _rhs :: Lens s t a b
@@ -356,7 +373,15 @@ instance Lift b => Lift1 (ExprF b) where
 deriving instance (Show b, Show a) => Show (ExprF b a)
 deriving instance Show b => Show (Binding b)
 deriving instance Show b => Show (Alter b)
+deriving instance Show b => Show (ScDef b)
+deriving instance Show b => Show (Program b)
 
 deriving instance Lift b => Lift (Binding b)
 deriving instance Lift b => Lift (Alter b)
+
+deriveEq1 ''ExprF
+
+deriving instance Eq b => Eq (Alter b)
+deriving instance Eq b => Eq (Binding b)
+deriving instance (Eq a, Eq b) => Eq (ExprF b a)
 

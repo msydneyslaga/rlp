@@ -1,6 +1,5 @@
 module Core
     ( module Core.Syntax
-    , parseCore
     , parseCoreProg
     , parseCoreExpr
     , lexCore

@@ -5,8 +5,7 @@ Description : Parser for the Core language
 -}
 {-# LANGUAGE OverloadedStrings, ViewPatterns #-}
 module Core.Parse
-    ( parseCore
-    , parseCoreExpr
+    ( parseCoreExpr
     , parseCoreExprR
     , parseCoreProg
     , parseCoreProgR
@@ -31,13 +30,15 @@ import Data.Text.IO         qualified as TIO
 import Data.Text            (Text)
 import Data.Text            qualified as T
 import Data.HashMap.Strict  qualified as H
+
+import Core.Parse.Types
 }
 
 %name parseCoreExpr StandaloneExpr
 %name parseCoreProg StandaloneProgram
 %tokentype { Located CoreToken }
 %error { parseError }
-%monad { RLPC } { happyBind } { happyPure }
+%monad { P }
 
 %token
       let             { Located _ TokenLet }
@@ -74,12 +75,12 @@ Eof             :: { () }
 Eof             : eof           { () }
                 | error         { () }
 
-StandaloneProgram :: { Program Var }
+StandaloneProgram :: { Program PsName }
 StandaloneProgram : Program eof                 { $1 }
 
-Program         :: { Program Var }
-Program         : ScTypeSig ';' Program         { insTypeSig $1 $3 }
-                | ScTypeSig OptSemi             { singletonTypeSig $1 }
+Program         :: { Program PsName }
+Program         : ScTypeSig ';' Program         { insTypeSig ($1 & _1 %~ Left) $3 }
+                | ScTypeSig OptSemi             { singletonTypeSig ($1 & _1 %~ Left) }
                 | ScDef     ';' Program         { insScDef $1 $3 }
                 | ScDef     OptSemi             { singletonScDef $1 }
                 | TLPragma  Program             {% doTLPragma $1 $2 }
@@ -105,24 +106,25 @@ ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
                 | ScDef                         { [$1] }
 
 ScDef           :: { ScDef PsName }
-ScDef           : Id ParList '=' Expr          { ScDef ($1,Nothing) $2 $4 }
+ScDef           : Id ParList '=' Expr          { ScDef (Left $1) $2
+                                                  ($4 & _binders %~ Right) }
 
-Type            :: { [(Name, Kind)] -> Kind -> Type }
-                : Type1 '->' Type   { \cases
-                                        g TyKindType ->
-                                          $1 g TyKindType :-> $3 g TyKindType
-                                        _ _ -> error "kind mismatch" }
+Type            :: { Kind -> Type }
+                : Type1 '->' Type   { \case
+                                        TyKindType ->
+                                          $1 TyKindType :-> $3 TyKindType
+                                        _ -> error "kind mismatch" }
                 | Type1                         { $1 }
 
 -- do we want to allow symbolic names for tyvars and tycons?
 
-Type1           :: { [(Name, Kind)] -> Kind -> Type }
+Type1           :: { Kind -> Type }
 Type1           : '(' Type ')'                  { $2 }
                 | varname                       { \k -> TyVar $ MkVar $1 k }
                 | conname                       { \k -> TyCon $ MkTyCon $1 k }
 
 ParList         :: { [PsName] }
-ParList         : varname ParList               { ($1, Nothing) : $2 }
+ParList         : varname ParList               { Left $1 : $2 }
                 | {- epsilon -}                 { [] }
 
 StandaloneExpr  :: { Expr Var }
@@ -148,7 +150,7 @@ Application     : Application AppArg           { App $1 $2 }
                 | Expr1       AppArg           { App $1 $2 }
 
 AppArg          :: { Expr Var }
-                : '@' Type1                     { Type ($2 [] TyKindInferred) }
+                : '@' Type1                     { Type ($2 TyKindInferred) }
                 | Expr1                         { $1 }
 
 CaseExpr        :: { Expr Var }
@@ -189,11 +191,11 @@ Id              :: { Name }
                 | conname                           { $1 }
 
 Var             :: { Var }
-Var             : '(' varname '::' Type ')'         { MkVar $2 ($4 [] TyKindType) }
+Var             : '(' varname '::' Type ')'         { MkVar $2 ($4 TyKindType) }
 
 {
 
-parseError :: [Located CoreToken] -> RLPC a
+parseError :: [Located CoreToken] -> P a
 parseError (Located _ t : _) =
     error $ "<line>" <> ":" <> "<col>"
          <> ": parse error at token `" <> show t <> "'"
@@ -224,12 +226,13 @@ singletonScDef :: (Hashable b) => ScDef b -> Program b
 singletonScDef sc = insScDef sc mempty
 
 parseCoreExprR :: (Monad m) => [Located CoreToken] -> RLPCT m (Expr Var)
-parseCoreExprR = hoistRlpcT generalise . parseCoreExpr
+parseCoreExprR = liftMaybe . snd . flip runP def . parseCoreExpr
 
-parseCoreProgR :: forall m. (Monad m) => [Located CoreToken] -> RLPCT m (Program Var)
-parseCoreProgR = ddumpast <=< (hoistRlpcT generalise . parseCoreProg)
+parseCoreProgR :: forall m. (Monad m)
+               => [Located CoreToken] -> RLPCT m (Program PsName)
+parseCoreProgR s = ddumpast =<< (liftMaybe . snd $ runP (parseCoreProg s) def)
     where
-        ddumpast :: (Program Var) -> RLPCT m (Program Var)
+        ddumpast :: (Program PsName) -> RLPCT m (Program PsName)
         ddumpast p = do
             addDebugMsg "dump-parsed-core" . show $ p
             pure p
@@ -240,7 +243,7 @@ happyBind m k = m >>= k
 happyPure :: a -> RLPC a
 happyPure a = pure a
 
-doTLPragma :: Pragma -> Program' -> RLPC Program'
+doTLPragma :: Pragma -> Program PsName -> P (Program PsName)
 -- TODO: warn unrecognised pragma
 doTLPragma (Pragma []) p = pure p
 
@@ -252,7 +255,7 @@ doTLPragma (Pragma pr) p = case pr of
 readt :: (Read a) => Text -> a
 readt = read . T.unpack
 
-type PsName = (Name, Maybe Type)
+type PsName = Either Name Var
 
 }
 
