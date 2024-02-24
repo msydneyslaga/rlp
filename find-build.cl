@@ -1,4 +1,4 @@
-#!/usr/bin/env clisp
+#!/usr/bin/env sbcl --script
 
 (let* ((paths (directory "dist-newstyle/build/*/*/rlp-*/build/"))
        (n (length paths)))
