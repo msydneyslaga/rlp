@@ -7,6 +7,7 @@ Description : Core ASTs and the like
 {-# LANGUAGE TemplateHaskell #-}
 -- for recursion-schemes
 {-# LANGUAGE DeriveTraversable, TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Core.Syntax
     -- (
     -- -- * Core AST
@@ -136,7 +137,7 @@ pattern a :-> b = TyApp (TyApp TyFun a) b
 data BindingF b a = BindingF b (ExprF b a)
     deriving (Functor, Foldable, Traversable)
 
--- type Binding b = Fix (BindingF b)
+type Binding b = BindingF b (ExprF b (Fix (ExprF b)))
 
 -- collapse = foldFix embed
 
@@ -154,6 +155,8 @@ data BindingF b a = BindingF b (ExprF b a)
 
 data AlterF b a = AlterF AltCon [b] (ExprF b a)
     deriving (Functor, Foldable, Traversable)
+
+type Alter b = AlterF b (ExprF b (Fix (ExprF b)))
 
 -- pattern Alter :: AltCon -> [b] -> Expr b -> Alter b
 -- pattern Alter con bs e <- Fix (AlterF con bs (undefined -> e))
@@ -365,8 +368,9 @@ explicitLayout as = vcat inner <+> "}" where
     inner = zipWith (<+>) delims (pretty <$> as)
     delims = "{" : repeat ";"
 
--- instance Pretty TyCon
-instance Pretty Var
+instance Pretty Var where
+    prettyPrec p (MkVar n t) = maybeParens (p>0) $
+        hsep [pretty n, ":", pretty t]
 
 --------------------------------------------------------------------------------
 
@@ -465,30 +469,6 @@ deriveBifunctor ''ExprF
 deriveBifoldable ''ExprF
 deriveBitraversable ''ExprF
 
--- instance Bifunctor ExprF where
---     bimap = $(makeBimap ''ExprF)
-
--- instance Bifoldable ExprF where
---     bifoldr = $(makeBifoldr ''ExprF)
-
--- instance Bitraversable ExprF where
---     bitraverse = $(makeBitraverse ''ExprF)
-
--- instance Functor Binding where
--- instance Foldable Binding where
--- instance Traversable Binding where
-
--- instance Functor Alter where
---     fmap f (Alter con bs e) = Alter con bs' e' where
---         bs' = f <$> bs
---         e' = first f `hoistFix` e
-
--- instance Foldable Alter where
---     foldr f z (Alter con bs e) = foldr f (foldrOf binders f z e) bs
-
--- instance Traversable Alter where
---     traverse k (Alter con bs e) = Alter con <$> traverse k bs <*> traverseOf binders k e
-
 instance Lift b => Lift1 (ExprF b) where
     lift1 (VarF k)      = liftCon 'VarF (lift k)
     lift1 (AppF f x)    = liftCon2 'AppF (lift f) (lift x)
@@ -510,21 +490,31 @@ deriving instance Lift b => Lift (Program b)
 class HasBinders s t a b | s -> a, t -> b, s b -> t, t a -> s where
     binders :: Traversal s t a b
 
--- instance HasBinders (Expr b) (Expr b') b b' where
---     binders :: forall f b b'. (Applicative f)
---              => LensLike f (Expr b) (Expr b') b b'
---     binders k = cata go where
---         go :: ExprF b (f (Expr b')) -> f (Expr b')
---         go (LamF bs e) = traverse_ k bs *> e
---         go (CaseF e as) = traverseOf_ (each . binders) k as *> e
---         go (LetF _ bs e) = traverseOf_ (each . binders) k bs *> e
---         go f = wrapFix <$> bitraverse k id f
+-- instance (HasBinders a a' b b')
+--       => HasBinders (ExprF b a) (ExprF b' a') b b' where
+--     binders k = undefined
 
--- instance HasBinders (Alter b) (Alter b') b b' where
---     binders = undefined
+instance HasBinders a a b b'
+    => HasBinders (ExprF b a) (ExprF b' a) b b' where
+    binders :: forall f. (Applicative f)
+                    => LensLike f (ExprF b a) (ExprF b' a) b b'
+    binders k = go where
+        go (LamF bs e)   = LamF <$> traverse k bs <*> binders k e
+        go (CaseF e as)  = CaseF <$> binders k e <*> traverseOf eachbind k as
+        go (LetF r bs e) = LetF r <$> traverseOf eachbind k bs <*> binders k e
+        go f             = bitraverse k pure f
 
--- instance HasBinders (Binding b) (Binding b') b b' where
---     binders = undefined
+        eachbind :: forall a a' b b'. HasBinders a a' b b'
+                 => Traversal [a] [a'] b b'
+        eachbind = each . binders
+
+instance HasBinders a a b b'
+      => HasBinders (AlterF b a) (AlterF b' a) b b' where
+    binders k (AlterF con bs e) =
+        AlterF con <$> traverse k bs <*> traverseOf binders k e
+
+instance HasBinders (BindingF b a) (BindingF b' a) b b' where
+    binders = undefined
 
 -- deriveEq1 ''ExprF
 
