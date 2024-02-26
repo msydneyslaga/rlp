@@ -88,6 +88,9 @@ type Expr b = Fix (ExprF b)
 instance IsString (ExprF b a) where
     fromString = VarF . fromString
 
+instance (IsString (f (Fix f))) => IsString (Fix f) where
+    fromString = Fix . fromString
+
 data Type = TyFun
           | TyVar Name
           | TyApp Type Type
