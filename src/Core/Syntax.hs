@@ -388,6 +388,10 @@ liftShowsPrecExpr :: (Show b)
                   -> Int -> ExprF b a -> ShowS
 liftShowsPrecExpr = $(makeLiftShowsPrec ''ExprF)
 
+showsPrec1Expr :: (Show b, Show a)
+               => Int -> ExprF b a -> ShowS
+showsPrec1Expr = $(makeShowsPrec1 ''ExprF)
+
 instance (Show b) => Show1 (AlterF b) where
     liftShowsPrec sp spl d (AlterF con bs e) =
         showsTernaryWith showsPrec showsPrec (liftShowsPrecExpr sp spl)
@@ -399,14 +403,67 @@ instance (Show b) => Show1 (BindingF b) where
                         "BindingF" d k v
 
 instance (Show b, Show a) => Show (BindingF b a) where
-    showsPrec p (BindingF k v) =
-        showString "BindingF" . showsPrec 11 k . fuckyou 11 v
-      where
-        fuckyou = liftShowsPrecExpr showsPrec showList
+    showsPrec d (BindingF k v)
+        = showParen (d > 10)
+        $ showString "BindingF" . showChar ' '
+        . showsPrec 11 k . showChar ' '
+        . showsPrec1Expr 11 v
 
 instance (Show b, Show a) => Show (AlterF b a) where
+    showsPrec d (AlterF con bs e)
+        = showParen (d > 10)
+        $ showString "AlterF" . showChar ' '
+        . showsPrec 11 con . showChar ' '
+        . showsPrec 11 bs . showChar ' '
+        . showsPrec1Expr 11 e
 
 deriveShow1 ''ExprF
+
+deriving instance (Show b, Show a) => Show (ExprF b a)
+-- deriving instance (Show b, Show a) => Show (BindingF b a)
+-- deriving instance (Show b, Show a) => Show (AlterF b a)
+deriving instance Show b => Show (ScDef b)
+deriving instance Show b => Show (Program b)
+
+bimapExpr :: (b -> b') -> (a -> a')
+          -> ExprF b a -> ExprF b' a'
+bimapExpr = $(makeBimap ''ExprF)
+
+bifoldrExpr :: (b -> c -> c)
+            -> (a -> c -> c)
+            -> c -> ExprF b a -> c
+bifoldrExpr = $(makeBifoldr ''ExprF)
+
+bitraverseExpr :: Applicative f
+               => (b -> f b')
+               -> (a -> f a')
+               -> ExprF b a -> f (ExprF b' a')
+bitraverseExpr = $(makeBitraverse ''ExprF)
+
+instance Bifunctor AlterF where
+    bimap f g (AlterF con bs e) = AlterF con (f <$> bs) (bimapExpr f g e)
+
+instance Bifunctor BindingF where
+    bimap f g (BindingF k v) = BindingF (f k) (bimapExpr f g v)
+
+instance Bifoldable AlterF where
+    bifoldr f g z (AlterF con bs e) = bifoldrExpr f g z' e where
+        z' = foldr f z bs
+
+instance Bitraversable AlterF where
+    bitraverse f g (AlterF con bs e) =
+        AlterF con <$> traverse f bs <*> bitraverseExpr f g e
+
+instance Bifoldable BindingF where
+    bifoldr f g z (BindingF k v) = bifoldrExpr f g (f k z) v
+
+instance Bitraversable BindingF where
+    bitraverse f g (BindingF k v) =
+        BindingF <$> f k <*> bitraverseExpr f g v
+
+deriveBifunctor ''ExprF
+deriveBifoldable ''ExprF
+deriveBitraversable ''ExprF
 
 -- instance Bifunctor ExprF where
 --     bimap = $(makeBimap ''ExprF)
@@ -433,20 +490,14 @@ deriveShow1 ''ExprF
 --     traverse k (Alter con bs e) = Alter con <$> traverse k bs <*> traverseOf binders k e
 
 instance Lift b => Lift1 (ExprF b) where
-    -- lift1 (VarF k)      = liftCon 'VarF (lift k)
-    -- lift1 (AppF f x)    = liftCon2 'AppF (lift f) (lift x)
-    -- lift1 (LamF b e)    = liftCon2 'LamF (lift b) (lift e)
-    -- lift1 (LetF r bs e) = liftCon3 'LetF (lift r) (lift bs) (lift e)
-    -- lift1 (CaseF e as)  = liftCon2 'CaseF (lift e) (lift as)
-    -- lift1 (TypeF t)     = liftCon 'TypeF (lift t)
-    -- lift1 (LitF l)      = liftCon 'LitF (lift l)
-    -- lift1 (ConF t a)    = liftCon2 'ConF (lift t) (lift a)
-
-deriving instance (Show b, Show a) => Show (ExprF b a)
--- deriving instance (Show b, Show a) => Show (BindingF b a)
--- deriving instance (Show b, Show a) => Show (AlterF b a)
-deriving instance Show b => Show (ScDef b)
-deriving instance Show b => Show (Program b)
+    lift1 (VarF k)      = liftCon 'VarF (lift k)
+    lift1 (AppF f x)    = liftCon2 'AppF (lift f) (lift x)
+    lift1 (LamF b e)    = liftCon2 'LamF (lift b) (lift e)
+    lift1 (LetF r bs e) = liftCon3 'LetF (lift r) (lift bs) (lift e)
+    lift1 (CaseF e as)  = liftCon2 'CaseF (lift e) (lift as)
+    lift1 (TypeF t)     = liftCon 'TypeF (lift t)
+    lift1 (LitF l)      = liftCon 'LitF (lift l)
+    lift1 (ConF t a)    = liftCon2 'ConF (lift t) (lift a)
 
 deriving instance (Lift b, Lift a) => Lift (ExprF b a)
 deriving instance (Lift b, Lift a) => Lift (BindingF b a)
