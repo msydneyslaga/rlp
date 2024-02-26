@@ -51,7 +51,7 @@ import Data.HashMap.Strict          qualified as H
 import Data.Hashable
 import Data.Foldable                (traverse_)
 import Data.Functor
-import Data.Functor.Classes         (Show1(..), showsPrec1, showsBinaryWith)
+import Data.Functor.Classes
 import Data.Text                    qualified as T
 import Data.Char
 import Data.These
@@ -84,6 +84,9 @@ data ExprF b a = VarF Name
                deriving (Functor, Foldable, Traversable)
 
 type Expr b = Fix (ExprF b)
+
+instance IsString (ExprF b a) where
+    fromString = VarF . fromString
 
 data Type = TyFun
           | TyVar Name
@@ -235,28 +238,20 @@ type ScDef' = ScDef Name
 class HasRHS s t a b | s -> a, t -> b, s b -> t, t a -> s where
     _rhs :: Lens s t a b
 
--- instance HasRHS (Alter b) (Alter b) (Expr b) (Expr b) where
---     _rhs = lens
---         (\ (Alter _ _ e) -> e)
---         (\ (Alter t as _) e' -> Alter t as e')
+instance HasRHS (AlterF b a) (AlterF b a') (ExprF b a) (ExprF b a') where
+    _rhs = lens
+        (\ (AlterF _ _ e) -> e)
+        (\ (AlterF t as _) e' -> AlterF t as e')
 
 instance HasRHS (ScDef b) (ScDef b) (Expr b) (Expr b) where
     _rhs = lens
         (\ (ScDef _ _ e) -> e)
         (\ (ScDef n as _) e' -> ScDef n as e')
 
--- instance HasRHS (Binding b) (Binding b) (Expr b) (Expr b) where
---     _rhs = lens
---         (\ (_ := e) -> e)
---         (\ (k := _) e' -> k := e')
+instance HasRHS (BindingF b a) (BindingF b' a') (ExprF b a) (ExprF b' a')
 
 class HasLHS s t a b | s -> a, t -> b, s b -> t, t a -> s where
     _lhs :: Lens s t a b
-
--- instance HasLHS (Alter b) (Alter b) (AltCon, [b]) (AltCon, [b]) where
---     _lhs = lens
---         (\ (Alter a bs _) -> (a,bs))
---         (\ (Alter _ _ e) (a',bs') -> Alter a' bs' e)
 
 instance HasLHS (ScDef b) (ScDef b) (b, [b]) (b, [b]) where
     _lhs = lens
@@ -532,9 +527,28 @@ instance (HasBinders (f b (Fix (f b))) (f b' (Fix (f b'))) b b')
       => HasBinders (Fix (f b)) (Fix (f b')) b b' where
     binders k (Fix f) = Fix <$> binders k f
 
--- deriveEq1 ''ExprF
+liftEqExpr :: (Eq b)
+           => (a -> a' -> Bool)
+           -> ExprF b a -> ExprF b a' -> Bool
+liftEqExpr = $(makeLiftEq ''ExprF)
 
--- deriving instance Eq b => Eq (Alter b)
--- deriving instance Eq b => Eq (Binding b)
--- deriving instance (Eq a, Eq b) => Eq (ExprF b a)
+instance (Eq b, Eq a) => Eq (BindingF b a) where
+    BindingF ka va == BindingF kb vb =
+        ka == kb && va `eq` vb
+      where eq = liftEqExpr (==)
+
+instance (Eq b, Eq a) => Eq (AlterF b a) where
+    AlterF cona bsa ea == AlterF conb bsb eb =
+        cona == conb && bsa == bsb && ea `eq` eb
+      where eq = liftEqExpr (==)
+
+instance (Eq b) => Eq1 (AlterF b) where
+    liftEq f (AlterF cona bsa ea) (AlterF conb bsb eb) =
+        cona == conb && bsa == bsb && ea `eq` eb
+      where eq = liftEqExpr f
+
+instance (Eq b) => Eq1 (BindingF b) where
+    liftEq f (BindingF ka va) (BindingF kb vb) =
+        ka == kb && va `eq` vb
+      where eq = liftEqExpr f
 

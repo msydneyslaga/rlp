@@ -128,9 +128,7 @@ floatNonStrictCases g = goE
         -- extract the right-hand sides of a list of bindings, traverse each
         -- one, and return the original list of bindings
         travBs :: (Expr' -> Floater Expr') -> [Binding'] -> Floater [Binding']
-        travBs c bs = bs ^.. each . _rhs
-                    & traverse goC
-                    & const (pure bs)
+        travBs c bs = undefined
         -- ^ ??? what the fuck?
         -- ^ 24/02/22: what is this shit lol?
 

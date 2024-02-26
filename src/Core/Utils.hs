@@ -28,25 +28,29 @@ isAtomic _        = False
 
 ----------------------------------------------------------------------------------
 
-freeVariables :: Expr' -> Set Name
-freeVariables = cata go
-    where
-        go :: ExprF Name (Set Name) -> Set Name
-        go (VarF k)         = S.singleton k
-        -- TODO: collect free vars in rhss of bs
-        go (LetF _ bs e)    = (e `S.union` esFree) `S.difference` ns
-            where
-                es = bs ^.. each . _rhs :: [Expr']
-                ns = S.fromList $ bs ^.. each . _lhs
-                -- TODO: this feels a little wrong. maybe a different scheme is
-                -- appropriate
-                esFree = foldMap id $ freeVariables <$> es
+freeVariables :: Expr b -> Set b
+freeVariables = undefined
 
-        go (CaseF e as)     = e `S.union` asFree
-            where
-                asFree = foldMap id $ freeVariables <$> (fmap altToLam as)
-                -- we map alts to lambdas to avoid writing a 'freeVariablesAlt'
-                altToLam (Alter _ ns e) = Lam ns e
-        go (LamF bs e)      = e `S.difference` (S.fromList bs)
-        go e                = foldMap id e
+-- freeVariables :: Expr' -> Set Name
+-- freeVariables = cata go
+--     where
+--         go :: ExprF Name (Set Name) -> Set Name
+--         go (VarF k)         = S.singleton k
+--         -- TODO: collect free vars in rhss of bs
+--         go (LetF _ bs e)    = (e `S.union` esFree) `S.difference` ns
+--             where
+--                 es = bs ^.. each . _rhs :: [Expr']
+--                 ns = S.fromList $ bs ^.. each . _lhs
+--                 -- TODO: this feels a little wrong. maybe a different scheme is
+--                 -- appropriate
+--                 esFree = foldMap id $ freeVariables <$> es
+
+--         go (CaseF e as)     = e `S.union` asFree
+--             where
+--                 -- asFree = foldMap id $ freeVariables <$> (fmap altToLam as)
+--                 asFree = foldMap (freeVariables . altToLam) as
+--                 -- we map alts to lambdas to avoid writing a 'freeVariablesAlt'
+--                 altToLam (Alter _ ns e) = Lam ns e
+--         go (LamF bs e)      = e `S.difference` (S.fromList bs)
+--         go e                = foldMap id e
 
