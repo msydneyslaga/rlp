@@ -2,40 +2,43 @@
 Module      : Core.Syntax
 Description : Core ASTs and the like
 -}
+-- {-# OPTIONS_GHC -freduction-depth=0 #-}
 {-# LANGUAGE PatternSynonyms, OverloadedStrings #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
 -- for recursion-schemes
 {-# LANGUAGE DeriveTraversable, TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE QuantifiedConstraints #-}
 module Core.Syntax
-    -- (
-    -- -- * Core AST
-    --   ExprF(..), ExprF'
-    -- , ScDef(..), ScDef'
-    -- , Program(..), Program'
-    -- , Type(..), Kind, pattern (:->), pattern TyInt
-    -- , Alter(..), Alter', AltCon(..)
-    -- , Rec(..), Lit(..)
-    -- , Pragma(..)
-    -- -- ** Variables and identifiers
-    -- , Name, Var(..), Tag
-    -- , Binding(..), pattern (:=), pattern (:$)
-    -- , type Binding'
-    -- -- ** Working with the fixed point of ExprF
-    -- , Expr, Expr'
-    -- , pattern Con, pattern Var, pattern App, pattern Lam, pattern Let
-    -- , pattern Case, pattern Type, pattern Lit
+    (
+    -- * Core AST
+      ExprF(..), ExprF'
+    , ScDef(..), ScDef'
+    , Program(..), Program'
+    , Type(..), Kind, pattern (:->), pattern TyInt
+    , Alter(..), Alter', AltCon(..)
+    , pattern Binding, pattern Alter
+    , Rec(..), Lit(..)
+    , Pragma(..)
+    -- ** Variables and identifiers
+    , Name, Var(..), Tag
+    , Binding(..), pattern (:=), pattern (:$)
+    , type Binding'
+    -- ** Working with the fixed point of ExprF
+    , Expr, Expr'
+    , pattern Con, pattern Var, pattern App, pattern Lam, pattern Let
+    , pattern Case, pattern Type, pattern Lit
 
-    -- -- * Misc
-    -- , Pretty(pretty)
+    -- * Misc
+    , Pretty(pretty)
 
-    -- -- * Optics
-    -- , programScDefs, programTypeSigs, programDataTags
-    -- , formalising
-    -- , HasRHS(_rhs), HasLHS(_lhs)
-    -- , HasBinders(binders)
-    -- )
+    -- * Optics
+    , programScDefs, programTypeSigs, programDataTags
+    , formalising
+    , HasRHS(_rhs), HasLHS(_lhs)
+    , HasBinders(binders)
+    )
     where
 ----------------------------------------------------------------------------------
 import Data.Coerce
@@ -47,6 +50,7 @@ import Data.HashMap.Strict          (HashMap)
 import Data.HashMap.Strict          qualified as H
 import Data.Hashable
 import Data.Foldable                (traverse_)
+import Data.Functor
 import Data.Functor.Classes         (Show1(..), showsPrec1, showsBinaryWith)
 import Data.Text                    qualified as T
 import Data.Char
@@ -100,63 +104,71 @@ data Var = MkVar Name Type
 instance Hashable Var where
     hashWithSalt s (MkVar n _) = hashWithSalt s n
 
--- pattern Con :: Tag -> Int -> Expr b
--- pattern Con t a = Fix (ConF t a)
+pattern Con :: Tag -> Int -> Expr b
+pattern Con t a = Fix (ConF t a)
 
--- pattern Var :: Name -> Expr b
--- pattern Var b = Fix (VarF b)
+pattern Var :: Name -> Expr b
+pattern Var b = Fix (VarF b)
 
--- pattern App :: Expr b -> Expr b -> Expr b
--- pattern App f x = Fix (AppF f x)
+pattern App :: Expr b -> Expr b -> Expr b
+pattern App f x = Fix (AppF f x)
 
--- pattern Lam :: [b] -> Expr b -> Expr b
--- pattern Lam bs e = Fix (LamF bs e)
+pattern Lam :: [b] -> Expr b -> Expr b
+pattern Lam bs e = Fix (LamF bs e)
 
--- pattern Let :: Rec -> [Binding b] -> Expr b -> Expr b
--- pattern Let r bs e = Fix (LetF r bs e)
+pattern Let :: Rec -> [Binding b] -> Expr b -> Expr b
+pattern Let r bs e = Fix (LetF r bs e)
 
--- pattern Case :: Expr b -> [Alter b] -> Expr b
--- pattern Case e as = Fix (CaseF e as)
+pattern Case :: Expr b -> [Alter b] -> Expr b
+pattern Case e as = Fix (CaseF e as)
 
--- pattern Type :: Type -> Expr b
--- pattern Type t = Fix (TypeF t)
+pattern Type :: Type -> Expr b
+pattern Type t = Fix (TypeF t)
 
--- pattern Lit :: Lit -> Expr b
--- pattern Lit t = Fix (LitF t)
+pattern Lit :: Lit -> Expr b
+pattern Lit t = Fix (LitF t)
 
--- pattern TyInt :: Type
--- pattern TyInt = TyCon "Int#"
+pattern TyInt :: Type
+pattern TyInt = TyCon "Int#"
 
 infixr 1 :->
 pattern (:->) :: Type -> Type -> Type
 pattern a :-> b = TyApp (TyApp TyFun a) b
 
--- {-# COMPLETE Binding :: Binding #-}
--- {-# COMPLETE (:=) :: Binding #-}
-
 data BindingF b a = BindingF b (ExprF b a)
     deriving (Functor, Foldable, Traversable)
 
-type Binding b = BindingF b (ExprF b (Fix (ExprF b)))
+type Binding b = BindingF b (Fix (ExprF b))
+
+type Binding' = Binding Name
 
 -- collapse = foldFix embed
 
--- pattern Binding :: b -> Expr b -> Binding b
--- pattern Binding k v <- Fix (BindingF k (undefined -> v))
---     where Binding k v = Fix (BindingF k undefined)
+pattern Binding :: b -> Expr b -> Binding b
+pattern Binding k v <- BindingF k (wrapFix -> v)
+    where Binding k v = BindingF k (unwrapFix v)
 
--- infixl 1 :=
--- pattern (:=) :: b -> Expr b -> Binding b
--- pattern k := v = Binding k v
+{-# COMPLETE (:=) #-}
+{-# COMPLETE Binding #-}
 
--- infixl 2 :$
--- pattern (:$) :: Expr b -> Expr b -> Expr b
--- pattern f :$ x = App f x
+infixl 1 :=
+pattern (:=) :: b -> Expr b -> Binding b
+pattern k := v = Binding k v
+
+infixl 2 :$
+pattern (:$) :: Expr b -> Expr b -> Expr b
+pattern f :$ x = App f x
 
 data AlterF b a = AlterF AltCon [b] (ExprF b a)
     deriving (Functor, Foldable, Traversable)
 
-type Alter b = AlterF b (ExprF b (Fix (ExprF b)))
+pattern Alter :: AltCon -> [b] -> Expr b -> Alter b
+pattern Alter con bs e <- AlterF con bs (wrapFix -> e)
+    where Alter con bs e = AlterF con bs (unwrapFix e)
+
+type Alter b = AlterF b (Fix (ExprF b))
+
+type Alter' = Alter Name
 
 -- pattern Alter :: AltCon -> [b] -> Expr b -> Alter b
 -- pattern Alter con bs e <- Fix (AlterF con bs (undefined -> e))
@@ -267,18 +279,18 @@ instance HasLHS (ScDef b) (ScDef b) (b, [b]) (b, [b]) where
 -- For this reason, it's best to consider 'formalising' as if it were two
 -- unrelated unidirectional getters.
 
--- formalising :: Iso (Expr a) (Expr b) (Expr a) (Expr b)
--- formalising = iso sa bt where
---     sa :: Expr a -> Expr a
---     sa = ana \case
---         Lam [b] e    -> LamF [b] e
---         Lam (b:bs) e -> LamF [b] (Lam bs e)
---         x            -> project x
+formalising :: Iso (Expr a) (Expr b) (Expr a) (Expr b)
+formalising = iso sa bt where
+    sa :: Expr a -> Expr a
+    sa = ana \case
+        Lam [b] e    -> LamF [b] e
+        Lam (b:bs) e -> LamF [b] (Lam bs e)
+        x            -> project x
 
---     bt :: Expr b -> Expr b
---     bt = cata \case
---         LamF [b] (Lam bs e) -> Lam (b:bs) e
---         x                   -> embed x
+    bt :: Expr b -> Expr b
+    bt = cata \case
+        LamF [b] (Lam bs e) -> Lam (b:bs) e
+        x                   -> embed x
 
 --------------------------------------------------------------------------------
 
@@ -494,19 +506,19 @@ class HasBinders s t a b | s -> a, t -> b, s b -> t, t a -> s where
 --       => HasBinders (ExprF b a) (ExprF b' a') b b' where
 --     binders k = undefined
 
-instance HasBinders a a b b'
-    => HasBinders (ExprF b a) (ExprF b' a) b b' where
+instance HasBinders a a' b b'
+    => HasBinders (ExprF b a) (ExprF b' a') b b' where
     binders :: forall f. (Applicative f)
-                    => LensLike f (ExprF b a) (ExprF b' a) b b'
+                    => LensLike f (ExprF b a) (ExprF b' a') b b'
     binders k = go where
+        go :: ExprF b a -> f (ExprF b' a')
         go (LamF bs e)   = LamF <$> traverse k bs <*> binders k e
-        go (CaseF e as)  = CaseF <$> binders k e <*> traverseOf eachbind k as
-        go (LetF r bs e) = LetF r <$> traverseOf eachbind k bs <*> binders k e
-        go f             = bitraverse k pure f
+        go (CaseF e as)  = CaseF <$> binders k e <*> eachbind as
+        go (LetF r bs e) = LetF r <$> eachbind bs <*> binders k e
+        go f             = bitraverse k (binders k) f
 
-        eachbind :: forall a a' b b'. HasBinders a a' b b'
-                 => Traversal [a] [a'] b b'
-        eachbind = each . binders
+        eachbind :: forall p. Bitraversable p => [p b a] -> f [p b' a']
+        eachbind bs = bitraverse k (binders k) `traverse` bs
 
 instance HasBinders a a b b'
       => HasBinders (AlterF b a) (AlterF b' a) b b' where
@@ -515,6 +527,10 @@ instance HasBinders a a b b'
 
 instance HasBinders (BindingF b a) (BindingF b' a) b b' where
     binders = undefined
+
+instance (HasBinders (f b (Fix (f b))) (f b' (Fix (f b'))) b b')
+      => HasBinders (Fix (f b)) (Fix (f b')) b b' where
+    binders k (Fix f) = Fix <$> binders k f
 
 -- deriveEq1 ''ExprF
 
