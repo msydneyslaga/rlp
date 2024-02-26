@@ -53,6 +53,6 @@ type PsName = Either Name Var
 
 --------------------------------------------------------------------------------
 
-finishTyping :: PState -> Program PsName -> Program Var
-finishTyping = undefined
+finishTyping :: Program PsName -> P (Program Var)
+finishTyping = error . show
 

@@ -10,12 +10,9 @@ import Core.Syntax
 import Core.TH
 ----------------------------------------------------------------------------------
 
--- fac3 = undefined
--- sumList = undefined
--- constDivZero = undefined
--- idCase = undefined
+letRecExample = undefined
 
----
+{--
 
 letrecExample :: Program'
 letrecExample = [coreProg|

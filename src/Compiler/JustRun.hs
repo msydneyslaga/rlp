@@ -44,8 +44,9 @@ justLexCore s = lexCoreR (T.pack s)
 
 justParseCore :: String -> Either [MsgEnvelope RlpcError] Program'
 justParseCore s = parse (T.pack s)
+                & undefined
                 & rlpcToEither
-    where parse = lexCoreR >=> parseCoreProgR
+    where parse = lexCoreR @Identity >=> parseCoreProgR
 
 justTypeCheckCore :: String -> Either [MsgEnvelope RlpcError] Program'
 justTypeCheckCore s = typechk (T.pack s)

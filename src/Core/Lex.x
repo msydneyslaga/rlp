@@ -78,7 +78,7 @@ rlp :-
     "{"                     { constTok TokenLBrace }
     "}"                     { constTok TokenRBrace }
     ";"                     { constTok TokenSemicolon }
-    "::"                    { constTok TokenHasType }
+    ":"                     { constTok TokenHasType }
     "@"                     { constTok TokenTypeApp }
     "{-#"                   { constTok TokenLPragma `andBegin` pragma }
 

@@ -76,6 +76,7 @@ library
                     , deriving-compat ^>=0.6.0
                     , these >=0.2 && <2.0
                     , free >=5.2
+                    , bifunctors >=5.2
 
     hs-source-dirs:   src
     default-language: GHC2021

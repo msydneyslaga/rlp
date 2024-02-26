@@ -8,33 +8,33 @@ Description : Core ASTs and the like
 -- for recursion-schemes
 {-# LANGUAGE DeriveTraversable, TypeFamilies #-}
 module Core.Syntax
-    (
-    -- * Core AST
-      ExprF(..), ExprF'
-    , ScDef(..), ScDef'
-    , Program(..), Program'
-    , Type(..), Kind, pattern (:->), pattern TyInt
-    , Alter(..), Alter', AltCon(..)
-    , Rec(..), Lit(..)
-    , Pragma(..)
-    -- ** Variables and identifiers
-    , Name, Var(..), TyCon(..), Tag
-    , Binding(..), pattern (:=), pattern (:$)
-    , type Binding'
-    -- ** Working with the fixed point of ExprF
-    , Expr, Expr'
-    , pattern Con, pattern Var, pattern App, pattern Lam, pattern Let
-    , pattern Case, pattern Type, pattern Lit
+    -- (
+    -- -- * Core AST
+    --   ExprF(..), ExprF'
+    -- , ScDef(..), ScDef'
+    -- , Program(..), Program'
+    -- , Type(..), Kind, pattern (:->), pattern TyInt
+    -- , Alter(..), Alter', AltCon(..)
+    -- , Rec(..), Lit(..)
+    -- , Pragma(..)
+    -- -- ** Variables and identifiers
+    -- , Name, Var(..), Tag
+    -- , Binding(..), pattern (:=), pattern (:$)
+    -- , type Binding'
+    -- -- ** Working with the fixed point of ExprF
+    -- , Expr, Expr'
+    -- , pattern Con, pattern Var, pattern App, pattern Lam, pattern Let
+    -- , pattern Case, pattern Type, pattern Lit
 
-    -- * Misc
-    , Pretty(pretty)
+    -- -- * Misc
+    -- , Pretty(pretty)
 
-    -- * Optics
-    , programScDefs, programTypeSigs, programDataTags
-    , formalising
-    , HasRHS(_rhs), HasLHS(_lhs)
-    , HasBinders(_binders)
-    )
+    -- -- * Optics
+    -- , programScDefs, programTypeSigs, programDataTags
+    -- , formalising
+    -- , HasRHS(_rhs), HasLHS(_lhs)
+    -- , HasBinders(binders)
+    -- )
     where
 ----------------------------------------------------------------------------------
 import Data.Coerce
@@ -45,6 +45,8 @@ import Data.String
 import Data.HashMap.Strict          (HashMap)
 import Data.HashMap.Strict          qualified as H
 import Data.Hashable
+import Data.Foldable                (traverse_)
+import Data.Functor.Classes         (Show1(..), showsPrec1, showsBinaryWith)
 import Data.Text                    qualified as T
 import Data.Char
 import Data.These
@@ -53,20 +55,24 @@ import Text.Show.Deriving
 import Data.Eq.Deriving
 
 import Data.Fix                     hiding (cata, ana)
-import Data.Bifoldable              (bifoldr)
+import Data.Bifunctor               (Bifunctor(..))
+import Data.Bifoldable              (bifoldr, Bifoldable(..))
+import Data.Bifunctor.TH
+import Data.Bitraversable
 import Data.Functor.Foldable
 import Data.Functor.Foldable.TH     (makeBaseFunctor)
 
 -- Lift instances for the Core quasiquoters
+import Misc
 import Misc.Lift1
 import Control.Lens
 ----------------------------------------------------------------------------------
 
 data ExprF b a = VarF Name
                | ConF Tag Int -- ^ Con Tag Arity
-               | CaseF a [Alter b]
+               | CaseF a [AlterF b a]
                | LamF [b] a
-               | LetF Rec [Binding b] a
+               | LetF Rec [BindingF b a] a
                | AppF a a
                | LitF Lit
                | TypeF Type
@@ -77,16 +83,15 @@ type Expr b = Fix (ExprF b)
 data Type = TyFun
           | TyVar Name
           | TyApp Type Type
-          | TyCon TyCon
+          | TyCon Name
           | TyForall Var Type
           | TyKindType
-          | TyKindInferred
           deriving (Show, Eq, Lift)
 
 type Kind = Type
 
-data TyCon = MkTyCon Name Kind
-    deriving (Eq, Show, Lift)
+-- data TyCon = MkTyCon Name Kind
+--     deriving (Eq, Show, Lift)
 
 data Var = MkVar Name Type
     deriving (Eq, Show, Lift)
@@ -94,51 +99,65 @@ data Var = MkVar Name Type
 instance Hashable Var where
     hashWithSalt s (MkVar n _) = hashWithSalt s n
 
-pattern Con :: Tag -> Int -> Expr b
-pattern Con t a = Fix (ConF t a)
+-- pattern Con :: Tag -> Int -> Expr b
+-- pattern Con t a = Fix (ConF t a)
 
-pattern Var :: Name -> Expr b
-pattern Var b = Fix (VarF b)
+-- pattern Var :: Name -> Expr b
+-- pattern Var b = Fix (VarF b)
 
-pattern App :: Expr b -> Expr b -> Expr b
-pattern App f x = Fix (AppF f x)
+-- pattern App :: Expr b -> Expr b -> Expr b
+-- pattern App f x = Fix (AppF f x)
 
-pattern Lam :: [b] -> Expr b -> Expr b
-pattern Lam bs e = Fix (LamF bs e)
+-- pattern Lam :: [b] -> Expr b -> Expr b
+-- pattern Lam bs e = Fix (LamF bs e)
 
-pattern Let :: Rec -> [Binding b] -> Expr b -> Expr b
-pattern Let r bs e = Fix (LetF r bs e)
+-- pattern Let :: Rec -> [Binding b] -> Expr b -> Expr b
+-- pattern Let r bs e = Fix (LetF r bs e)
 
-pattern Case :: Expr b -> [Alter b] -> Expr b
-pattern Case e as = Fix (CaseF e as)
+-- pattern Case :: Expr b -> [Alter b] -> Expr b
+-- pattern Case e as = Fix (CaseF e as)
 
-pattern Type :: Type -> Expr b
-pattern Type t = Fix (TypeF t)
+-- pattern Type :: Type -> Expr b
+-- pattern Type t = Fix (TypeF t)
 
-pattern Lit :: Lit -> Expr b
-pattern Lit t = Fix (LitF t)
+-- pattern Lit :: Lit -> Expr b
+-- pattern Lit t = Fix (LitF t)
 
-pattern TyInt :: Type
-pattern TyInt = TyCon (MkTyCon "Int#" TyKindType)
+-- pattern TyInt :: Type
+-- pattern TyInt = TyCon "Int#"
 
 infixr 1 :->
 pattern (:->) :: Type -> Type -> Type
 pattern a :-> b = TyApp (TyApp TyFun a) b
 
-{-# COMPLETE Binding :: Binding #-}
-{-# COMPLETE (:=) :: Binding #-}
+-- {-# COMPLETE Binding :: Binding #-}
+-- {-# COMPLETE (:=) :: Binding #-}
 
-data Binding b = Binding b (Expr b)
+data BindingF b a = BindingF b (ExprF b a)
+    deriving (Functor, Foldable, Traversable)
 
-infixl 1 :=
-pattern (:=) :: b -> Expr b -> Binding b
-pattern k := v = Binding k v
+-- type Binding b = Fix (BindingF b)
 
-infixl 2 :$
-pattern (:$) :: Expr b -> Expr b -> Expr b
-pattern f :$ x = App f x
+-- collapse = foldFix embed
 
-data Alter b = Alter AltCon [b] (Expr b)
+-- pattern Binding :: b -> Expr b -> Binding b
+-- pattern Binding k v <- Fix (BindingF k (undefined -> v))
+--     where Binding k v = Fix (BindingF k undefined)
+
+-- infixl 1 :=
+-- pattern (:=) :: b -> Expr b -> Binding b
+-- pattern k := v = Binding k v
+
+-- infixl 2 :$
+-- pattern (:$) :: Expr b -> Expr b -> Expr b
+-- pattern f :$ x = App f x
+
+data AlterF b a = AlterF AltCon [b] (ExprF b a)
+    deriving (Functor, Foldable, Traversable)
+
+-- pattern Alter :: AltCon -> [b] -> Expr b -> Alter b
+-- pattern Alter con bs e <- Fix (AlterF con bs (undefined -> e))
+--     where Alter con bs e = Fix (AlterF con bs undefined)
 
 newtype Pragma = Pragma [T.Text]
 
@@ -160,8 +179,8 @@ type Tag = Int
 
 data ScDef b = ScDef b [b] (Expr b)
 
-unliftScDef :: ScDef b -> Expr b
-unliftScDef (ScDef _ as e) = Lam as e
+-- unliftScDef :: ScDef b -> Expr b
+-- unliftScDef (ScDef _ as e) = Lam as e
 
 data Module b = Module (Maybe (Name, [Name])) (Program b)
 
@@ -190,57 +209,49 @@ type ExprF' = ExprF Name
 type Program' = Program Name
 type Expr' = Expr Name
 type ScDef' = ScDef Name
-type Alter' = Alter Name
-type Binding' = Binding Name
+-- type Alter' = Alter Name
+-- type Binding' = Binding Name
 
-instance IsString (Expr b) where
-    fromString = Var . fromString
+-- instance IsString (Expr b) where
+--     fromString = Var . fromString
 
 ----------------------------------------------------------------------------------
-
-class HasBinders s t a b | s -> a, t -> b, s b -> t, t a -> s where
-    _binders :: Traversal s t a b
-
-instance HasBinders (Expr b) (Expr b') b b' where
-    _binders k = cata go where
-        go :: Applicative f => ExprF b (f (Expr b')) -> f (Expr b')
-        go = undefined
 
 class HasRHS s t a b | s -> a, t -> b, s b -> t, t a -> s where
     _rhs :: Lens s t a b
 
-instance HasRHS (Alter b) (Alter b) (Expr b) (Expr b) where
-    _rhs = lens
-        (\ (Alter _ _ e) -> e)
-        (\ (Alter t as _) e' -> Alter t as e')
+-- instance HasRHS (Alter b) (Alter b) (Expr b) (Expr b) where
+--     _rhs = lens
+--         (\ (Alter _ _ e) -> e)
+--         (\ (Alter t as _) e' -> Alter t as e')
 
 instance HasRHS (ScDef b) (ScDef b) (Expr b) (Expr b) where
     _rhs = lens
         (\ (ScDef _ _ e) -> e)
         (\ (ScDef n as _) e' -> ScDef n as e')
 
-instance HasRHS (Binding b) (Binding b) (Expr b) (Expr b) where
-    _rhs = lens
-        (\ (_ := e) -> e)
-        (\ (k := _) e' -> k := e')
+-- instance HasRHS (Binding b) (Binding b) (Expr b) (Expr b) where
+--     _rhs = lens
+--         (\ (_ := e) -> e)
+--         (\ (k := _) e' -> k := e')
 
 class HasLHS s t a b | s -> a, t -> b, s b -> t, t a -> s where
     _lhs :: Lens s t a b
 
-instance HasLHS (Alter b) (Alter b) (AltCon, [b]) (AltCon, [b]) where
-    _lhs = lens
-        (\ (Alter a bs _) -> (a,bs))
-        (\ (Alter _ _ e) (a',bs') -> Alter a' bs' e)
+-- instance HasLHS (Alter b) (Alter b) (AltCon, [b]) (AltCon, [b]) where
+--     _lhs = lens
+--         (\ (Alter a bs _) -> (a,bs))
+--         (\ (Alter _ _ e) (a',bs') -> Alter a' bs' e)
 
 instance HasLHS (ScDef b) (ScDef b) (b, [b]) (b, [b]) where
     _lhs = lens
         (\ (ScDef n as _) -> (n,as))
         (\ (ScDef _ _ e) (n',as') -> ScDef n' as' e)
 
-instance HasLHS (Binding b) (Binding b) b b where
-    _lhs = lens
-        (\ (k := _) -> k)
-        (\ (_ := e) k' -> k' := e)
+-- instance HasLHS (Binding b) (Binding b) b b where
+    -- _lhs = lens
+    --     (\ (k := _) -> k)
+    --     (\ (_ := e) k' -> k' := e)
 
 -- | This is not a valid isomorphism for expressions containing lambdas whose
 -- bodies are themselves lambdas with multiple arguments:
@@ -253,18 +264,18 @@ instance HasLHS (Binding b) (Binding b) b b where
 -- For this reason, it's best to consider 'formalising' as if it were two
 -- unrelated unidirectional getters.
 
-formalising :: Iso (Expr a) (Expr b) (Expr a) (Expr b)
-formalising = iso sa bt where
-    sa :: Expr a -> Expr a
-    sa = ana \case
-        Lam [b] e    -> LamF [b] e
-        Lam (b:bs) e -> LamF [b] (Lam bs e)
-        x            -> project x
+-- formalising :: Iso (Expr a) (Expr b) (Expr a) (Expr b)
+-- formalising = iso sa bt where
+--     sa :: Expr a -> Expr a
+--     sa = ana \case
+--         Lam [b] e    -> LamF [b] e
+--         Lam (b:bs) e -> LamF [b] (Lam bs e)
+--         x            -> project x
 
-    bt :: Expr b -> Expr b
-    bt = cata \case
-        LamF [b] (Lam bs e) -> Lam (b:bs) e
-        x                   -> embed x
+--     bt :: Expr b -> Expr b
+--     bt = cata \case
+--         LamF [b] (Lam bs e) -> Lam (b:bs) e
+--         x                   -> embed x
 
 --------------------------------------------------------------------------------
 
@@ -320,22 +331,22 @@ instance (Pretty b) => Pretty (ScDef b) where
             e = pretty $ sc ^. _rhs
 
 instance (Pretty b) => Pretty (Expr b) where
-    prettyPrec _ (Var n)      = ttext n
-    prettyPrec _ (Con t a)    = "Pack{" <> (ttext t <+> ttext a) <> "}"
-    prettyPrec _ (Lam bs e)   = hsep ["λ", hsep (prettyPrec 1 <$> bs), "->", pretty e]
-    prettyPrec _ (Let r bs e) = hsep [word, explicitLayout bs]
-                            $+$ hsep ["in", pretty e]
-        where word = if r == Rec then "letrec" else "let"
-    prettyPrec p (App f x)    = maybeParens (p>0) $
-        prettyPrec 0 f <+> prettyPrec 1 x
-    prettyPrec _ (Lit l)      = pretty l
-    prettyPrec p (Case e as)  = maybeParens (p>0) $
-        "case" <+> pretty e <+> "of"
-        $+$ nest 2 (explicitLayout as)
+    -- prettyPrec _ (Var n)      = ttext n
+    -- prettyPrec _ (Con t a)    = "Pack{" <> (ttext t <+> ttext a) <> "}"
+    -- prettyPrec _ (Lam bs e)   = hsep ["λ", hsep (prettyPrec 1 <$> bs), "->", pretty e]
+    -- prettyPrec _ (Let r bs e) = hsep [word, explicitLayout bs]
+    --                         $+$ hsep ["in", pretty e]
+    --     where word = if r == Rec then "letrec" else "let"
+    -- prettyPrec p (App f x)    = maybeParens (p>0) $
+    --     prettyPrec 0 f <+> prettyPrec 1 x
+    -- prettyPrec _ (Lit l)      = pretty l
+    -- prettyPrec p (Case e as)  = maybeParens (p>0) $
+    --     "case" <+> pretty e <+> "of"
+    --     $+$ nest 2 (explicitLayout as)
 
-instance (Pretty b) => Pretty (Alter b) where
-    pretty (Alter c as e) =
-        hsep [pretty c, hsep (pretty <$> as), "->", pretty e]
+instance (Pretty b, Pretty a) => Pretty (AlterF b a) where
+    -- pretty (Alter c as e) =
+    --     hsep [pretty c, hsep (pretty <$> as), "->", pretty e]
 
 instance Pretty AltCon where
     pretty (AltData n) = ttext n
@@ -346,43 +357,127 @@ instance Pretty AltCon where
 instance Pretty Lit where
     pretty (IntL n) = ttext n
 
-instance (Pretty b) => Pretty (Binding b) where
-    pretty (k := v) = hsep [pretty k, "=", pretty v]
+instance (Pretty b, Pretty a) => Pretty (BindingF b a) where
+    -- pretty (k := v) = hsep [pretty k, "=", pretty v]
 
 explicitLayout :: (Pretty a) => [a] -> Doc
 explicitLayout as = vcat inner <+> "}" where
     inner = zipWith (<+>) delims (pretty <$> as)
     delims = "{" : repeat ";"
 
-instance Pretty TyCon
+-- instance Pretty TyCon
 instance Pretty Var
 
 --------------------------------------------------------------------------------
 
+-- instance Functor Alter where
+--     fmap f (Alter con bs e) = Alter con (f <$> bs) e'
+--         where
+--             e' = foldFix (embed . bimap' f id) e
+--             bimap' = $(makeBimap ''ExprF)
+
+-- instance Foldable Alter where
+-- instance Traversable Alter where
+-- instance Functor Binding where
+-- instance Foldable Binding where
+-- instance Traversable Binding where
+
+liftShowsPrecExpr :: (Show b)
+                  => (Int -> a -> ShowS)
+                  -> ([a] -> ShowS)
+                  -> Int -> ExprF b a -> ShowS
+liftShowsPrecExpr = $(makeLiftShowsPrec ''ExprF)
+
+instance (Show b) => Show1 (AlterF b) where
+    liftShowsPrec sp spl d (AlterF con bs e) =
+        showsTernaryWith showsPrec showsPrec (liftShowsPrecExpr sp spl)
+                         "AlterF" d con bs e
+
+instance (Show b) => Show1 (BindingF b) where
+    liftShowsPrec sp spl d (BindingF k v) =
+        showsBinaryWith showsPrec (liftShowsPrecExpr sp spl)
+                        "BindingF" d k v
+
+instance (Show b, Show a) => Show (BindingF b a) where
+    showsPrec p (BindingF k v) =
+        showString "BindingF" . showsPrec 11 k . fuckyou 11 v
+      where
+        fuckyou = liftShowsPrecExpr showsPrec showList
+
+instance (Show b, Show a) => Show (AlterF b a) where
+
 deriveShow1 ''ExprF
 
+-- instance Bifunctor ExprF where
+--     bimap = $(makeBimap ''ExprF)
+
+-- instance Bifoldable ExprF where
+--     bifoldr = $(makeBifoldr ''ExprF)
+
+-- instance Bitraversable ExprF where
+--     bitraverse = $(makeBitraverse ''ExprF)
+
+-- instance Functor Binding where
+-- instance Foldable Binding where
+-- instance Traversable Binding where
+
+-- instance Functor Alter where
+--     fmap f (Alter con bs e) = Alter con bs' e' where
+--         bs' = f <$> bs
+--         e' = first f `hoistFix` e
+
+-- instance Foldable Alter where
+--     foldr f z (Alter con bs e) = foldr f (foldrOf binders f z e) bs
+
+-- instance Traversable Alter where
+--     traverse k (Alter con bs e) = Alter con <$> traverse k bs <*> traverseOf binders k e
+
 instance Lift b => Lift1 (ExprF b) where
-    lift1 (VarF k)      = liftCon 'VarF (lift k)
-    lift1 (AppF f x)    = liftCon2 'AppF (lift f) (lift x)
-    lift1 (LamF b e)    = liftCon2 'LamF (lift b) (lift e)
-    lift1 (LetF r bs e) = liftCon3 'LetF (lift r) (lift bs) (lift e)
-    lift1 (CaseF e as)  = liftCon2 'CaseF (lift e) (lift as)
-    lift1 (TypeF t)     = liftCon 'TypeF (lift t)
-    lift1 (LitF l)      = liftCon 'LitF (lift l)
-    lift1 (ConF t a)    = liftCon2 'ConF (lift t) (lift a)
+    -- lift1 (VarF k)      = liftCon 'VarF (lift k)
+    -- lift1 (AppF f x)    = liftCon2 'AppF (lift f) (lift x)
+    -- lift1 (LamF b e)    = liftCon2 'LamF (lift b) (lift e)
+    -- lift1 (LetF r bs e) = liftCon3 'LetF (lift r) (lift bs) (lift e)
+    -- lift1 (CaseF e as)  = liftCon2 'CaseF (lift e) (lift as)
+    -- lift1 (TypeF t)     = liftCon 'TypeF (lift t)
+    -- lift1 (LitF l)      = liftCon 'LitF (lift l)
+    -- lift1 (ConF t a)    = liftCon2 'ConF (lift t) (lift a)
 
 deriving instance (Show b, Show a) => Show (ExprF b a)
-deriving instance Show b => Show (Binding b)
-deriving instance Show b => Show (Alter b)
+-- deriving instance (Show b, Show a) => Show (BindingF b a)
+-- deriving instance (Show b, Show a) => Show (AlterF b a)
 deriving instance Show b => Show (ScDef b)
 deriving instance Show b => Show (Program b)
 
-deriving instance Lift b => Lift (Binding b)
-deriving instance Lift b => Lift (Alter b)
+deriving instance (Lift b, Lift a) => Lift (ExprF b a)
+deriving instance (Lift b, Lift a) => Lift (BindingF b a)
+deriving instance (Lift b, Lift a) => Lift (AlterF b a)
+deriving instance Lift b => Lift (ScDef b)
+deriving instance Lift b => Lift (Program b)
 
-deriveEq1 ''ExprF
+--------------------------------------------------------------------------------
 
-deriving instance Eq b => Eq (Alter b)
-deriving instance Eq b => Eq (Binding b)
-deriving instance (Eq a, Eq b) => Eq (ExprF b a)
+class HasBinders s t a b | s -> a, t -> b, s b -> t, t a -> s where
+    binders :: Traversal s t a b
+
+-- instance HasBinders (Expr b) (Expr b') b b' where
+--     binders :: forall f b b'. (Applicative f)
+--              => LensLike f (Expr b) (Expr b') b b'
+--     binders k = cata go where
+--         go :: ExprF b (f (Expr b')) -> f (Expr b')
+--         go (LamF bs e) = traverse_ k bs *> e
+--         go (CaseF e as) = traverseOf_ (each . binders) k as *> e
+--         go (LetF _ bs e) = traverseOf_ (each . binders) k bs *> e
+--         go f = wrapFix <$> bitraverse k id f
+
+-- instance HasBinders (Alter b) (Alter b') b b' where
+--     binders = undefined
+
+-- instance HasBinders (Binding b) (Binding b') b b' where
+--     binders = undefined
+
+-- deriveEq1 ''ExprF
+
+-- deriving instance Eq b => Eq (Alter b)
+-- deriving instance Eq b => Eq (Binding b)
+-- deriving instance (Eq a, Eq b) => Eq (ExprF b a)
 

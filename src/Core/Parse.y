@@ -66,7 +66,7 @@ import Core.Parse.Types
       '{-#'           { Located _ TokenLPragma }
       '#-}'           { Located _ TokenRPragma }
       ';'             { Located _ TokenSemicolon }
-      '::'            { Located _ TokenHasType }
+      ':'             { Located _ TokenHasType }
       eof             { Located _ TokenEOF }
 
 %%
@@ -75,8 +75,8 @@ Eof             :: { () }
 Eof             : eof           { () }
                 | error         { () }
 
-StandaloneProgram :: { Program PsName }
-StandaloneProgram : Program eof                 { $1 }
+StandaloneProgram :: { Program Var }
+StandaloneProgram : Program eof                 {% finishTyping $1 }
 
 Program         :: { Program PsName }
 Program         : ScTypeSig ';' Program         { insTypeSig ($1 & _1 %~ Left) $3 }
@@ -98,7 +98,7 @@ OptSemi         : ';'                           { () }
                 | {- epsilon -}                 { () }
 
 ScTypeSig       :: { (Name, Type) }
-ScTypeSig       : Id '::' Type                  { ($1, $3 TyKindType) }
+ScTypeSig       : Id ':' Type                   { ($1, $3) }
 
 ScDefs          :: { [ScDef PsName] }
 ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
@@ -106,22 +106,19 @@ ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
                 | ScDef                         { [$1] }
 
 ScDef           :: { ScDef PsName }
-ScDef           : Id ParList '=' Expr          { ScDef (Left $1) $2
-                                                  ($4 & _binders %~ Right) }
+ScDef           : Id ParList '=' Expr   { ScDef (Left $1) $2
+                                                ($4 & binders %~ Right) }
 
-Type            :: { Kind -> Type }
-                : Type1 '->' Type   { \case
-                                        TyKindType ->
-                                          $1 TyKindType :-> $3 TyKindType
-                                        _ -> error "kind mismatch" }
+Type            :: { Type }
+                : Type1 '->' Type               { $1 :-> $3 }
                 | Type1                         { $1 }
 
 -- do we want to allow symbolic names for tyvars and tycons?
 
-Type1           :: { Kind -> Type }
+Type1           :: { Type }
 Type1           : '(' Type ')'                  { $2 }
-                | varname                       { \k -> TyVar $1 }
-                | conname                       { \k -> TyCon $ MkTyCon $1 k }
+                | varname                       { TyVar $1 }
+                | conname                       { TyCon $1 }
 
 ParList         :: { [PsName] }
 ParList         : varname ParList               { Left $1 : $2 }
@@ -150,7 +147,7 @@ Application     : Application AppArg           { App $1 $2 }
                 | Expr1       AppArg           { App $1 $2 }
 
 AppArg          :: { Expr Var }
-                : '@' Type1                     { Type ($2 TyKindInferred) }
+                : '@' Type1                     { Type $2 }
                 | Expr1                         { $1 }
 
 CaseExpr        :: { Expr Var }
@@ -191,7 +188,7 @@ Id              :: { Name }
                 | conname                           { $1 }
 
 Var             :: { Var }
-Var             : '(' varname '::' Type ')'         { MkVar $2 ($4 TyKindType) }
+Var             : '(' varname ':' Type ')'          { MkVar $2 $4 }
 
 {
 
@@ -200,18 +197,12 @@ parseError (Located _ t : _) =
     error $ "<line>" <> ":" <> "<col>"
          <> ": parse error at token `" <> show t <> "'"
 
-{-# WARNING parseError "unimpl" #-}
-
 exprPragma :: [String] -> RLPC (Expr Var)
 exprPragma ("AST" : e) = undefined
 exprPragma _           = undefined
 
-{-# WARNING exprPragma "unimpl" #-}
-
 astPragma :: [String] -> RLPC (Expr Var)
 astPragma _ = undefined
-
-{-# WARNING astPragma "unimpl" #-}
 
 insTypeSig :: (Hashable b) => (b, Type) -> Program b -> Program b
 insTypeSig ts = programTypeSigs %~ uncurry H.insert ts
@@ -234,9 +225,8 @@ parseCoreProgR s = do
     let p = runP (parseCoreProg s) def
     case p of
         (st, Just a) -> do
-            let a' = finishTyping st a
-            ddumpast a'
-            pure a'
+            ddumpast a
+            pure a
   where
     ddumpast :: Show a => Program a -> RLPCT m (Program a)
     ddumpast p = do

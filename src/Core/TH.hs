@@ -5,8 +5,8 @@ Description : Core quasiquoters
 module Core.TH
     ( coreExpr
     , coreProg
-    , coreExprT
-    , coreProgT
+    -- , coreExprT
+    -- , coreProgT
     )
     where
 ----------------------------------------------------------------------------------
@@ -33,18 +33,18 @@ coreExpr :: QuasiQuoter
 coreExpr = mkqq $ lexCoreR >=> parseCoreExprR
 
 -- | Type-checked @coreProg@
-coreProgT :: QuasiQuoter
-coreProgT = mkqq $ lexCoreR >=> parseCoreProgR >=> checkCoreProgR
+-- coreProgT :: QuasiQuoter
+-- coreProgT = mkqq $ lexCoreR >=> parseCoreProgR >=> checkCoreProgR
 
-coreExprT :: QuasiQuoter
-coreExprT = mkqq $ lexCoreR >=> parseCoreExprR >=> checkCoreExprR g
-    where
-        g = [ ("+#", TyInt :-> TyInt :-> TyInt)
-            , ("id", TyForall (MkVar "a" TyKindType) $
-                    TyVar "a" :-> TyVar "a")
-            , ("fix", TyForall (MkVar "a" TyKindType) $
-                    (TyVar "a" :-> TyVar "a") :-> TyVar "a")
-            ]
+-- coreExprT :: QuasiQuoter
+-- coreExprT = mkqq $ lexCoreR >=> parseCoreExprR >=> checkCoreExprR g
+--     where
+--         g = [ ("+#", TyInt :-> TyInt :-> TyInt)
+--             , ("id", TyForall (MkVar "a" TyKindType) $
+--                     TyVar "a" :-> TyVar "a")
+--             , ("fix", TyForall (MkVar "a" TyKindType) $
+--                     (TyVar "a" :-> TyVar "a") :-> TyVar "a")
+--             ]
 
 mkqq :: (Lift a) => (Text -> RLPCIO a) -> QuasiQuoter
 mkqq p = QuasiQuoter
