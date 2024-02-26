@@ -54,5 +54,5 @@ type PsName = Either Name Var
 --------------------------------------------------------------------------------
 
 finishTyping :: Program PsName -> P (Program Var)
-finishTyping = error . show
+finishTyping = traverseOf binders undefined
 

@@ -2,7 +2,6 @@
 Module      : Core.Syntax
 Description : Core ASTs and the like
 -}
--- {-# OPTIONS_GHC -freduction-depth=0 #-}
 {-# LANGUAGE PatternSynonyms, OverloadedStrings #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -51,6 +50,7 @@ import Data.HashMap.Strict          qualified as H
 import Data.Hashable
 import Data.Foldable                (traverse_)
 import Data.Functor
+import Data.Monoid
 import Data.Functor.Classes
 import Data.Text                    qualified as T
 import Data.Char
@@ -500,9 +500,21 @@ deriving instance Lift b => Lift (Program b)
 class HasBinders s t a b | s -> a, t -> b, s b -> t, t a -> s where
     binders :: Traversal s t a b
 
--- instance (HasBinders a a' b b')
---       => HasBinders (ExprF b a) (ExprF b' a') b b' where
---     binders k = undefined
+instance HasBinders (ScDef b) (ScDef b') b b' where
+    binders k (ScDef b as e) = ScDef <$> k b <*> traverse k as <*> binders k e
+
+instance (Hashable b, Hashable b')
+      => HasBinders (Program b) (Program b') b b' where
+    binders :: forall f. (Applicative f)
+            => LensLike f (Program b) (Program b') b b'
+    binders k p
+        = Program
+        <$> traverse (binders k) (_programScDefs p)
+        <*> (getAp . ifoldMap toSingleton $ _programTypeSigs p)
+        <*> pure (_programDataTags p)
+      where
+        toSingleton :: b -> Type -> Ap f (HashMap b' Type)
+        toSingleton b t = Ap $ (`H.singleton` t) <$> k b
 
 instance HasBinders a a' b b'
     => HasBinders (ExprF b a) (ExprF b' a') b b' where
