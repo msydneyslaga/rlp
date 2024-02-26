@@ -552,3 +552,7 @@ instance (Eq b) => Eq1 (BindingF b) where
         ka == kb && va `eq` vb
       where eq = liftEqExpr f
 
+deriveEq1 ''ExprF
+
+deriving instance (Eq b, Eq a) => Eq (ExprF b a)
+
