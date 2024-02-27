@@ -4,7 +4,7 @@ module Core.Parse.Types
     , psTyVars
     , def
     , PsName
-    , finishTyping
+    , mkTypedScDef
     )
     where
 --------------------------------------------------------------------------------
@@ -12,6 +12,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.State
 import Data.Default
+import Data.Maybe
 import Data.Tuple               (swap)
 
 import Control.Lens
@@ -53,6 +54,9 @@ type PsName = Either Name Var
 
 --------------------------------------------------------------------------------
 
-finishTyping :: Program PsName -> P (Program Var)
-finishTyping = traverseOf binders undefined
+mkTypedScDef :: Name -> Type -> Name -> [Name] -> Expr Var -> ScDef Var
+mkTypedScDef nt tt n as e | nt == n = ScDef n' as' e
+    where
+        n' = MkVar n tt
+        as' = zipWith MkVar as (tt ^.. arrowStops)
 

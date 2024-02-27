@@ -37,6 +37,7 @@ module Core.Syntax
     , formalising
     , HasRHS(_rhs), HasLHS(_lhs)
     , HasBinders(binders)
+    , HasArrowStops(arrowStops)
     )
     where
 ----------------------------------------------------------------------------------
@@ -542,6 +543,14 @@ instance HasBinders a a b b'
 instance (HasBinders (f b (Fix (f b))) (f b' (Fix (f b'))) b b')
       => HasBinders (Fix (f b)) (Fix (f b')) b b' where
     binders k (Fix f) = Fix <$> binders k f
+
+class HasArrowStops s t a b | s -> a, t -> b, s b -> t, t a -> s where
+    arrowStops :: Traversal s t a b
+
+instance HasArrowStops Type Type Type Type where
+    arrowStops k (s :-> t) = (:->) <$> k s <*> arrowStops k t
+
+--------------------------------------------------------------------------------
 
 liftEqExpr :: (Eq b)
            => (a -> a' -> Bool)

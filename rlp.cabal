@@ -44,6 +44,7 @@ library
                     , Data.Heap
                     , Data.Pretty
                     , Core.Parse
+                    , Core.Parse.Types
                     , Core.Lex
                     , Core2Core
                     , Rlp2Core

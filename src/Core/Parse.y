@@ -76,7 +76,8 @@ Eof             : eof           { () }
                 | error         { () }
 
 StandaloneProgram :: { Program Var }
-StandaloneProgram : Program eof                 {% finishTyping $1 }
+-- StandaloneProgram : Program eof                 { undefined }
+StandaloneProgram : ProgramUgh eof                 { $1 }
 
 Program         :: { Program PsName }
 Program         : ScTypeSig ';' Program         { insTypeSig ($1 & _1 %~ Left) $3 }
@@ -85,6 +86,12 @@ Program         : ScTypeSig ';' Program         { insTypeSig ($1 & _1 %~ Left) $
                 | ScDef     OptSemi             { singletonScDef $1 }
                 | TLPragma  Program             {% doTLPragma $1 $2 }
                 | TLPragma                      {% doTLPragma $1 mempty }
+
+ProgramUgh      :: { Program Var }
+                : TypedScDef ';' ProgramUgh
+                            { $3 & insTypeSigUgh (fst $1)
+                                 & insScDef (snd $1) }
+                | OptSemi { mempty }
 
 TLPragma        :: { Pragma }
                 : '{-#' Words '#-}'             { Pragma $2 }
@@ -99,6 +106,10 @@ OptSemi         : ';'                           { () }
 
 ScTypeSig       :: { (Name, Type) }
 ScTypeSig       : Id ':' Type                   { ($1, $3) }
+
+TypedScDef      :: { (Var, ScDef Var) }
+                : Id ':' Type ';' Id ParListUgh '=' Expr
+                            { (MkVar $1 $3, mkTypedScDef $1 $3 $5 $6 $8) }
 
 ScDefs          :: { [ScDef PsName] }
 ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
@@ -119,6 +130,10 @@ Type1           :: { Type }
 Type1           : '(' Type ')'                  { $2 }
                 | varname                       { TyVar $1 }
                 | conname                       { TyCon $1 }
+
+ParListUgh      :: { [Name] }
+ParListUgh      : varname ParListUgh            { $1 : $2 }
+                | {- epsilon -}                 { [] }
 
 ParList         :: { [PsName] }
 ParList         : varname ParList               { Left $1 : $2 }
@@ -206,6 +221,9 @@ astPragma _ = undefined
 
 insTypeSig :: (Hashable b) => (b, Type) -> Program b -> Program b
 insTypeSig ts = programTypeSigs %~ uncurry H.insert ts
+
+insTypeSigUgh :: Var -> Program Var -> Program Var
+insTypeSigUgh w@(MkVar _ t) = programTypeSigs %~ H.insert w t
 
 singletonTypeSig :: (Hashable b) => (b, Type) -> Program b
 singletonTypeSig ts = insTypeSig ts mempty
