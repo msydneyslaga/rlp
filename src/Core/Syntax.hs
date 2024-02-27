@@ -535,8 +535,9 @@ instance HasBinders a a b b'
     binders k (AlterF con bs e) =
         AlterF con <$> traverse k bs <*> traverseOf binders k e
 
-instance HasBinders (BindingF b a) (BindingF b' a) b b' where
-    binders = undefined
+instance HasBinders a a b b'
+      => HasBinders (BindingF b a) (BindingF b' a) b b' where
+    binders k (BindingF b v) = BindingF <$> k b <*> binders k v
 
 instance (HasBinders (f b (Fix (f b))) (f b' (Fix (f b'))) b b')
       => HasBinders (Fix (f b)) (Fix (f b')) b b' where
