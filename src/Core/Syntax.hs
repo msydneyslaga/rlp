@@ -36,8 +36,9 @@ module Core.Syntax
     , programScDefs, programTypeSigs, programDataTags
     , formalising
     , HasRHS(_rhs), HasLHS(_lhs)
-    , HasBinders(binders)
-    , HasArrowStops(arrowStops)
+    , applicants
+    -- ** Classy optics
+    , HasBinders(..), HasArrowStops(..)
     )
     where
 ----------------------------------------------------------------------------------
@@ -411,27 +412,31 @@ instance (Pretty (f (Fix f))) => Pretty (Fix f) where
 instance (Pretty b, Pretty a) => Pretty (ExprF b a) where
     prettyPrec _ (VarF n) = ttext n
     prettyPrec _ (ConF t a) = "Pack{" <> (ttext t <+> ttext a) <> "}"
-    prettyPrec p (LamF bs e) = maybeParens (p<appPrec1) $
+    prettyPrec p (LamF bs e) = maybeParens (p>0) $
         hsep ["λ", hsep (prettyPrec appPrec1 <$> bs), "->", pretty e]
-    -- prettyPrec _ (Lam bs e)   = hsep ["λ", hsep (prettyPrec 1 <$> bs), "->", pretty e]
-    -- prettyPrec _ (Let r bs e) = hsep [word, explicitLayout bs]
-    --                         $+$ hsep ["in", pretty e]
-    --     where word = if r == Rec then "letrec" else "let"
-    -- prettyPrec p (App f x)    = maybeParens (p>0) $
-    --     prettyPrec 0 f <+> prettyPrec 1 x
-    -- prettyPrec _ (Lit l)      = pretty l
-    -- prettyPrec p (Case e as)  = maybeParens (p>0) $
-    --     "case" <+> pretty e <+> "of"
-    --     $+$ nest 2 (explicitLayout as)
+    prettyPrec p (LetF r bs e) = maybeParens (p>0)
+                               $ hsep [pretty r, explicitLayout bs]
+                             $+$ hsep ["in", pretty e]
+    prettyPrec p (AppF f x) = maybeParens (p>appPrec) $
+        prettyPrec appPrec f <+> prettyPrec appPrec1 x
+    prettyPrec p (LitF l) = prettyPrec p l
+    prettyPrec p (CaseF e as) = maybeParens (p>0) $
+        "case" <+> pretty e <+> "of"
+        $+$ nest 2 (explicitLayout as)
+    prettyPrec p (TypeF t) = "@" <> prettyPrec appPrec1 t
+
+instance Pretty Rec where
+    pretty Rec = "letrec"
+    pretty NonRec = "let"
 
 instance (Pretty b, Pretty a) => Pretty (AlterF b a) where
-    -- pretty (Alter c as e) =
-    --     hsep [pretty c, hsep (pretty <$> as), "->", pretty e]
+    pretty (AlterF c as e) =
+        hsep [pretty c, hsep (pretty <$> as), "->", pretty e]
 
 instance Pretty AltCon where
     pretty (AltData n) = ttext n
     pretty (AltLit l) = pretty l
-    pretty (AltTag t) = ttext t
+    pretty (AltTag t) = "<" <> ttext t <> ">"
     pretty AltDefault = "_"
 
 instance Pretty Lit where
@@ -563,6 +568,21 @@ deriving instance Lift b => Lift (ScDef b)
 deriving instance Lift b => Lift (Program b)
 
 --------------------------------------------------------------------------------
+
+-- instance HasApplicants (ExprF b (Fix (ExprF b))) (ExprF b (Fix (ExprF b)))
+--                        (Fix (ExprF b)) (Fix (ExprF b)) where
+--     applicants k (AppF f x) = AppF <$> applicants k f <*> k x
+--     applicants k x          = unwrapFix <$> k (wrapFix x)
+
+-- instance HasApplicants (f (Fix f)) (f (Fix f)) (Fix f) (Fix f)
+--       => HasApplicants (Fix f) (Fix f) (Fix f) (Fix f) where
+--     applicants :: forall g. Applicative g
+--                => LensLike' g (Fix f) (Fix f)
+--     applicants k (Fix f) = Fix <$> applicants k f
+
+applicants :: Traversal' (Expr b) (Expr b)
+applicants k (App f x) = App <$> applicants k f <*> k x
+applicants k x         = k x
 
 class HasBinders s t a b | s -> a, t -> b, s b -> t, t a -> s where
     binders :: Traversal s t a b
