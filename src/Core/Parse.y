@@ -76,22 +76,15 @@ Eof             : eof           { () }
                 | error         { () }
 
 StandaloneProgram :: { Program Var }
--- StandaloneProgram : Program eof                 { undefined }
-StandaloneProgram : ProgramUgh eof                 { $1 }
+StandaloneProgram : Program eof                 { $1 }
 
-Program         :: { Program PsName }
-Program         : ScTypeSig ';' Program         { insTypeSig ($1 & _1 %~ Left) $3 }
-                | ScTypeSig OptSemi             { singletonTypeSig ($1 & _1 %~ Left) }
-                | ScDef     ';' Program         { insScDef $1 $3 }
-                | ScDef     OptSemi             { singletonScDef $1 }
-                | TLPragma  Program             {% doTLPragma $1 $2 }
-                | TLPragma                      {% doTLPragma $1 mempty }
-
-ProgramUgh      :: { Program Var }
-                : TypedScDef ';' ProgramUgh
-                            { $3 & insTypeSigUgh (fst $1)
-                                 & insScDef (snd $1) }
-                | OptSemi { mempty }
+Program         :: { Program Var }
+                : TypedScDef ';' Program    { $3 & insTypeSig (fst $1)
+                                                 & insScDef (snd $1) }
+                | TypedScDef OptSemi        { mempty & insTypeSig (fst $1)
+                                                     & insScDef (snd $1) }
+                | TLPragma Program          {% doTLPragma $1 $2 }
+                | TLPragma                  {% doTLPragma $1 mempty }
 
 TLPragma        :: { Pragma }
                 : '{-#' Words '#-}'             { Pragma $2 }
@@ -108,17 +101,17 @@ ScTypeSig       :: { (Name, Type) }
 ScTypeSig       : Id ':' Type                   { ($1, $3) }
 
 TypedScDef      :: { (Var, ScDef Var) }
-                : Id ':' Type ';' Id ParListUgh '=' Expr
+                : Id ':' Type ';' Id ParList '=' Expr
                             { (MkVar $1 $3, mkTypedScDef $1 $3 $5 $6 $8) }
 
-ScDefs          :: { [ScDef PsName] }
-ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
-                | ScDef ';'                     { [$1] }
-                | ScDef                         { [$1] }
-
-ScDef           :: { ScDef PsName }
-ScDef           : Id ParList '=' Expr   { ScDef (Left $1) $2
-                                                ($4 & binders %~ Right) }
+-- ScDefs          :: { [ScDef PsName] }
+-- ScDefs          : ScDef ';' ScDefs              { $1 : $3 }
+--                 | ScDef ';'                     { [$1] }
+--                 | ScDef                         { [$1] }
+-- 
+-- ScDef           :: { ScDef PsName }
+-- ScDef           : Id ParList '=' Expr   { ScDef (Left $1) $2
+--                                                 ($4 & binders %~ Right) }
 
 Type            :: { Type }
                 : Type1 '->' Type               { $1 :-> $3 }
@@ -131,13 +124,9 @@ Type1           : '(' Type ')'                  { $2 }
                 | varname                       { TyVar $1 }
                 | conname                       { TyCon $1 }
 
-ParListUgh      :: { [Name] }
-ParListUgh      : varname ParListUgh            { $1 : $2 }
-                | {- epsilon -}                 { [] }
-
-ParList         :: { [PsName] }
-ParList         : varname ParList               { Left $1 : $2 }
-                | {- epsilon -}                 { [] }
+ParList      :: { [Name] }
+ParList      : varname ParList            { $1 : $2 }
+             | {- epsilon -}                 { [] }
 
 StandaloneExpr  :: { Expr Var }
 StandaloneExpr  : Expr eof                      { $1 }
@@ -219,20 +208,20 @@ exprPragma _           = undefined
 astPragma :: [String] -> RLPC (Expr Var)
 astPragma _ = undefined
 
-insTypeSig :: (Hashable b) => (b, Type) -> Program b -> Program b
-insTypeSig ts = programTypeSigs %~ uncurry H.insert ts
+-- insTypeSig :: (Hashable b) => (b, Type) -> Program b -> Program b
+-- insTypeSig ts = programTypeSigs %~ uncurry H.insert ts
 
-insTypeSigUgh :: Var -> Program Var -> Program Var
-insTypeSigUgh w@(MkVar _ t) = programTypeSigs %~ H.insert w t
+insTypeSig :: Var -> Program Var -> Program Var
+insTypeSig w@(MkVar _ t) = programTypeSigs %~ H.insert w t
 
-singletonTypeSig :: (Hashable b) => (b, Type) -> Program b
-singletonTypeSig ts = insTypeSig ts mempty
+-- singletonTypeSig :: (Hashable b) => (b, Type) -> Program b
+-- singletonTypeSig ts = insTypeSig ts mempty
 
 insScDef :: (Hashable b) => ScDef b -> Program b -> Program b
 insScDef sc = programScDefs %~ (sc:)
 
-singletonScDef :: (Hashable b) => ScDef b -> Program b
-singletonScDef sc = insScDef sc mempty
+-- singletonScDef :: (Hashable b) => ScDef b -> Program b
+-- singletonScDef sc = insScDef sc mempty
 
 parseCoreExprR :: (Monad m) => [Located CoreToken] -> RLPCT m (Expr Var)
 parseCoreExprR = liftMaybe . snd . flip runP def . parseCoreExpr
@@ -257,7 +246,7 @@ happyBind m k = m >>= k
 happyPure :: a -> RLPC a
 happyPure a = pure a
 
-doTLPragma :: Pragma -> Program PsName -> P (Program PsName)
+doTLPragma :: Pragma -> Program Var -> P (Program Var)
 -- TODO: warn unrecognised pragma
 doTLPragma (Pragma []) p = pure p
 
