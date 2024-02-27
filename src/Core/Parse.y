@@ -128,7 +128,8 @@ TypeApp         :: { Type }
 Type1           :: { Type }
 Type1           : '(' Type ')'                  { $2 }
                 | varname                       { TyVar $1 }
-                | conname                       { TyCon $1 }
+                | conname                       { if $1 == "Type"
+                                                    then TyKindType else TyCon $1 }
 
 ParList      :: { [Name] }
 ParList      : varname ParList            { $1 : $2 }

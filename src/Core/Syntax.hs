@@ -16,13 +16,13 @@ module Core.Syntax
     , ScDef(..), ScDef'
     , Program(..), Program'
     , Type(..), Kind, pattern (:->), pattern TyInt
-    , Alter(..), Alter', AltCon(..)
+    , AlterF(..), Alter(..), Alter', AltCon(..)
     , pattern Binding, pattern Alter
     , Rec(..), Lit(..)
     , Pragma(..)
     -- ** Variables and identifiers
-    , Name, Var(..), Tag
-    , Binding(..), pattern (:=), pattern (:$)
+    , Name, Var(..), Tag, pattern (:^)
+    , Binding, BindingF(..), pattern (:=), pattern (:$)
     , type Binding'
     -- ** Working with the fixed point of ExprF
     , Expr, Expr'
@@ -36,7 +36,7 @@ module Core.Syntax
     , programScDefs, programTypeSigs, programDataTags
     , formalising
     , HasRHS(_rhs), HasLHS(_lhs)
-    , applicants
+    , _BindingF, _MkVar
     -- ** Classy optics
     , HasBinders(..), HasArrowStops(..)
     )
@@ -109,6 +109,9 @@ type Kind = Type
 
 data Var = MkVar Name Type
     deriving (Eq, Show, Lift)
+
+pattern (:^) :: Name -> Type -> Var
+pattern n :^ t = MkVar n t
 
 instance Hashable Var where
     hashWithSalt s (MkVar n _) = hashWithSalt s n
@@ -284,14 +287,16 @@ formalising :: Iso (Expr a) (Expr b) (Expr a) (Expr b)
 formalising = iso sa bt where
     sa :: Expr a -> Expr a
     sa = ana \case
-        Lam [b] e    -> LamF [b] e
-        Lam (b:bs) e -> LamF [b] (Lam bs e)
-        x            -> project x
+        Lam [b] e      -> LamF [b] e
+        Lam (b:bs) e   -> LamF [b] (Lam bs e)
+        Let r (b:bs) e -> LetF r [b] (Let r bs e)
+        x              -> project x
 
     bt :: Expr b -> Expr b
     bt = cata \case
-        LamF [b] (Lam bs e) -> Lam (b:bs) e
-        x                   -> embed x
+        LamF [b] (Lam bs e)                -> Lam (b:bs) e
+        LetF r [b] (Let r' bs e) | r == r' -> Let r (b:bs) e
+        x                                  -> embed x
 
 --------------------------------------------------------------------------------
 
@@ -386,6 +391,9 @@ instance Pretty Type where
         hsep [prettyPrec appPrec a, "->", prettyPrec (appPrec-1) b]
     prettyPrec p (TyApp f x) = maybeParens (p>appPrec) $
         prettyPrec appPrec f <+> prettyPrec appPrec1 x
+    prettyPrec p (TyForall a m) = maybeParens (p>appPrec-2) $
+        "∀" <+> (prettyPrec appPrec1 a <> ".") <+> pretty m
+    prettyPrec _ TyKindType = "Type"
 
 instance (Pretty b, Pretty (AsTerse b), MakeTerse b)
       => Pretty (WithTerseBinds (ScDef b)) where
@@ -569,6 +577,9 @@ deriving instance Lift b => Lift (Program b)
 
 --------------------------------------------------------------------------------
 
+-- class HasApplicants s t a b | s -> a, t -> b, s b -> t, t a -> s where
+--     applicants :: Traversal s t a b
+
 -- instance HasApplicants (ExprF b (Fix (ExprF b))) (ExprF b (Fix (ExprF b)))
 --                        (Fix (ExprF b)) (Fix (ExprF b)) where
 --     applicants k (AppF f x) = AppF <$> applicants k f <*> k x
@@ -580,9 +591,9 @@ deriving instance Lift b => Lift (Program b)
 --                => LensLike' g (Fix f) (Fix f)
 --     applicants k (Fix f) = Fix <$> applicants k f
 
-applicants :: Traversal' (Expr b) (Expr b)
-applicants k (App f x) = App <$> applicants k f <*> k x
-applicants k x         = k x
+-- applicants :: Traversal' (Expr b) (Expr b)
+-- applicants k (App f x) = App <$> applicants k f <*> k x
+-- applicants k x         = k x
 
 class HasBinders s t a b | s -> a, t -> b, s b -> t, t a -> s where
     binders :: Traversal s t a b
@@ -635,6 +646,7 @@ class HasArrowStops s t a b | s -> a, t -> b, s b -> t, t a -> s where
 
 instance HasArrowStops Type Type Type Type where
     arrowStops k (s :-> t) = (:->) <$> k s <*> arrowStops k t
+    arrowStops k t = k t
 
 --------------------------------------------------------------------------------
 
@@ -666,4 +678,7 @@ instance (Eq b) => Eq1 (BindingF b) where
 deriveEq1 ''ExprF
 
 deriving instance (Eq b, Eq a) => Eq (ExprF b a)
+
+makePrisms ''BindingF
+makePrisms ''Var
 
