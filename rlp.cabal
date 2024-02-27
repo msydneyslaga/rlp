@@ -49,6 +49,9 @@ library
                     , Core2Core
                     , Rlp2Core
                     , Control.Monad.Utils
+                    , Misc
+                    , Misc.Lift1
+                    , Core.SystemF
 
     build-tool-depends: happy:happy, alex:alex
 

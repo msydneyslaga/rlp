@@ -69,6 +69,8 @@ import Core.Parse.Types
       ':'             { Located _ TokenHasType }
       eof             { Located _ TokenEOF }
 
+%right '->'
+
 %%
 
 Eof             :: { () }
@@ -114,7 +116,11 @@ TypedScDef      :: { (Var, ScDef Var) }
 --                                                 ($4 & binders %~ Right) }
 
 Type            :: { Type }
-                : Type1 '->' Type               { $1 :-> $3 }
+                : TypeApp '->' TypeApp              { $1 :-> $3 }
+                | TypeApp                         { $1 }
+
+TypeApp         :: { Type }
+                : TypeApp Type1                 { TyApp $1 $2 }
                 | Type1                         { $1 }
 
 -- do we want to allow symbolic names for tyvars and tycons?

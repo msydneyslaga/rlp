@@ -6,8 +6,11 @@ module Data.Pretty
     , hsepOf, vsepOf
     , vcatOf
     , vlinesOf
+    , vsepTerm
     , module Text.PrettyPrint
     , maybeParens
+    , appPrec
+    , appPrec1
     )
     where
 ----------------------------------------------------------------------------------
@@ -62,4 +65,13 @@ vcatOf l = foldrOf l ($$) mempty
 vlinesOf :: Getting (Endo Doc) s Doc -> s -> Doc
 vlinesOf l = foldrOf l (\a b -> a $+$ "" $+$ b) mempty
 -- hack(?) to separate chunks with a blankline
+
+vsepTerm :: Doc -> Doc -> Doc -> Doc
+vsepTerm term a b = (a <> term) $+$ b
+
+--------------------------------------------------------------------------------
+
+appPrec, appPrec1 :: Int
+appPrec  = 10
+appPrec1 = 11
 

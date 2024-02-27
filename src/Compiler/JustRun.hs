@@ -12,13 +12,14 @@ module Compiler.JustRun
     , justParseCore
     , justTypeCheckCore
     , justHdbg
+    , makeItPretty, makeItPretty'
     )
     where
 ----------------------------------------------------------------------------------
 import Core.Lex
 import Core.Parse
 import Core.HindleyMilner
-import Core.Syntax                      (Program')
+import Core.Syntax
 import Compiler.RLPC
 import Control.Arrow                    ((>>>))
 import Control.Monad                    ((>=>), void)
@@ -30,6 +31,7 @@ import System.IO
 import GM
 import Rlp.Parse
 import Rlp2Core
+import Data.Pretty
 ----------------------------------------------------------------------------------
 
 justHdbg :: String -> IO GmState
@@ -42,9 +44,8 @@ justLexCore s = lexCoreR (T.pack s)
               & mapped . each %~ extract
               & rlpcToEither
 
-justParseCore :: String -> Either [MsgEnvelope RlpcError] Program'
+justParseCore :: String -> Either [MsgEnvelope RlpcError] (Program Var)
 justParseCore s = parse (T.pack s)
-                & undefined
                 & rlpcToEither
     where parse = lexCoreR @Identity >=> parseCoreProgR
 
@@ -52,6 +53,12 @@ justTypeCheckCore :: String -> Either [MsgEnvelope RlpcError] Program'
 justTypeCheckCore s = typechk (T.pack s)
                     & rlpcToEither
     where typechk = lexCoreR >=> parseCoreProgR >=> checkCoreProgR
+
+makeItPretty :: (Pretty a) => Either e a -> Either e Doc
+makeItPretty = fmap pretty
+
+makeItPretty' :: (Pretty (WithTerseBinds a)) => Either e a -> Either e Doc
+makeItPretty' = fmap (pretty . WithTerseBinds)
 
 rlpcToEither :: RLPC a -> Either [MsgEnvelope RlpcError] a
 rlpcToEither r = case evalRLPC def r of

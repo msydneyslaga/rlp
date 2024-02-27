@@ -29,8 +29,8 @@ module Core.Syntax
     , pattern Con, pattern Var, pattern App, pattern Lam, pattern Let
     , pattern Case, pattern Type, pattern Lit
 
-    -- * Misc
-    , Pretty(pretty)
+    -- * Pretty-printing
+    , Pretty(pretty), WithTerseBinds(..)
 
     -- * Optics
     , programScDefs, programTypeSigs, programDataTags
@@ -59,6 +59,7 @@ import Data.These
 import GHC.Generics                 (Generic, Generically(..))
 import Text.Show.Deriving
 import Data.Eq.Deriving
+import Data.Kind                    qualified
 
 import Data.Fix                     hiding (cata, ana)
 import Data.Bifunctor               (Bifunctor(..))
@@ -293,6 +294,44 @@ formalising = iso sa bt where
 
 --------------------------------------------------------------------------------
 
+newtype WithTerseBinds a = WithTerseBinds a
+
+class MakeTerse a where
+    type AsTerse a :: Data.Kind.Type
+    asTerse :: a -> AsTerse a
+
+instance MakeTerse Var where
+    type AsTerse Var = Name
+    asTerse (MkVar n _) = n
+
+instance (Hashable b, Pretty b, Pretty (AsTerse b), MakeTerse b)
+      => Pretty (WithTerseBinds (Program b)) where
+    pretty (WithTerseBinds p)
+            = (datatags <> "\n")
+          $+$ defs
+        where
+            datatags = ifoldrOf (programDataTags . ifolded) cataDataTag mempty p
+            defs = vlinesOf (programJoinedDefs . to prettyGroup) p
+
+            programJoinedDefs :: Fold (Program b) (These (b, Type) (ScDef b))
+            programJoinedDefs = folding $ \p ->
+                foldMapOf programTypeSigs thisTs p
+                `u` foldMapOf programScDefs thatSc p
+              where u = H.unionWith unionThese
+
+            thisTs = ifoldMap @b @(HashMap b)
+                (\n t -> H.singleton n (This (n,t)))
+            thatSc = foldMap $ \sc ->
+                H.singleton (sc ^. _lhs . _1) (That sc)
+
+            prettyGroup :: These (b, Type) (ScDef b) -> Doc
+            prettyGroup = bifoldr vs vs mempty
+                        . bimap (uncurry prettyTySig')
+                                (pretty . WithTerseBinds)
+                where vs = vsepTerm ";"
+
+            cataDataTag n (t,a) acc = prettyDataTag n t a $+$ acc
+
 instance (Hashable b, Pretty b) => Pretty (Program b) where
     pretty p = (datatags <> "\n")
            $+$ defs
@@ -312,30 +351,48 @@ instance (Hashable b, Pretty b) => Pretty (Program b) where
                 H.singleton (sc ^. _lhs . _1) (That sc)
 
             prettyGroup :: These (b, Type) (ScDef b) -> Doc
-            prettyGroup = bifoldr vcatWithSemi vcatWithSemi mempty
-                        . bimap prettyTySig pretty
-
-            vcatWithSemi a b = (a <+> ";") $$ b
-
-            prettyTySig (n,t) = hsep [ttext n, "::", pretty t]
-
-            unionThese (This a) (That b) = These a b
-            unionThese (That b) (This a) = These a b
-            unionThese (These a b) _     = These a b
+            prettyGroup = bifoldr vs vs mempty
+                        . bimap (uncurry prettyTySig) pretty
+                where vs = vsepTerm ";"
 
             cataDataTag n (t,a) acc = prettyDataTag n t a $+$ acc
 
-            prettyDataTag n t a =
-                hsep ["{-#", "PackData", ttext n, ttext t, ttext a, "#-}"]
+unionThese :: These a b -> These a b -> These a b
+unionThese (This a) (That b) = These a b
+unionThese (That b) (This a) = These a b
+unionThese (These a b) _     = These a b
+
+prettyDataTag :: (Pretty n, Pretty t, Pretty a)
+              => n -> t -> a -> Doc
+prettyDataTag n t a =
+    hsep ["{-#", "PackData", ttext n, ttext t, ttext a, "#-}"]
+
+prettyTySig :: (Pretty n, Pretty t) => n -> t -> Doc
+prettyTySig n t = hsep [ttext n, ":", pretty t]
+
+prettyTySig' :: (MakeTerse n, Pretty (AsTerse n), Pretty t) => n -> t -> Doc
+prettyTySig' n t = hsep [ttext (asTerse n), ":", pretty t]
+
+-- Pretty Type
+-- TyApp | appPrec   | left
+-- (:->) | appPrec-1 | right
 
 instance Pretty Type where
-    prettyPrec _ (TyVar n) = ttext n
-    prettyPrec _ TyFun = "(->)"
-    prettyPrec _ (TyCon n) = ttext n
-    prettyPrec p (a :-> b) = maybeParens (p>0) $
-        hsep [prettyPrec 1 a, "->", prettyPrec 0 b]
-    prettyPrec p (TyApp f x) = maybeParens (p>1) $
-        prettyPrec 1 f <+> prettyPrec 2 x
+    prettyPrec _ (TyVar n)   = ttext n
+    prettyPrec _ TyFun       = "(->)"
+    prettyPrec _ (TyCon n)   = ttext n
+    prettyPrec p (a :-> b)   = maybeParens (p>appPrec-1) $
+        hsep [prettyPrec appPrec a, "->", prettyPrec (appPrec-1) b]
+    prettyPrec p (TyApp f x) = maybeParens (p>appPrec) $
+        prettyPrec appPrec f <+> prettyPrec appPrec1 x
+
+instance (Pretty b, Pretty (AsTerse b), MakeTerse b)
+      => Pretty (WithTerseBinds (ScDef b)) where
+    pretty (WithTerseBinds sc) = hsep [name, as, "=", hang empty 1 e]
+        where
+            name = ttext $ sc ^. _lhs . _1 . to asTerse
+            as = sc & hsepOf (_lhs . _2 . each . to asTerse . to ttext)
+            e = pretty $ sc ^. _rhs
 
 instance (Pretty b) => Pretty (ScDef b) where
     pretty sc = hsep [name, as, "=", hang empty 1 e]
@@ -344,9 +401,18 @@ instance (Pretty b) => Pretty (ScDef b) where
             as = sc & hsepOf (_lhs . _2 . each . to ttext)
             e = pretty $ sc ^. _rhs
 
-instance (Pretty b) => Pretty (Expr b) where
-    -- prettyPrec _ (Var n)      = ttext n
-    -- prettyPrec _ (Con t a)    = "Pack{" <> (ttext t <+> ttext a) <> "}"
+instance (Pretty (f (Fix f))) => Pretty (Fix f) where
+    prettyPrec d (Fix f) = prettyPrec d f
+
+-- Pretty Expr
+-- LamF | appPrec1 | right
+-- AppF | appPrec  | left
+
+instance (Pretty b, Pretty a) => Pretty (ExprF b a) where
+    prettyPrec _ (VarF n) = ttext n
+    prettyPrec _ (ConF t a) = "Pack{" <> (ttext t <+> ttext a) <> "}"
+    prettyPrec p (LamF bs e) = maybeParens (p<appPrec1) $
+        hsep ["λ", hsep (prettyPrec appPrec1 <$> bs), "->", pretty e]
     -- prettyPrec _ (Lam bs e)   = hsep ["λ", hsep (prettyPrec 1 <$> bs), "->", pretty e]
     -- prettyPrec _ (Let r bs e) = hsep [word, explicitLayout bs]
     --                         $+$ hsep ["in", pretty e]
@@ -372,7 +438,7 @@ instance Pretty Lit where
     pretty (IntL n) = ttext n
 
 instance (Pretty b, Pretty a) => Pretty (BindingF b a) where
-    -- pretty (k := v) = hsep [pretty k, "=", pretty v]
+    pretty (BindingF k v) = hsep [pretty k, "=", pretty v]
 
 explicitLayout :: (Pretty a) => [a] -> Doc
 explicitLayout as = vcat inner <+> "}" where
