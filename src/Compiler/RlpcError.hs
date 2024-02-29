@@ -14,6 +14,9 @@ module Compiler.RlpcError
     -- * Located Comonad
     , Located(..)
     , SrcSpan(..)
+
+    -- * Common error messages
+    , undefinedVariableErr
     )
     where
 ----------------------------------------------------------------------------------
@@ -73,4 +76,9 @@ debugMsg tag e = MsgEnvelope
     , _msgDiagnostic = e
     , _msgSeverity = SevDebug tag
     }
+
+undefinedVariableErr :: Text -> RlpcError
+undefinedVariableErr n = Text
+    [ "Variable not in scope: `" <> n <> "'."
+    ]
 

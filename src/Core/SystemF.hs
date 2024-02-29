@@ -14,6 +14,9 @@ import Data.Foldable
 import Data.List.Extra
 import Control.Monad.Utils
 import Control.Monad
+import Data.Text                    qualified as T
+import Data.Pretty
+import Text.Printf
 
 import Control.Comonad
 import Control.Comonad.Cofree
@@ -24,6 +27,7 @@ import Control.Lens                 hiding ((:<))
 import Control.Lens.Unsound
 
 import Compiler.RLPC
+import Compiler.RlpcError
 import Core
 --------------------------------------------------------------------------------
 
@@ -46,12 +50,27 @@ lint = undefined
 
 type ET = Cofree (ExprF Var) Type
 
-type SysF = Either TypeError
+type SysF = Either SystemFError
 
-data TypeError = TypeErrorUndefinedVariable Name
-               | TypeErrorKindMismatch Kind Kind
-               | TypeErrorCouldNotMatch Type Type
-               deriving Show
+data SystemFError = SystemFErrorUndefinedVariable Name
+                  | SystemFErrorKindMismatch Kind Kind
+                  | SystemFErrorCouldNotMatch Type Type
+                  deriving Show
+
+instance IsRlpcError SystemFError where
+    liftRlpcError = \case
+        SystemFErrorUndefinedVariable n ->
+            undefinedVariableErr n
+        SystemFErrorKindMismatch k k' ->
+            Text [ T.pack $ printf "Could not match kind `%s' with `%s'"
+                                   (pretty k) (pretty k')
+                 ]
+        SystemFErrorCouldNotMatch t t' ->
+            Text [ T.pack $ printf "Could not match type `%s' with `%s'"
+                                   (pretty t) (pretty t')
+                 ]
+
+justLintCoreExpr = fmap (fmap (prettyPrec appPrec1)) . lintE demoContext
 
 lintE :: Gamma -> Expr Var -> SysF ET
 lintE g = \case
@@ -97,7 +116,7 @@ lintE g = \case
         g' = supplementVars vs g
         checkBind v@(MkVar n t) e = case lintE g' e of
             Right (t' :< e') | t == t'   -> Right (BindingF v e')
-                             | otherwise -> Left (TypeErrorCouldNotMatch t t')
+                             | otherwise -> Left (SystemFErrorCouldNotMatch t t')
             Left e -> Left e
     Let NonRec bs e -> do
         (g',bs') <- mapAccumLM checkBind g bs
@@ -109,38 +128,50 @@ lintE g = \case
         checkBind g (BindingF v@(n :^ t) e) = case lintE g (wrapFix e) of
             Right (t' :< e')
                 | t == t'   -> Right (supplementVar n t g, BindingF v e')
-                | otherwise -> Left (TypeErrorCouldNotMatch t t')
+                | otherwise -> Left (SystemFErrorCouldNotMatch t t')
             Left e -> Left e
 
     Case e as -> do
-        (ts,as') <- unzip <$> checkAlt `traverse` as
-        unless (allSame ts) $
-            Left (error "unifica oh my god fix this later")
-        e' <- lintE g e
-        pure $ head ts :< CaseF e' as'
+        e'@(et :< _) <- lintE g e
+        (ts,as') <- unzip <$> checkAlt et `traverse` as
+        case allUnify ts of
+            Just err -> Left err
+            Nothing  -> pure $ head ts  :< CaseF e' as'
       where
-        checkAlt :: Alter Var -> SysF (Type, AlterF Var ET)
-        checkAlt (AlterF (AltData con) bs e) = do
+        checkAlt :: Type -> Alter Var -> SysF (Type, AlterF Var ET)
+        checkAlt scrutineeType (AlterF (AltData con) bs e) = do
             ct <- lookupVar g con
-            zipWithM_ fzip bs (ct ^.. arrowStops)
+            ct' <- foldrMOf applicants (elimForall g) ct scrutineeType
+            zipWithM_ fzip bs (ct' ^.. arrowStops)
             (t :< e') <- lintE (supplementVars (varsToPairs bs) g) (wrapFix e)
             pure (t, AlterF (AltData con) bs e')
           where
             fzip (MkVar _ t) t'
                 | t == t'   = Right ()
-                | otherwise = Left (TypeErrorCouldNotMatch t t')
+                | otherwise = Left (SystemFErrorCouldNotMatch t t')
 
-unforall :: Type -> Type
-unforall (TyForall _ m) = m
-unforall m = m
+allUnify :: [Type] -> Maybe SystemFError
+allUnify [] = Nothing
+allUnify [t] = Nothing
+allUnify (t:t':ts)
+    | t == t'   = allUnify ts
+    | otherwise = Just (SystemFErrorCouldNotMatch t t')
 
+elimForall :: Gamma -> Type -> Type -> SysF Type
+elimForall g t (TyForall (n :^ k) m) = do
+    k' <- kindOf g t
+    case k == k' of
+        True -> pure $ subst n t m
+        False -> Left $ SystemFErrorKindMismatch k k'
+elimForall _ m _ = pure m
+ 
 varsToPairs :: [Var] -> [(Name, Type)]
 varsToPairs = toListOf (each . _MkVar)
 
 checkAgainst :: Gamma -> Var -> Expr Var -> SysF ET
 checkAgainst g v@(MkVar n t) e = case lintE g e of
     Right e'@(t' :< _) | t == t'      -> Right e'
-                       | otherwise    -> Left (TypeErrorCouldNotMatch t t')
+                       | otherwise    -> Left (SystemFErrorCouldNotMatch t t')
     Left a -> Left a
 
 supplementVars :: [(Name, Type)] -> Gamma -> Gamma
@@ -174,17 +205,17 @@ kindOf _ e          = error (show e)
 lookupCon :: Gamma -> Name -> SysF Kind
 lookupCon g n = case g ^. gammaTyCons . at n of
     Just k  -> Right k
-    Nothing -> Left (TypeErrorUndefinedVariable n)
+    Nothing -> Left (SystemFErrorUndefinedVariable n)
 
 lookupVar :: Gamma -> Name -> SysF Type
 lookupVar g n = case g ^. gammaVars . at n of
     Just t -> Right t
-    Nothing -> Left (TypeErrorUndefinedVariable n)
+    Nothing -> Left (SystemFErrorUndefinedVariable n)
 
 lookupTyVar :: Gamma -> Name -> SysF Kind
 lookupTyVar g n = case g ^. gammaTyVars . at n of
     Just k -> Right k
-    Nothing -> Left (TypeErrorUndefinedVariable n)
+    Nothing -> Left (SystemFErrorUndefinedVariable n)
 
 demoContext :: Gamma
 demoContext = Gamma

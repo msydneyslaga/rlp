@@ -1,3 +1,4 @@
+{-# LANGUAGE QuantifiedConstraints #-}
 module Data.Pretty
     ( Pretty(..)
     , rpretty
@@ -18,10 +19,13 @@ import Text.PrettyPrint             hiding ((<>))
 import Text.PrettyPrint.HughesPJ    hiding ((<>))
 import Text.Printf
 import Data.String                  (IsString(..))
-import Data.Text.Lens
+import Data.Text.Lens               hiding ((:<))
 import Data.Monoid
-import Data.Text                    qualified as T
 import Control.Lens
+
+-- instances
+import Control.Comonad.Cofree
+import Data.Text                    qualified as T
 ----------------------------------------------------------------------------------
 
 class Pretty a where
@@ -47,6 +51,9 @@ instance (Show a) => Pretty (Showing a) where
     prettyPrec p (Showing a) = fromString $ showsPrec p a ""
 
 deriving via Showing Int instance Pretty Int
+
+class (forall a. Pretty a => Pretty (f a)) => Pretty1 f where
+    liftPrettyPrec :: (Int -> a -> Doc) -> f a -> Doc
 
 --------------------------------------------------------------------------------
 
@@ -74,4 +81,11 @@ vsepTerm term a b = (a <> term) $+$ b
 appPrec, appPrec1 :: Int
 appPrec  = 10
 appPrec1 = 11
+
+instance PrintfArg Doc where
+    formatArg d fmt
+        | fmtChar (vFmt 'D' fmt) == 'D' = formatString (render d) fmt'
+        | otherwise                     = errorBadFormat $ fmtChar fmt
+      where
+        fmt' = fmt { fmtChar = 's', fmtPrecision = Nothing }
 

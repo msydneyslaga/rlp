@@ -38,7 +38,7 @@ module Core.Syntax
     , HasRHS(_rhs), HasLHS(_lhs)
     , _BindingF, _MkVar
     -- ** Classy optics
-    , HasBinders(..), HasArrowStops(..)
+    , HasBinders(..), HasArrowStops(..), HasApplicants1(..), HasApplicants(..)
     )
     where
 ----------------------------------------------------------------------------------
@@ -577,23 +577,34 @@ deriving instance Lift b => Lift (Program b)
 
 --------------------------------------------------------------------------------
 
--- class HasApplicants s t a b | s -> a, t -> b, s b -> t, t a -> s where
---     applicants :: Traversal s t a b
+class HasApplicants1 s t a b | s -> a, t -> b, s b -> t, t a -> s where
+    applicants1 :: Traversal s t a b
 
--- instance HasApplicants (ExprF b (Fix (ExprF b))) (ExprF b (Fix (ExprF b)))
+class HasApplicants s t a b | s -> a, t -> b, s b -> t, t a -> s where
+    applicants :: Traversal s t a b
+
+instance HasApplicants1 Type Type Type Type where
+    applicants1 k (TyApp f x) = TyApp <$> applicants1 k f <*> k x
+    applicants1 k x           = k x
+
+instance HasApplicants Type Type Type Type where
+    applicants k (TyApp f x) = TyApp <$> applicants k f <*> k x
+    applicants k x           = pure x
+
+-- instance HasArguments (ExprF b (Fix (ExprF b))) (ExprF b (Fix (ExprF b)))
 --                        (Fix (ExprF b)) (Fix (ExprF b)) where
---     applicants k (AppF f x) = AppF <$> applicants k f <*> k x
---     applicants k x          = unwrapFix <$> k (wrapFix x)
+--     arguments k (AppF f x) = AppF <$> arguments k f <*> k x
+--     arguments k x          = unwrapFix <$> k (wrapFix x)
 
--- instance HasApplicants (f (Fix f)) (f (Fix f)) (Fix f) (Fix f)
---       => HasApplicants (Fix f) (Fix f) (Fix f) (Fix f) where
---     applicants :: forall g. Applicative g
+-- instance HasArguments (f (Fix f)) (f (Fix f)) (Fix f) (Fix f)
+--       => HasArguments (Fix f) (Fix f) (Fix f) (Fix f) where
+--     arguments :: forall g. Applicative g
 --                => LensLike' g (Fix f) (Fix f)
---     applicants k (Fix f) = Fix <$> applicants k f
+--     arguments k (Fix f) = Fix <$> arguments k f
 
--- applicants :: Traversal' (Expr b) (Expr b)
--- applicants k (App f x) = App <$> applicants k f <*> k x
--- applicants k x         = k x
+-- arguments :: Traversal' (Expr b) (Expr b)
+-- arguments k (App f x) = App <$> arguments k f <*> k x
+-- arguments k x         = k x
 
 class HasBinders s t a b | s -> a, t -> b, s b -> t, t a -> s where
     binders :: Traversal s t a b
