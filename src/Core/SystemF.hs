@@ -45,8 +45,36 @@ makeLenses ''Gamma
 lintCoreProgR :: (Monad m) => Program Var -> RLPCT m (Program Name)
 lintCoreProgR = undefined
 
-lint :: Program Var -> Program Name
-lint = undefined
+lintDontCheck :: Program Var -> Program Name
+lintDontCheck = binders %~ view (_MkVar . _1)
+
+lint :: Program Var -> SysF (Program Name)
+lint p = do
+    scs <- traverse (lintScDef g0) $ p ^. programScDefs
+    pure $ lintDontCheck p & programScDefs .~ scs
+  where
+    g0 = mempty & gammaVars .~ typeSigs
+                & gammaTyCons .~ p ^. programTyCons
+    -- 'p' stores the type signatures as 'HashMap Var Type',
+    -- while our typechecking context demands a 'HashMap Name Type'.
+    -- This conversion is perfectly safe, as the 'Hashable' instance for
+    -- 'Var' hashes exactly the internal 'Name'. i.e.
+    -- `hash (MkVar n t) = hash n`.
+    typeSigs = p ^. programTypeSigs
+             & H.mapKeys (view $ _MkVar . _1)
+
+lintScDef :: Gamma -> ScDef Var -> SysF (ScDef Name)
+lintScDef g = traverseOf lambdaLifting $ \ (MkVar n t, e) -> do
+    e'@(t' :< _) <- lintE g e
+    assertUnify t t'
+    let e'' = stripVars . stripTypes $ e'
+    pure (n, e'')
+
+stripTypes :: ET -> Expr Var
+stripTypes (_ :< as) = Fix (stripTypes <$> as)
+
+stripVars :: Expr Var -> Expr Name
+stripVars = binders %~ view (_MkVar . _1)
 
 type ET = Cofree (ExprF Var) Type
 
@@ -149,6 +177,11 @@ lintE g = \case
             fzip (MkVar _ t) t'
                 | t == t'   = Right ()
                 | otherwise = Left (SystemFErrorCouldNotMatch t t')
+
+assertUnify :: Type -> Type -> SysF ()
+assertUnify t t'
+    | t == t'   = pure ()
+    | otherwise = Left (SystemFErrorCouldNotMatch t t')
 
 allUnify :: [Type] -> Maybe SystemFError
 allUnify [] = Nothing

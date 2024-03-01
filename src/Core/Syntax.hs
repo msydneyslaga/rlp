@@ -33,10 +33,10 @@ module Core.Syntax
     , Pretty(pretty), WithTerseBinds(..)
 
     -- * Optics
-    , programScDefs, programTypeSigs, programDataTags
-    , formalising
+    , programScDefs, programTypeSigs, programDataTags, programTyCons
+    , formalising, lambdaLifting
     , HasRHS(_rhs), HasLHS(_lhs)
-    , _BindingF, _MkVar
+    , _BindingF, _MkVar, _ScDef
     -- ** Classy optics
     , HasBinders(..), HasArrowStops(..), HasApplicants1(..), HasApplicants(..)
     )
@@ -216,6 +216,8 @@ data Program b = Program
     , _programTypeSigs :: HashMap b Type
     , _programDataTags :: HashMap Name (Tag, Int)
     -- ^ map constructors to their tag and arity
+    , _programTyCons   :: HashMap Name Kind
+    -- ^ map type constructors to their kind
     }
     deriving (Generic)
     deriving (Semigroup, Monoid)
@@ -241,6 +243,14 @@ type ScDef' = ScDef Name
 
 -- instance IsString (Expr b) where
 --     fromString = Var . fromString
+
+lambdaLifting :: Iso (ScDef b) (ScDef b') (b, Expr b) (b', Expr b')
+lambdaLifting = iso sa bt where
+    sa (ScDef n as e) = (n, e') where
+        e' = Lam as e
+
+    bt (n, Lam as e) = ScDef n as e
+    bt (n, e)        = ScDef n [] e
 
 ----------------------------------------------------------------------------------
 
@@ -621,6 +631,7 @@ instance (Hashable b, Hashable b')
         <$> traverse (binders k) (_programScDefs p)
         <*> (getAp . ifoldMap toSingleton $ _programTypeSigs p)
         <*> pure (_programDataTags p)
+        <*> pure (_programTyCons p)
       where
         toSingleton :: b -> Type -> Ap f (HashMap b' Type)
         toSingleton b t = Ap $ (`H.singleton` t) <$> k b
@@ -692,4 +703,5 @@ deriving instance (Eq b, Eq a) => Eq (ExprF b a)
 
 makePrisms ''BindingF
 makePrisms ''Var
+makePrisms ''ScDef
 

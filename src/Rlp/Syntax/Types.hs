@@ -15,7 +15,7 @@ module Rlp.Syntax.Types
     , Rec(..)
     , Lit(..)
     , Pat(..)
-    , Decl(..)
+    , Decl(..), Decl'
     , Program(..)
     , Where
 
@@ -23,6 +23,8 @@ module Rlp.Syntax.Types
     , Cofree(..)
     , Trans.Cofree.CofreeF
     , SrcSpan(..)
+
+    , programDecls
     )
     where
 ----------------------------------------------------------------------------------
