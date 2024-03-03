@@ -101,6 +101,14 @@ DataCon             :: { DataCon PsName }
 Type1               :: { Type PsName }
                     : varname               { VarT $ extractVarName $1 }
                     | Con                   { ConT $1 }
+                    | '(' Type ')'          { $2 }
+
+Type                :: { Type PsName }
+                    : AppT                  { $1 }
+
+AppT                :: { Type PsName }
+                    : Type1                 { $1 }
+                    | AppT Type1            { AppT $1 $2 }
 
 TyVars              :: { [PsName] }
                     : list0(varname)     { $1 <&> view ( to extract
@@ -111,6 +119,14 @@ FunD                :: { Decl PsName (RlpExpr PsName) }
 
 Expr                :: { RlpExpr PsName }
                     : AppE                  { $1 }
+                    | LetE                  { $1 }
+
+LetE                :: { RlpExpr PsName }
+                    : let layout1(Binding) in Expr
+                        { Finr $ LetEF Core.NonRec $2 $4 }
+
+Binding             :: { Binding PsName (RlpExpr PsName) }
+                    : Pat '=' Expr          { VarB $1 $3 }
 
 AppE                :: { RlpExpr PsName }
                     : AppE VarE             { Finl $ Core.AppF $1 $2 }
@@ -124,6 +140,9 @@ Pat1s               :: { [Pat PsName] }
 
 Pat1                :: { Pat PsName }
                     : Var                   { VarP $1 }
+
+Pat                 :: { Pat PsName }
+                    : Pat1                  { $1 }
 
 Con                 :: { PsName }
                     : conname               { $1 ^. to extract
