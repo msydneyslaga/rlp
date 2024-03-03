@@ -1,13 +1,12 @@
-{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE QuantifiedConstraints, UndecidableInstances #-}
 module Data.Pretty
-    ( Pretty(..)
+    ( Pretty(..), Pretty1(..)
+    , prettyPrec1
     , rpretty
     , ttext
     -- * Pretty-printing lens combinators
-    , hsepOf, vsepOf
-    , vcatOf
-    , vlinesOf
-    , vsepTerm
+    , hsepOf, vsepOf, vcatOf, vlinesOf, vsepTerm
+    , vsep
     , module Text.PrettyPrint
     , maybeParens
     , appPrec
@@ -20,12 +19,14 @@ import Text.PrettyPrint.HughesPJ    hiding ((<>))
 import Text.Printf
 import Data.String                  (IsString(..))
 import Data.Text.Lens               hiding ((:<))
-import Data.Monoid
+import Data.Monoid                  hiding (Sum)
 import Control.Lens
 
 -- instances
 import Control.Comonad.Cofree
 import Data.Text                    qualified as T
+import Data.Functor.Sum
+import Data.Fix                     (Fix(..))
 ----------------------------------------------------------------------------------
 
 class Pretty a where
@@ -53,7 +54,24 @@ instance (Show a) => Pretty (Showing a) where
 deriving via Showing Int instance Pretty Int
 
 class (forall a. Pretty a => Pretty (f a)) => Pretty1 f where
-    liftPrettyPrec :: (Int -> a -> Doc) -> f a -> Doc
+    liftPrettyPrec :: (Int -> a -> Doc) -> Int -> f a -> Doc
+
+prettyPrec1 :: (Pretty1 f, Pretty a) => Int -> f a -> Doc
+prettyPrec1 = liftPrettyPrec prettyPrec
+
+instance (Pretty1 f, Pretty1 g, Pretty a) => Pretty (Sum f g a) where
+    prettyPrec p (InL fa) = prettyPrec1 p fa
+    prettyPrec p (InR ga) = prettyPrec1 p ga
+
+instance (Pretty1 f, Pretty1 g) => Pretty1 (Sum f g) where
+    liftPrettyPrec pr p (InL fa) = liftPrettyPrec pr p fa
+    liftPrettyPrec pr p (InR ga) = liftPrettyPrec pr p ga
+
+instance (Pretty (f (Fix f))) => Pretty (Fix f) where
+    prettyPrec d (Fix f) = prettyPrec d f
+
+-- instance (Pretty1 f) => Pretty (Fix f) where
+--     prettyPrec d (Fix f) = prettyPrec1 d f
 
 --------------------------------------------------------------------------------
 
@@ -75,6 +93,9 @@ vlinesOf l = foldrOf l (\a b -> a $+$ "" $+$ b) mempty
 
 vsepTerm :: Doc -> Doc -> Doc -> Doc
 vsepTerm term a b = (a <> term) $+$ b
+
+vsep :: [Doc] -> Doc
+vsep = foldr ($+$) mempty
 
 --------------------------------------------------------------------------------
 

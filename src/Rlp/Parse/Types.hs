@@ -18,7 +18,7 @@ module Rlp.Parse.Types
     , RlpToken(..), AlexInput(..), Position(..), spanFromPos, LexerAction
     , Located(..), PsName
     -- ** Lenses
-    , _TokenLitInt, _TokenVarName, _TokenConName, _TokenVarSym
+    , _TokenLitInt, _TokenVarName, _TokenConName, _TokenVarSym, _TokenConSym
     , aiPrevChar, aiSource, aiBytes, aiPos, posLine, posColumn
 
     -- * Error handling
@@ -277,7 +277,7 @@ initAlexInput s = AlexInput
     { _aiPrevChar   = '\0'
     , _aiSource     = s
     , _aiBytes      = []
-    , _aiPos        = (1,1,0)
+    , _aiPos        = (1,0,0)
     }
 
 --------------------------------------------------------------------------------

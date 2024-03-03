@@ -32,6 +32,8 @@ library
                     , Core.HindleyMilner
                     , Control.Monad.Errorful
                     , Rlp.Syntax
+                    , Rlp.AltSyntax
+                    , Rlp.AltParse
                     , Rlp.Syntax.Backstage
                     , Rlp.Syntax.Types
                     -- , Rlp.Parse.Decls

@@ -28,6 +28,7 @@ import Data.Functor.Bind
 import Data.Function                    (on)
 import GHC.Stack
 import Debug.Trace
+import Numeric
 
 import Effectful.State.Static.Local
 import Effectful.Labeled
@@ -71,9 +72,10 @@ desugarRlpProg :: Rlp.Program RlpcPs SrcSpan -> Core.Program'
 desugarRlpProg = rlpProgToCore
 
 desugarRlpExpr :: Rlp.Expr' RlpcPs SrcSpan -> Core.Expr'
-desugarRlpExpr = runPureEff . runNameSupply "anon" . exprToCore
+desugarRlpExpr = runPureEff . runNameSupply "anon" . undefined
 
-runNameSupply = undefined
+runNameSupply :: Text -> Eff (NameSupply ': es) a -> Eff es a
+runNameSupply pre = undefined -- evalState [ pre <> "_" <> tshow name | name <- [0..] ]
 
 -- the rl' program is desugared by desugaring each declaration as a separate
 -- program, and taking the monoidal product of the lot :3
@@ -84,5 +86,9 @@ rlpProgToCore = foldMapOf (programDecls . each) declToCore
 declToCore :: Rlp.Decl RlpcPs SrcSpan -> Program'
 declToCore = undefined
 
+type NameSupply = State [Name]
+
+exprToCore :: (NameSupply :> es)
+           => Rlp.ExprF RlpcPs a -> Eff es Core.Expr'
 exprToCore = undefined
 

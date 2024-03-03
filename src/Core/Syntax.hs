@@ -420,36 +420,56 @@ instance (Pretty b) => Pretty (ScDef b) where
             as = sc & hsepOf (_lhs . _2 . each . to ttext)
             e = pretty $ sc ^. _rhs
 
-instance (Pretty (f (Fix f))) => Pretty (Fix f) where
-    prettyPrec d (Fix f) = prettyPrec d f
-
 -- Pretty Expr
 -- LamF | appPrec1 | right
 -- AppF | appPrec  | left
 
 instance (Pretty b, Pretty a) => Pretty (ExprF b a) where
-    prettyPrec _ (VarF n) = ttext n
-    prettyPrec _ (ConF t a) = "Pack{" <> (ttext t <+> ttext a) <> "}"
-    prettyPrec p (LamF bs e) = maybeParens (p>0) $
-        hsep ["λ", hsep (prettyPrec appPrec1 <$> bs), "->", pretty e]
-    prettyPrec p (LetF r bs e) = maybeParens (p>0)
-                               $ hsep [pretty r, explicitLayout bs]
-                             $+$ hsep ["in", pretty e]
-    prettyPrec p (AppF f x) = maybeParens (p>appPrec) $
-        prettyPrec appPrec f <+> prettyPrec appPrec1 x
-    prettyPrec p (LitF l) = prettyPrec p l
-    prettyPrec p (CaseF e as) = maybeParens (p>0) $
-        "case" <+> pretty e <+> "of"
-        $+$ nest 2 (explicitLayout as)
-    prettyPrec p (TypeF t) = "@" <> prettyPrec appPrec1 t
+    prettyPrec = prettyPrec1
+
+    -- prettyPrec _ (VarF n) = ttext n
+    -- prettyPrec _ (ConF t a) = "Pack{" <> (ttext t <+> ttext a) <> "}"
+    -- prettyPrec p (LamF bs e) = maybeParens (p>0) $
+    --     hsep ["λ", hsep (prettyPrec appPrec1 <$> bs), "->", pretty e]
+    -- prettyPrec p (LetF r bs e) = maybeParens (p>0)
+    --                            $ hsep [pretty r, explicitLayout bs]
+    --                          $+$ hsep ["in", pretty e]
+    -- prettyPrec p (AppF f x) = maybeParens (p>appPrec) $
+    --     prettyPrec appPrec f <+> prettyPrec appPrec1 x
+    -- prettyPrec p (LitF l) = prettyPrec p l
+    -- prettyPrec p (CaseF e as) = maybeParens (p>0) $
+    --     "case" <+> pretty e <+> "of"
+    --     $+$ nest 2 (explicitLayout as)
+    -- prettyPrec p (TypeF t) = "@" <> prettyPrec appPrec1 t
+
+instance (Pretty b) => Pretty1 (ExprF b) where
+    liftPrettyPrec pr _ (VarF n) = ttext n
+    liftPrettyPrec pr _ (ConF t a) = "Pack{" <> (ttext t <+> ttext a) <> "}"
+    liftPrettyPrec pr p (LamF bs e) = maybeParens (p>0) $
+        hsep ["λ", hsep (prettyPrec appPrec1 <$> bs), "->", pr 0 e]
+    liftPrettyPrec pr p (LetF r bs e) = maybeParens (p>0)
+                               $ hsep [pretty r, bs']
+                             $+$ hsep ["in", pr 0 e]
+        where bs' = liftExplicitLayout (liftPrettyPrec pr 0) bs
+    liftPrettyPrec pr p (AppF f x) = maybeParens (p>appPrec) $
+        pr appPrec f <+> pr appPrec1 x
+    liftPrettyPrec pr p (LitF l) = prettyPrec p l
+    liftPrettyPrec pr p (CaseF e as) = maybeParens (p>0) $
+            "case" <+> pr 0 e <+> "of"
+            $+$ nest 2 as'
+        where as' = liftExplicitLayout (liftPrettyPrec pr 0) as
+    liftPrettyPrec pr p (TypeF t) = "@" <> prettyPrec appPrec1 t
 
 instance Pretty Rec where
     pretty Rec = "letrec"
     pretty NonRec = "let"
 
 instance (Pretty b, Pretty a) => Pretty (AlterF b a) where
-    pretty (AlterF c as e) =
-        hsep [pretty c, hsep (pretty <$> as), "->", pretty e]
+    prettyPrec = prettyPrec1
+
+instance (Pretty b) => Pretty1 (AlterF b) where
+    liftPrettyPrec pr _ (AlterF c as e) =
+        hsep [pretty c, hsep (pretty <$> as), "->", liftPrettyPrec pr 0 e]
 
 instance Pretty AltCon where
     pretty (AltData n) = ttext n
@@ -461,7 +481,15 @@ instance Pretty Lit where
     pretty (IntL n) = ttext n
 
 instance (Pretty b, Pretty a) => Pretty (BindingF b a) where
-    pretty (BindingF k v) = hsep [pretty k, "=", pretty v]
+    prettyPrec = prettyPrec1
+
+instance Pretty b => Pretty1 (BindingF b) where
+    liftPrettyPrec pr _ (BindingF k v) = hsep [pretty k, "=", liftPrettyPrec pr 0 v]
+
+liftExplicitLayout :: (a -> Doc) -> [a] -> Doc
+liftExplicitLayout pr as = vcat inner <+> "}" where
+    inner = zipWith (<+>) delims (pr <$> as)
+    delims = "{" : repeat ";"
 
 explicitLayout :: (Pretty a) => [a] -> Doc
 explicitLayout as = vcat inner <+> "}" where

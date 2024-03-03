@@ -46,8 +46,6 @@ import Data.Function                (on)
 data Located a = Located SrcSpan a
     deriving (Show, Lift, Functor)
 
-data Floc f = Floc SrcSpan (f (Floc f))
-
 pattern (:<$) :: a -> f b -> Trans.Cofree.CofreeF f a b
 pattern a :<$ b = a Trans.Cofree.:< b
 
@@ -56,10 +54,10 @@ pattern a :<$ b = a Trans.Cofree.:< b
 
 infixl 5 <~>
 
--- (~>) :: (CanGet k, CanSet k', HasLocation k a, HasLocation k' b)
---      => a -> b -> b
--- a ~> b = 
-(~>) = undefined
+(~>) :: (CanGet k, CanSet k', HasLocation k a, HasLocation k' b)
+     => a -> b -> b
+a ~> b = b & fromSet getSetLocation .~ (a ^. fromGet getSetLocation)
+-- (~>) = undefined
 
 infixl 4 ~>
 
@@ -97,15 +95,15 @@ data SrcSpan = SrcSpan
     !Int -- ^ Length
     deriving (Show, Eq, Lift)
 
-tupling :: Iso' SrcSpan (Int, Int, Int, Int)
-tupling = iso (\ (SrcSpan a b c d) -> (a,b,c,d))
+_SrcSpan :: Iso' SrcSpan (Int, Int, Int, Int)
+_SrcSpan = iso (\ (SrcSpan a b c d) -> (a,b,c,d))
               (\ (a,b,c,d) -> SrcSpan a b c d)
 
 srcSpanLine, srcSpanColumn, srcSpanAbs, srcSpanLen :: Lens' SrcSpan Int
-srcSpanLine = tupling . _1
-srcSpanColumn = tupling . _2
-srcSpanAbs = tupling . _3
-srcSpanLen = tupling . _4
+srcSpanLine = _SrcSpan . _1
+srcSpanColumn = _SrcSpan . _2
+srcSpanAbs = _SrcSpan . _3
+srcSpanLen = _SrcSpan . _4
 
 -- | debug tool
 nolo :: a -> Located a
@@ -228,3 +226,4 @@ lochead afs (Located ss fss) = ss :< unwrap (lochead afs $ Located ss fss)
 --------------------------------------------------------------------------------
 
 makePrisms ''Located
+

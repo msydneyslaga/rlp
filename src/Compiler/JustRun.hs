@@ -10,6 +10,7 @@ types such as @RLPC@ or @Text@.
 module Compiler.JustRun
     ( justLexCore
     , justParseCore
+    , justParseRlp
     , justTypeCheckCore
     , justHdbg
     , makeItPretty, makeItPretty'
@@ -29,15 +30,18 @@ import Data.Text                        qualified as T
 import Data.Function                    ((&))
 import System.IO
 import GM
-import Rlp.Parse
 import Rlp2Core
 import Data.Pretty
+
+import Rlp.AltParse
+import Rlp.AltSyntax                    qualified as Rlp
 ----------------------------------------------------------------------------------
 
 justHdbg :: String -> IO GmState
-justHdbg s = do
-    p <- evalRLPCIO def (parseRlpProgR >=> desugarRlpProgR $ T.pack s)
-    withFile "/tmp/t.log" WriteMode $ hdbgProg p
+justHdbg = undefined
+-- justHdbg s = do
+--     p <- evalRLPCIO def (parseRlpProgR >=> desugarRlpProgR $ T.pack s)
+--     withFile "/tmp/t.log" WriteMode $ hdbgProg p
 
 justLexCore :: String -> Either [MsgEnvelope RlpcError] [CoreToken]
 justLexCore s = lexCoreR (T.pack s)
@@ -48,6 +52,13 @@ justParseCore :: String -> Either [MsgEnvelope RlpcError] (Program Var)
 justParseCore s = parse (T.pack s)
                 & rlpcToEither
     where parse = lexCoreR @Identity >=> parseCoreProgR
+
+justParseRlp :: String
+             -> Either [MsgEnvelope RlpcError]
+                       (Rlp.Program Name (Rlp.RlpExpr Name))
+justParseRlp s = parse (T.pack s)
+               & rlpcToEither
+    where parse = parseRlpProgR @Identity
 
 justTypeCheckCore :: String -> Either [MsgEnvelope RlpcError] Program'
 justTypeCheckCore s = typechk (T.pack s)
