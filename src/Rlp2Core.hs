@@ -36,10 +36,9 @@ import Effectful
 import Text.Show.Deriving
 
 import Core.Syntax                      as Core
-import Rlp.Syntax                       as Rlp
+import Rlp.AltSyntax                    as Rlp
 import Compiler.Types
 import Data.Pretty                      (render, pretty)
-import Rlp.Parse.Types                  (RlpcPs, PsName)
 --------------------------------------------------------------------------------
 
 type Tree a = Either Name (Name, Branch a)
@@ -60,19 +59,17 @@ deriveShow1 ''Branch
 
 --------------------------------------------------------------------------------
 
-desugarRlpProgR :: forall m. (Monad m)
-                => Rlp.Program RlpcPs SrcSpan
+desugarRlpProgR :: forall m a. (Monad m)
+                => Rlp.Program PsName a
                 -> RLPCT m Core.Program'
 desugarRlpProgR p = do
     let p' = desugarRlpProg p
     addDebugMsg "dump-desugared" $ render (pretty p')
     pure p'
 
-desugarRlpProg :: Rlp.Program RlpcPs SrcSpan -> Core.Program'
-desugarRlpProg = rlpProgToCore
+desugarRlpProg = undefined
 
-desugarRlpExpr :: Rlp.Expr' RlpcPs SrcSpan -> Core.Expr'
-desugarRlpExpr = runPureEff . runNameSupply "anon" . undefined
+desugarRlpExpr = undefined
 
 runNameSupply :: Text -> Eff (NameSupply ': es) a -> Eff es a
 runNameSupply pre = undefined -- evalState [ pre <> "_" <> tshow name | name <- [0..] ]
@@ -80,15 +77,31 @@ runNameSupply pre = undefined -- evalState [ pre <> "_" <> tshow name | name <- 
 -- the rl' program is desugared by desugaring each declaration as a separate
 -- program, and taking the monoidal product of the lot :3
 
-rlpProgToCore :: Rlp.Program RlpcPs SrcSpan -> Program'
+rlpProgToCore :: Rlp.Program PsName (RlpExpr PsName) -> Program'
 rlpProgToCore = foldMapOf (programDecls . each) declToCore
 
-declToCore :: Rlp.Decl RlpcPs SrcSpan -> Program'
-declToCore = undefined
+declToCore :: Rlp.Decl PsName (RlpExpr PsName) -> Program'
+
+-- assume all arguments are VarP's for now
+declToCore (FunD b as e) = mempty & programScDefs .~ [ScDef b as' e']
+    where
+        as' = as ^.. each . singular _VarP
+        e' = runPureEff . runNameSupply b . exprToCore $ e
 
 type NameSupply = State [Name]
 
 exprToCore :: (NameSupply :> es)
-           => Rlp.ExprF RlpcPs a -> Eff es Core.Expr'
-exprToCore = undefined
+           => RlpExpr PsName -> Eff es Core.Expr'
+exprToCore = foldFixM \case
+    InL e -> pure $ Fix e
+    InR e -> rlpExprToCore e
+
+rlpExprToCore :: (NameSupply :> es)
+           => Rlp.ExprF PsName Core.Expr' -> Eff es Core.Expr'
+
+-- assume all binders are simple variable patterns for now
+rlpExprToCore (LetEF r bs e) = pure $ Let r bs' e
+  where
+    bs' = b2b <$> bs
+    b2b (VarB (VarP k) v) = Binding k v
 

@@ -3,10 +3,14 @@ module Rlp.AltSyntax
     (
     -- * AST
       Program(..), Decl(..), ExprF(..), Pat(..)
-    , RlpExprF, RlpExpr, Binding(..)
+    , RlpExprF, RlpExpr, Binding(..), Alter(..)
     , DataCon(..), Type(..)
 
     , Core.Name, PsName
+
+    -- * Optics
+    , programDecls
+    , _VarP, _FunB, _VarB
 
     -- * Functor-related tools
     , Fix(..), Cofree(..), Sum(..), pattern Finl, pattern Finr
@@ -17,6 +21,7 @@ import Data.Functor.Sum
 import Control.Comonad.Cofree
 import Data.Fix
 import Data.Function            (fix)
+import Control.Lens
 
 import Text.Show.Deriving
 import Data.Text                qualified as T
@@ -30,6 +35,9 @@ type PsName = T.Text
 
 newtype Program b a = Program [Decl b a]
     deriving Show
+
+programDecls :: Lens' (Program b a) [Decl b a]
+programDecls = lens (\ (Program ds) -> ds) (const Program)
 
 data Decl b a = FunD b [Pat b] a
               | DataD b [b] [DataCon b]
@@ -46,10 +54,15 @@ data Type b = VarT b
 
 data ExprF b a = InfixEF b a a
                | LetEF Core.Rec [Binding b a] a
+               | CaseEF a [Alter b a]
+               deriving (Functor, Foldable, Traversable)
+
+data Alter b a = Alter (Pat b) a
+               deriving (Show, Functor, Foldable, Traversable)
 
 data Binding b a = FunB b [Pat b] a
                  | VarB (Pat b) a
-    deriving Show
+                 deriving (Show, Functor, Foldable, Traversable)
 
 -- type Expr b = Cofree (ExprF b)
 
@@ -58,8 +71,11 @@ type RlpExprF b = Sum (Core.ExprF b) (ExprF b)
 type RlpExpr b = Fix (RlpExprF b)
 
 data Pat b = VarP b
-    deriving Show
+           | ConP b
+           | AppP (Pat b) (Pat b)
+           deriving Show
 
+deriveShow1 ''Alter
 deriveShow1 ''Binding
 deriveShow1 ''ExprF
 deriving instance (Show b, Show a) => Show (ExprF b a)
@@ -75,9 +91,19 @@ pattern Finr ga = Fix (InR ga)
 instance (Pretty b, Pretty a) => Pretty (ExprF b a) where
     prettyPrec = prettyPrec1
 
+instance (Pretty b, Pretty a) => Pretty (Alter b a) where
+    prettyPrec = prettyPrec1
+
+instance (Pretty b) => Pretty1 (Alter b) where
+    liftPrettyPrec pr _ (Alter p e) =
+        hsep [ pretty p, "->", pr 0 e]
+
 instance Pretty b => Pretty1 (ExprF b) where
     liftPrettyPrec pr p (InfixEF o a b) = maybeParens (p>0) $
         pr 1 a <+> pretty o <+> pr 1 b
+    liftPrettyPrec pr p (CaseEF e as) = maybeParens (p>0) $
+        hsep [ "case", pr 0 e, "of" ]
+        $+$ nest 2 (vcat $ liftPrettyPrec pr 0 <$> as)
 
 instance (Pretty b, Pretty a) => Pretty (Decl b a) where
     prettyPrec = prettyPrec1
@@ -107,10 +133,16 @@ instance (Pretty b) => Pretty (Type b) where
 
 instance (Pretty b) => Pretty (Pat b) where
     prettyPrec p (VarP b) = prettyPrec p b
+    prettyPrec p (ConP b) = prettyPrec p b
+    prettyPrec p (AppP c x) = maybeParens (p>appPrec) $
+        prettyPrec appPrec c <+> prettyPrec appPrec1 x
 
 instance (Pretty a, Pretty b) => Pretty (Program b a) where
     prettyPrec = prettyPrec1
 
 instance (Pretty b) => Pretty1 (Program b) where
     liftPrettyPrec pr p (Program ds) = vsep $ liftPrettyPrec pr p <$> ds
+
+makePrisms ''Pat
+makePrisms ''Binding
 

@@ -120,6 +120,16 @@ FunD                :: { Decl PsName (RlpExpr PsName) }
 Expr                :: { RlpExpr PsName }
                     : AppE                  { $1 }
                     | LetE                  { $1 }
+                    | CaseE                 { $1 }
+
+CaseE               :: { RlpExpr PsName }
+                    : case Expr of CaseAlts { Finr $ CaseEF $2 $4 }
+
+CaseAlts            :: { [Alter PsName (RlpExpr PsName)] }
+                    : layout1(CaseAlt)      { $1 }
+
+CaseAlt             :: { Alter PsName (RlpExpr PsName) }
+                    : Pat '->' Expr    { Alter $1 $3 }
 
 LetE                :: { RlpExpr PsName }
                     : let layout1(Binding) in Expr
@@ -140,9 +150,15 @@ Pat1s               :: { [Pat PsName] }
 
 Pat1                :: { Pat PsName }
                     : Var                   { VarP $1 }
+                    | Con                   { ConP $1 }
+                    | '(' Pat ')'           { $2 }
 
 Pat                 :: { Pat PsName }
+                    : AppP                  { $1 }
+
+AppP                :: { Pat PsName }
                     : Pat1                  { $1 }
+                    | AppP Pat1             { $1 `AppP` $2 }
 
 Con                 :: { PsName }
                     : conname               { $1 ^. to extract
