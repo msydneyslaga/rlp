@@ -86,6 +86,10 @@ VS                  : ';'                   { () }
 Decl                :: { Decl PsName (RlpExpr PsName) }
                     : FunD                  { $1 }
                     | DataD                 { $1 }
+                    | TySigD                { $1 }
+
+TySigD              :: { Decl PsName (RlpExpr PsName) }
+                    : Var '::' Type         { TySigD $1 $3 }
 
 DataD               :: { Decl PsName (RlpExpr PsName) }
                     : data Con TyVars               { DataD $2 $3 [] }
@@ -104,7 +108,8 @@ Type1               :: { Type PsName }
                     | '(' Type ')'          { $2 }
 
 Type                :: { Type PsName }
-                    : AppT                  { $1 }
+                    : Type '->' Type        { $1 :-> $3 }
+                    | AppT                  { $1 }
 
 AppT                :: { Type PsName }
                     : Type1                 { $1 }

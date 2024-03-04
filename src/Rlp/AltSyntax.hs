@@ -7,6 +7,7 @@ module Rlp.AltSyntax
     , DataCon(..), Type(..)
 
     , Core.Name, PsName
+    , pattern (Core.:->)
 
     -- * Optics
     , programDecls
@@ -41,6 +42,7 @@ programDecls = lens (\ (Program ds) -> ds) (const Program)
 
 data Decl b a = FunD b [Pat b] a
               | DataD b [b] [DataCon b]
+              | TySigD b (Type b)
               deriving Show
 
 data DataCon b = DataCon b [Type b]
@@ -51,6 +53,13 @@ data Type b = VarT b
             | AppT (Type b) (Type b)
             | FunT
             deriving Show
+
+instance Core.HasArrowSyntax (Type b) (Type b) (Type b) where
+    _arrowSyntax = prism make unmake where
+        make (s,t) = FunT `AppT` s `AppT` t
+
+        unmake (FunT `AppT` s `AppT` t) = Right (s,t)
+        unmake s                        = Left s
 
 data ExprF b a = InfixEF b a a
                | LetEF Core.Rec [Binding b a] a
@@ -122,14 +131,21 @@ instance (Pretty b) => Pretty1 (Decl b) where
         cons = vcat $ zipWith (<+>) delims (pretty <$> ds)
         delims = "=" : repeat "|"
 
+    liftPrettyPrec _ _ (TySigD n t) =
+        hsep [ ttext n, ":", pretty t ]
+
 instance (Pretty b) => Pretty (DataCon b) where
     pretty (DataCon n as) = ttext n <+> hsep (prettyPrec appPrec1 <$> as)
 
+-- (->) is given prec `appPrec-1`
 instance (Pretty b) => Pretty (Type b) where
     prettyPrec _ (VarT n) = ttext n
     prettyPrec _ (ConT n) = ttext n
+    prettyPrec p (s Core.:-> t) = maybeParens (p>appPrec-1) $
+        hsep [ prettyPrec appPrec s, "->", prettyPrec (appPrec-1) t ]
     prettyPrec p (AppT f x) = maybeParens (p>appPrec) $
         prettyPrec appPrec f <+> prettyPrec appPrec1 x
+    prettyPrec p FunT = maybeParens (p>0) "->"
 
 instance (Pretty b) => Pretty (Pat b) where
     prettyPrec p (VarP b) = prettyPrec p b

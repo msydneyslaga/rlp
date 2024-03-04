@@ -33,6 +33,7 @@ module Core.Syntax
     , Pretty(pretty), WithTerseBinds(..)
 
     -- * Optics
+    , HasArrowSyntax(..)
     , programScDefs, programTypeSigs, programDataTags, programTyCons
     , formalising, lambdaLifting
     , HasRHS(_rhs), HasLHS(_lhs)
@@ -143,9 +144,22 @@ pattern Lit t = Fix (LitF t)
 pattern TyInt :: Type
 pattern TyInt = TyCon "Int#"
 
+class HasArrowSyntax s a b | s -> a b where
+    _arrowSyntax :: Prism' s (a, b)
+
+instance HasArrowSyntax Type Type Type where
+    _arrowSyntax = prism make unmake where
+        make (s,t) = TyFun `TyApp` s `TyApp` t
+
+        unmake (TyFun `TyApp` s `TyApp` t) = Right (s,t)
+        unmake s                           = Left s
+
 infixr 1 :->
-pattern (:->) :: Type -> Type -> Type
-pattern a :-> b = TyApp (TyApp TyFun a) b
+pattern (:->) :: HasArrowSyntax s a b
+              => a -> b -> s
+-- pattern (:->) :: Type -> Type -> Type
+pattern a :-> b <- (preview _arrowSyntax -> Just (a, b))
+    where a :-> b = _arrowSyntax # (a, b)
 
 data BindingF b a = BindingF b (ExprF b a)
     deriving (Functor, Foldable, Traversable)

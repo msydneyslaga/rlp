@@ -61,7 +61,7 @@ $asciisym       = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~\:]
     |infixr|infixl|infix
 
 @reservedop =
-    "=" | \\ | "->" | "|" | "::"
+    "=" | \\ | "->" | "|" | ":"
 
 rlp :-
     
@@ -167,7 +167,7 @@ lexReservedName = \case
 lexReservedOp :: Text -> RlpToken
 lexReservedOp = \case
     "="     -> TokenEquals
-    "::"    -> TokenHasType
+    ":"     -> TokenHasType
     "|"     -> TokenPipe
     "->"    -> TokenArrow
     s       -> error (show s)
