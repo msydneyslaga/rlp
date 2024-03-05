@@ -13,16 +13,14 @@ import Control.Monad.IO.Class
 import Control.Monad
 
 import Compiler.RLPC
-import Rlp.Parse
+import Rlp.AltParse
 --------------------------------------------------------------------------------
 
 rlpProg :: QuasiQuoter
-rlpProg = undefined
--- rlpProg = mkqq parseRlpProgR
+rlpProg = mkqq parseRlpProgR
 
 rlpExpr :: QuasiQuoter
-rlpExpr = undefined
--- rlpExpr = mkqq parseRlpExprR
+rlpExpr = mkqq parseRlpExprR
 
 mkq :: (Lift a) => (Text -> RLPCIO a) -> String -> Q Exp
 mkq parse = evalAndParse >=> lift where

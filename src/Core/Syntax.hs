@@ -611,15 +611,24 @@ deriveBifunctor ''ExprF
 deriveBifoldable ''ExprF
 deriveBitraversable ''ExprF
 
+instance Lift b => Lift1 (BindingF b) where
+    liftLift lf (BindingF k v) = liftCon2 'BindingF (lift k) (liftLift lf v)
+
+instance Lift b => Lift1 (AlterF b) where
+    liftLift lf (AlterF con bs e) =
+        liftCon3 'AlterF (lift con) (lift1 bs) (liftLift lf e)
+
 instance Lift b => Lift1 (ExprF b) where
-    lift1 (VarF k)      = liftCon 'VarF (lift k)
-    lift1 (AppF f x)    = liftCon2 'AppF (lift f) (lift x)
-    lift1 (LamF b e)    = liftCon2 'LamF (lift b) (lift e)
-    lift1 (LetF r bs e) = liftCon3 'LetF (lift r) (lift bs) (lift e)
-    lift1 (CaseF e as)  = liftCon2 'CaseF (lift e) (lift as)
-    lift1 (TypeF t)     = liftCon 'TypeF (lift t)
-    lift1 (LitF l)      = liftCon 'LitF (lift l)
-    lift1 (ConF t a)    = liftCon2 'ConF (lift t) (lift a)
+    liftLift lf (VarF k)      = liftCon 'VarF (lift k)
+    liftLift lf (AppF f x)    = liftCon2 'AppF (lf f) (lf x)
+    liftLift lf (LamF b e)    = liftCon2 'LamF (lift b) (lf e)
+    liftLift lf (LetF r bs e) = liftCon3 'LetF (lift r) bs' (lf e)
+        where bs' = liftLift (liftLift lf) bs
+    liftLift lf (CaseF e as)  = liftCon2 'CaseF (lf e) as'
+        where as' = liftLift (liftLift lf) as
+    liftLift lf (TypeF t)     = liftCon 'TypeF (lift t)
+    liftLift lf (LitF l)      = liftCon 'LitF (lift l)
+    liftLift lf (ConF t a)    = liftCon2 'ConF (lift t) (lift a)
 
 deriving instance (Lift b, Lift a) => Lift (ExprF b a)
 deriving instance (Lift b, Lift a) => Lift (BindingF b a)

@@ -34,6 +34,7 @@ library
                     , Rlp.Syntax
                     , Rlp.AltSyntax
                     , Rlp.AltParse
+                    , Rlp.HindleyMilner
                     , Rlp.Syntax.Backstage
                     , Rlp.Syntax.Types
                     -- , Rlp.Parse.Decls

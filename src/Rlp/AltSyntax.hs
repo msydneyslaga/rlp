@@ -27,6 +27,7 @@ import Control.Lens
 import Text.Show.Deriving
 import Data.Text                qualified as T
 import Data.Pretty
+import Misc.Lift1
 
 import Compiler.Types
 import Core.Syntax              qualified as Core
@@ -161,4 +162,26 @@ instance (Pretty b) => Pretty1 (Program b) where
 
 makePrisms ''Pat
 makePrisms ''Binding
+
+deriving instance (Lift b, Lift a) => Lift (Program b a)
+deriving instance (Lift b, Lift a) => Lift (Decl b a)
+deriving instance (Lift b) => Lift (Pat b)
+deriving instance (Lift b) => Lift (DataCon b)
+deriving instance (Lift b) => Lift (Type b)
+
+instance Lift b => Lift1 (Binding b) where
+    liftLift lf (VarB b a) = liftCon2 'VarB (lift b) (lf a)
+
+instance Lift b => Lift1 (Alter b) where
+    liftLift lf (Alter b a) = liftCon2 'Alter (lift b) (lf a)
+
+instance Lift b => Lift1 (ExprF b) where
+    liftLift lf (InfixEF o a b) =
+        liftCon3 'InfixEF (lift o) (lf a) (lf b)
+    liftLift lf (LetEF r bs e) =
+        liftCon3 'LetEF (lift r) bs' (lf e)
+      where bs' = liftLift (liftLift lf) bs
+    liftLift lf (CaseEF e as) =
+        liftCon2 'CaseEF (lf e) as'
+      where as' = liftLift (liftLift lf) as
 

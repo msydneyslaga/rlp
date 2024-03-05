@@ -2,6 +2,7 @@
 module Rlp.AltParse
     ( parseRlpProg
     , parseRlpProgR
+    , parseRlpExprR
     , runP'
     )
     where
@@ -70,7 +71,7 @@ StandaloneProgram :: { Program Name (RlpExpr PsName) }
 
 
 StandaloneExpr :: { RlpExpr PsName }
-               : litint                  { undefined }
+               : VL Expr VR             { $2 }
 
 VL  :: { () }
 VL  : vlbrace       { () }
@@ -206,6 +207,11 @@ parseRlpProgR :: (Monad m) => Text -> RLPCT m (Program Name (RlpExpr PsName))
 parseRlpProgR s = liftErrorful $ errorful (ma,es)
     where
         (_,es,ma) = runP' parseRlpProg s
+
+parseRlpExprR :: (Monad m) => Text -> RLPCT m (RlpExpr PsName)
+parseRlpExprR s = liftErrorful $ errorful (ma,es)
+    where
+        (_,es,ma) = runP' parseRlpExpr s
 
 parseError = error "explode"
 
