@@ -51,6 +51,7 @@ import Data.String
 import Data.HashMap.Strict          (HashMap)
 import Data.HashMap.Strict          qualified as H
 import Data.Hashable
+import Data.Hashable.Lifted
 import Data.Foldable                (traverse_)
 import Data.Functor
 import Data.Monoid
@@ -58,7 +59,7 @@ import Data.Functor.Classes
 import Data.Text                    qualified as T
 import Data.Char
 import Data.These
-import GHC.Generics                 (Generic, Generically(..))
+import GHC.Generics                 (Generic, Generic1, Generically(..))
 import Text.Show.Deriving
 import Data.Eq.Deriving
 import Data.Kind                    qualified
@@ -755,4 +756,27 @@ deriving instance (Eq b, Eq a) => Eq (ExprF b a)
 makePrisms ''BindingF
 makePrisms ''Var
 makePrisms ''ScDef
+
+deriving instance Generic (ExprF b a)
+deriving instance Generic1 (ExprF b)
+deriving instance Generic1 (AlterF b)
+deriving instance Generic1 (BindingF b)
+deriving instance Generic (AlterF b a)
+deriving instance Generic (BindingF b a)
+deriving instance Generic AltCon
+deriving instance Generic Lit
+deriving instance Generic Rec
+deriving instance Generic Type
+
+instance Hashable Lit
+instance Hashable AltCon
+instance Hashable Rec
+instance Hashable Type
+instance (Hashable b, Hashable a) => Hashable (BindingF b a)
+instance (Hashable b, Hashable a) => Hashable (AlterF b a)
+instance (Hashable b, Hashable a) => Hashable (ExprF b a)
+
+instance Hashable b => Hashable1 (AlterF b)
+instance Hashable b => Hashable1 (BindingF b)
+instance Hashable b => Hashable1 (ExprF b)
 

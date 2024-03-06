@@ -127,6 +127,7 @@ Expr                :: { RlpExpr PsName }
                     : AppE                  { $1 }
                     | LetE                  { $1 }
                     | CaseE                 { $1 }
+                    | Expr1                 { $1 }
 
 CaseE               :: { RlpExpr PsName }
                     : case Expr of CaseAlts { Finr $ CaseEF $2 $4 }
@@ -144,9 +145,15 @@ LetE                :: { RlpExpr PsName }
 Binding             :: { Binding PsName (RlpExpr PsName) }
                     : Pat '=' Expr          { VarB $1 $3 }
 
+Expr1               :: { RlpExpr PsName }
+                    : VarE                  { $1 }
+                    | litint                { $1 ^. to extract
+                                                  . singular _TokenLitInt
+                                                  . to (Finl . Core.LitF . Core.IntL) }
+
 AppE                :: { RlpExpr PsName }
-                    : AppE VarE             { Finl $ Core.AppF $1 $2 }
-                    | VarE                  { $1 }
+                    : AppE Expr1            { Finl $ Core.AppF $1 $2 }
+                    | Expr1                 { $1 }
 
 VarE                :: { RlpExpr PsName }
                     : Var                   { Finl $ Core.VarF $1 }

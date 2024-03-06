@@ -22,11 +22,13 @@ import Data.Functor.Sum
 import Control.Comonad.Cofree
 import Data.Fix
 import Data.Function            (fix)
-import GHC.Generics             (Generic(..))
+import GHC.Generics             (Generic, Generic1)
 import Data.Hashable
+import Data.Hashable.Lifted
 import Control.Lens
 
 import Text.Show.Deriving
+import Data.Eq.Deriving
 import Data.Text                qualified as T
 import Data.Pretty
 import Misc.Lift1
@@ -49,7 +51,7 @@ data Decl b a = FunD b [Pat b] a
               deriving Show
 
 data DataCon b = DataCon b [Type b]
-    deriving Show
+    deriving (Show, Generic)
 
 data Type b = VarT b
             | ConT b
@@ -70,13 +72,16 @@ data ExprF b a = InfixEF b a a
                | LetEF Core.Rec [Binding b a] a
                | CaseEF a [Alter b a]
                deriving (Functor, Foldable, Traversable)
+               deriving (Eq, Generic, Generic1)
 
 data Alter b a = Alter (Pat b) a
                deriving (Show, Functor, Foldable, Traversable)
+               deriving (Eq, Generic, Generic1)
 
 data Binding b a = FunB b [Pat b] a
                  | VarB (Pat b) a
                  deriving (Show, Functor, Foldable, Traversable)
+                 deriving (Eq, Generic, Generic1)
 
 -- type Expr b = Cofree (ExprF b)
 
@@ -87,7 +92,7 @@ type RlpExpr b = Fix (RlpExprF b)
 data Pat b = VarP b
            | ConP b
            | AppP (Pat b) (Pat b)
-           deriving Show
+           deriving (Eq, Show, Generic)
 
 deriveShow1 ''Alter
 deriveShow1 ''Binding
@@ -188,4 +193,16 @@ instance Lift b => Lift1 (ExprF b) where
     liftLift lf (CaseEF e as) =
         liftCon2 'CaseEF (lf e) as'
       where as' = liftLift (liftLift lf) as
+
+deriveEq1 ''Binding
+deriveEq1 ''Alter
+deriveEq1 ''ExprF
+
+instance (Hashable b) => Hashable (Pat b)
+instance (Hashable b, Hashable a) => Hashable (Binding b a)
+instance (Hashable b, Hashable a) => Hashable (Alter b a)
+instance (Hashable b, Hashable a) => Hashable (ExprF b a)
+instance (Hashable b) => Hashable1 (Alter b)
+instance (Hashable b) => Hashable1 (Binding b)
+instance (Hashable b) => Hashable1 (ExprF b)
 

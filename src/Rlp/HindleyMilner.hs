@@ -1,3 +1,6 @@
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Rlp.HindleyMilner
     ( infer
     , check
@@ -8,6 +11,7 @@ module Rlp.HindleyMilner
 --------------------------------------------------------------------------------
 import Control.Lens             hiding (Context', Context, (:<))
 import Control.Monad.Errorful
+import Control.Monad.State
 import Data.Text                qualified as T
 import Data.Pretty
 import Text.Printf
@@ -23,7 +27,9 @@ import Data.Fix
 import Control.Comonad.Cofree
 
 import Compiler.RlpcError
-import Rlp.AltSyntax
+import Rlp.AltSyntax            as Rlp
+import Core.Syntax              qualified as Core
+import Core.Syntax              (ExprF(..))
 --------------------------------------------------------------------------------
 
 -- | Type error enum.
@@ -70,12 +76,20 @@ instance Hashable Constraint
 
 type Constraints = HashSet Constraint
 
-data PartialJudgement =
-    PartialJudgement Constraints Context'
-
+data PartialJudgement = PartialJudgement Constraints Context'
     deriving (Generic, Show)
     deriving (Semigroup, Monoid)
         via Generically PartialJudgement
+
+constraints :: Lens' PartialJudgement Constraints
+constraints = lens sa sbt where
+    sa (PartialJudgement cs _) = cs
+    sbt (PartialJudgement _ g) cs' = PartialJudgement cs' g
+
+assumptions :: Lens' PartialJudgement Context'
+assumptions = lens sa sbt where
+    sa (PartialJudgement _ g) = g
+    sbt (PartialJudgement cs _) g' = PartialJudgement cs g'
 
 fixCofree :: (Functor f, Functor g)
           => Iso (Fix f) (Fix g) (Cofree f ()) (Cofree g b)
@@ -83,6 +97,46 @@ fixCofree = iso sa bt where
     sa = foldFix (() :<)
     bt (_ :< as) = Fix $ bt <$> as
 
-gather :: Context' -> RlpExpr PsName -> HMError (Type PsName, Constraints)
-gather = undefined
+data TypeState t m = TypeState
+    { _tsUnique :: Int
+    , _tsMemo   :: HashMap t m
+    }
+    deriving Show
+
+makeLenses ''TypeState
+
+type TC t = State (TypeState t (Type PsName, PartialJudgement))
+                  (Type PsName, PartialJudgement)
+
+freshTv :: State (TypeState t m) (Type PsName)
+freshTv = do
+    n <- use tsUnique
+    tsUnique %= succ
+    pure . VarT $ "$a" <> T.pack (show n)
+
+memoisedTC :: (Hashable a) => (a -> TC a) -> a -> TC a
+memoisedTC k a = do
+    m <- use tsMemo
+    r <- k a
+    tsMemo . at a %= \case
+        Just c -> Just c
+        Nothing -> Just r
+    pure r
+
+gather :: Fix (RlpExprF PsName) -> TC (Fix (RlpExprF PsName)) 
+
+gather (Fix (InL (Core.LitF (Core.IntL _)))) =
+    pure (ConT "Int#", mempty)
+
+gather (Fix (InL (Core.VarF n))) = do
+    tv <- freshTv
+    let j = mempty & assumptions .~ H.singleton n tv
+    pure (tv, j)
+
+gather (Fix (InL (Core.AppF f x))) = do
+    tv <- freshTv
+    (tf,j) <- memoisedTC gather f
+    (tx,j') <- memoisedTC gather x
+    let j'' = mempty & constraints .~ S.singleton (Equality tf $ tx :-> tv)
+    pure (tv, j <> j' <> j'')
 
