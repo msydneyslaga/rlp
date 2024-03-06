@@ -22,6 +22,8 @@ import Data.Functor.Sum
 import Control.Comonad.Cofree
 import Data.Fix
 import Data.Function            (fix)
+import GHC.Generics             (Generic(..))
+import Data.Hashable
 import Control.Lens
 
 import Text.Show.Deriving
@@ -53,7 +55,9 @@ data Type b = VarT b
             | ConT b
             | AppT (Type b) (Type b)
             | FunT
-            deriving Show
+            deriving (Show, Eq, Generic)
+
+instance (Hashable b) => Hashable (Type b)
 
 instance Core.HasArrowSyntax (Type b) (Type b) (Type b) where
     _arrowSyntax = prism make unmake where

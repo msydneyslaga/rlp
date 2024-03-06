@@ -6,13 +6,20 @@ module Rlp.HindleyMilner
     )
     where
 --------------------------------------------------------------------------------
-import Control.Lens             hiding (Context', Context)
+import Control.Lens             hiding (Context', Context, (:<))
 import Control.Monad.Errorful
 import Data.Text                qualified as T
 import Data.Pretty
 import Text.Printf
+import Data.Hashable
+import Data.HashMap.Strict      (HashMap)
+import Data.HashMap.Strict      qualified as H
+import Data.HashSet             (HashSet)
+import Data.HashSet             qualified as S
+import GHC.Generics             (Generic(..), Generically(..))
 
 import Data.Functor
+import Data.Fix
 import Control.Comonad.Cofree
 
 import Compiler.RlpcError
@@ -53,4 +60,29 @@ type HMError = Errorful TypeError
 
 infer = undefined
 check = undefined
+
+type Context' = HashMap PsName (Type PsName)
+
+data Constraint = Equality (Type PsName) (Type PsName)
+    deriving (Eq, Generic, Show)
+
+instance Hashable Constraint
+
+type Constraints = HashSet Constraint
+
+data PartialJudgement =
+    PartialJudgement Constraints Context'
+
+    deriving (Generic, Show)
+    deriving (Semigroup, Monoid)
+        via Generically PartialJudgement
+
+fixCofree :: (Functor f, Functor g)
+          => Iso (Fix f) (Fix g) (Cofree f ()) (Cofree g b)
+fixCofree = iso sa bt where
+    sa = foldFix (() :<)
+    bt (_ :< as) = Fix $ bt <$> as
+
+gather :: Context' -> RlpExpr PsName -> HMError (Type PsName, Constraints)
+gather = undefined
 
