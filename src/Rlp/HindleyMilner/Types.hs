@@ -23,14 +23,14 @@ type Context' = HashMap PsName (Type PsName)
 data Constraint = Equality (Type PsName) (Type PsName)
     deriving (Eq, Generic, Show)
 
-newtype PartialJudgement = PartialJudgement Constraints
+newtype PartialJudgement = PartialJudgement [Constraint]
     deriving (Generic, Show)
     deriving (Semigroup, Monoid)
         via Generically PartialJudgement
 
 instance Hashable Constraint
 
-type Constraints = HashSet Constraint
+-- type Constraints = HashSet Constraint
 
 type Memo t = HashMap t (Type PsName, PartialJudgement)
 

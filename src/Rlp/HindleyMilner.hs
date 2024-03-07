@@ -9,9 +9,10 @@ module Rlp.HindleyMilner
     )
     where
 --------------------------------------------------------------------------------
-import Control.Lens             hiding (Context', Context, (:<))
+import Control.Lens             hiding (Context', Context, (:<), para)
 import Control.Monad.Errorful
 import Control.Monad.State
+import Control.Monad
 import Control.Monad.Writer.Strict
 import Data.Text                qualified as T
 import Data.Pretty
@@ -22,9 +23,11 @@ import Data.HashMap.Strict      qualified as H
 import Data.HashSet             (HashSet)
 import Data.HashSet             qualified as S
 import Data.Maybe               (fromMaybe)
+import Data.Traversable
 import GHC.Generics             (Generic(..), Generically(..))
 
 import Data.Functor
+import Data.Functor.Foldable
 import Data.Fix
 import Control.Comonad.Cofree
 
@@ -79,7 +82,7 @@ fixCofree = iso sa bt where
 type Gather t = WriterT PartialJudgement (HM t)
 
 addConstraint :: Constraint -> Gather t ()
-addConstraint = tell . ($ mempty) . (_PartialJudgement .~) . S.singleton
+addConstraint = tell . ($ mempty) . (_PartialJudgement .~) . pure
 
 lookupContext :: Applicative m => PsName -> Context' -> m (Type PsName)
 lookupContext n g = maybe (error "undefined variable") pure $
@@ -105,11 +108,61 @@ gather g (Finl (LitF (IntL _))) = pure IntT
 gather g (Finl (VarF n)) = lookupContext n g
 
 gather g (Finl (AppF f x)) = do
-    tv <- lift freshTv
+    ty <- lift freshTv
     tf <- gather' g f
     tx <- gather' g x
-    addConstraint $ Equality tf (tx :-> tv)
-    pure tv
+    addConstraint $ Equality tf (tx :-> ty)
+    pure ty
+
+gather g (Finl (LamF xs e)) = do
+    bs <- for xs \n -> do
+        tx <- lift freshTv
+        pure (n, tx)
+    let g' = H.fromList bs <> g
+        txs = bs ^.. each . _2
+    te <- gather' g' e
+    pure $ foldr (:->) te txs
+
+gather g (Finr (CaseEF e as)) = do
+    undefined
+
+gatherA :: Context'
+        -> Alter PsName (Fix (RlpExprF PsName))
+        -> Gather (Fix (RlpExprF PsName)) (Type PsName)
+gatherA = undefined
+
+type Subst = Context'
+
+applySubst :: Subst -> Type PsName -> Type PsName
+applySubst = flip $ ifoldr subst
+
+composeSubst :: Subst -> Subst -> Subst
+composeSubst = H.union
+
+subst :: (Eq b) => b -> Type b -> Type b -> Type b
+subst n t' = para \case
+    VarTF x               | n == x -> t'
+    -- here `pre` is the oringal, unsubstituted type
+    ForallTF x (pre,post) | n == x -> ForallT x pre
+    t                              -> embed $ fmap snd t
+
+mgu :: Type PsName -> Type PsName -> Maybe Subst
+
+mgu (VarT n) t = Just $ H.singleton n t
+mgu t (VarT n) = Just $ H.singleton n t
+
+mgu (ConT a) (ConT b) | a == b = Just mempty
+
+mgu (a :-> b) (a' :-> b') = do
+    sa <- a `mgu` a'
+    sb <- applySubst sa b `mgu` applySubst sa b'
+    pure $ sa `composeSubst` sb
+
+mgu _ _ = Nothing
+
+solve :: [Constraint] -> Maybe Subst
+solve = foldM go mempty where
+    go s (Equality a b) = applySubst s a `mgu` applySubst s b
 
 demoContext :: Context'
 demoContext = H.fromList

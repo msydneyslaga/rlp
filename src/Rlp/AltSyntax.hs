@@ -7,6 +7,8 @@ module Rlp.AltSyntax
     , DataCon(..), Type(..)
     , pattern IntT
 
+    , TypeF(..)
+
     , Core.Name, PsName
     , pattern (Core.:->)
 
@@ -29,6 +31,7 @@ import Data.Hashable.Lifted
 import GHC.Exts                 (IsString)
 import Control.Lens
 
+import Data.Functor.Foldable.TH
 import Text.Show.Deriving
 import Data.Eq.Deriving
 import Data.Text                qualified as T
@@ -211,4 +214,6 @@ instance (Hashable b, Hashable a) => Hashable (ExprF b a)
 instance (Hashable b) => Hashable1 (Alter b)
 instance (Hashable b) => Hashable1 (Binding b)
 instance (Hashable b) => Hashable1 (ExprF b)
+
+makeBaseFunctor ''Type
 
