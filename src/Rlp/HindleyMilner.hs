@@ -12,6 +12,7 @@ module Rlp.HindleyMilner
 import Control.Lens             hiding (Context', Context, (:<))
 import Control.Monad.Errorful
 import Control.Monad.State
+import Control.Monad.Writer.Strict
 import Data.Text                qualified as T
 import Data.Pretty
 import Text.Printf
@@ -20,6 +21,7 @@ import Data.HashMap.Strict      (HashMap)
 import Data.HashMap.Strict      qualified as H
 import Data.HashSet             (HashSet)
 import Data.HashSet             qualified as S
+import Data.Maybe               (fromMaybe)
 import GHC.Generics             (Generic(..), Generically(..))
 
 import Data.Functor
@@ -29,7 +31,8 @@ import Control.Comonad.Cofree
 import Compiler.RlpcError
 import Rlp.AltSyntax            as Rlp
 import Core.Syntax              qualified as Core
-import Core.Syntax              (ExprF(..))
+import Core.Syntax              (ExprF(..), Lit(..))
+import Rlp.HindleyMilner.Types
 --------------------------------------------------------------------------------
 
 -- | Type error enum.
@@ -67,43 +70,53 @@ type HMError = Errorful TypeError
 infer = undefined
 check = undefined
 
-type Context' = HashMap PsName (Type PsName)
-
-data Constraint = Equality (Type PsName) (Type PsName)
-    deriving (Eq, Generic, Show)
-
-instance Hashable Constraint
-
-type Constraints = HashSet Constraint
-
-data PartialJudgement = PartialJudgement Constraints Context'
-    deriving (Generic, Show)
-    deriving (Semigroup, Monoid)
-        via Generically PartialJudgement
-
-constraints :: Lens' PartialJudgement Constraints
-constraints = lens sa sbt where
-    sa (PartialJudgement cs _) = cs
-    sbt (PartialJudgement _ g) cs' = PartialJudgement cs' g
-
-assumptions :: Lens' PartialJudgement Context'
-assumptions = lens sa sbt where
-    sa (PartialJudgement _ g) = g
-    sbt (PartialJudgement cs _) g' = PartialJudgement cs g'
-
 fixCofree :: (Functor f, Functor g)
           => Iso (Fix f) (Fix g) (Cofree f ()) (Cofree g b)
 fixCofree = iso sa bt where
     sa = foldFix (() :<)
     bt (_ :< as) = Fix $ bt <$> as
 
-data TypeState t m = TypeState
-    { _tsUnique :: Int
-    , _tsMemo   :: HashMap t m
-    }
-    deriving Show
+type Gather t = WriterT PartialJudgement (HM t)
 
-makeLenses ''TypeState
+addConstraint :: Constraint -> Gather t ()
+addConstraint = tell . ($ mempty) . (_PartialJudgement .~) . S.singleton
+
+lookupContext :: Applicative m => PsName -> Context' -> m (Type PsName)
+lookupContext n g = maybe (error "undefined variable") pure $
+    H.lookup n g
+
+-- | 'gather', but memoise the result. All recursive calls should be to
+-- 'gather'', not 'gather'!
+
+gather' :: Context'
+        -> Fix (RlpExprF PsName)
+        -> Gather (Fix (RlpExprF PsName)) (Type PsName)
+gather' g e = do
+    t <- listen $ gather g e
+    lift . tell $ H.singleton e t
+    pure (t ^. _1)
+
+gather :: Context'
+       -> Fix (RlpExprF PsName)
+       -> Gather (Fix (RlpExprF PsName)) (Type PsName)
+
+gather g (Finl (LitF (IntL _))) = pure IntT
+
+gather g (Finl (VarF n)) = lookupContext n g
+
+gather g (Finl (AppF f x)) = do
+    tv <- lift freshTv
+    tf <- gather' g f
+    tx <- gather' g x
+    addConstraint $ Equality tf (tx :-> tv)
+    pure tv
+
+demoContext :: Context'
+demoContext = H.fromList
+    [ ("id", ForallT "a" $ VarT "a" :-> VarT "a")
+    ]
+
+{--
 
 type TC t = State (TypeState t (Type PsName, PartialJudgement))
                   (Type PsName, PartialJudgement)
@@ -139,4 +152,6 @@ gather (Fix (InL (Core.AppF f x))) = do
     (tx,j') <- memoisedTC gather x
     let j'' = mempty & constraints .~ S.singleton (Equality tf $ tx :-> tv)
     pure (tv, j <> j' <> j'')
+
+--}
 

@@ -5,6 +5,7 @@ module Rlp.AltSyntax
       Program(..), Decl(..), ExprF(..), Pat(..)
     , RlpExprF, RlpExpr, Binding(..), Alter(..)
     , DataCon(..), Type(..)
+    , pattern IntT
 
     , Core.Name, PsName
     , pattern (Core.:->)
@@ -25,6 +26,7 @@ import Data.Function            (fix)
 import GHC.Generics             (Generic, Generic1)
 import Data.Hashable
 import Data.Hashable.Lifted
+import GHC.Exts                 (IsString)
 import Control.Lens
 
 import Text.Show.Deriving
@@ -57,9 +59,13 @@ data Type b = VarT b
             | ConT b
             | AppT (Type b) (Type b)
             | FunT
+            | ForallT b (Type b)
             deriving (Show, Eq, Generic)
 
 instance (Hashable b) => Hashable (Type b)
+
+pattern IntT :: (IsString b, Eq b) => Type b
+pattern IntT = ConT "Int#"
 
 instance Core.HasArrowSyntax (Type b) (Type b) (Type b) where
     _arrowSyntax = prism make unmake where
