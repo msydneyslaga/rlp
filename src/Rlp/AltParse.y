@@ -45,6 +45,7 @@ import Core.Syntax              qualified as Core
     '|'             { Located _ TokenPipe }
     '::'            { Located _ TokenHasType }
     ';'             { Located _ TokenSemicolon }
+    'λ'             { Located _ TokenLambda }
     '('             { Located _ TokenLParen }
     ')'             { Located _ TokenRParen }
     '->'            { Located _ TokenArrow }
@@ -118,7 +119,7 @@ AppT                :: { Type PsName }
 
 TyVars              :: { [PsName] }
                     : list0(varname)     { $1 <&> view ( to extract
-                                                       . singular _TokenVarName) }
+                                                       . singular _TokenVarName ) }
 
 FunD                :: { Decl PsName (RlpExpr PsName) }
                     : Var Pat1s '=' Expr    { FunD $1 $2 $4 }
@@ -128,6 +129,10 @@ Expr                :: { RlpExpr PsName }
                     | LetE                  { $1 }
                     | CaseE                 { $1 }
                     | Expr1                 { $1 }
+                    | LamE                  { $1 }
+
+LamE                :: { RlpExpr PsName }
+                    : 'λ' list0(varname) '->' Expr { Finl $ Core.LamF (fmap extractName $2) $4 }
 
 CaseE               :: { RlpExpr PsName }
                     : case Expr of CaseAlts { Finr $ CaseEF $2 $4 }
@@ -221,5 +226,7 @@ parseRlpExprR s = liftErrorful $ errorful (ma,es)
         (_,es,ma) = runP' parseRlpExpr s
 
 parseError = error "explode"
+
+extractName = view $ to extract . singular _TokenVarName
 
 }

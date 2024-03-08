@@ -170,6 +170,7 @@ lexReservedOp = \case
     ":"     -> TokenHasType
     "|"     -> TokenPipe
     "->"    -> TokenArrow
+    "\\"    -> TokenLambda
     s       -> error (show s)
 
 -- | @andBegin@, with the subtle difference that the start code is set

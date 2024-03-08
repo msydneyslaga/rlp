@@ -70,7 +70,6 @@ instance IsRlpcError TypeError where
 -- throw any number of fatal or nonfatal errors. Run with @runErrorful@.
 type HMError = Errorful TypeError
 
-infer = undefined
 check = undefined
 
 fixCofree :: (Functor f, Functor g)
@@ -163,6 +162,9 @@ mgu _ _ = Nothing
 solve :: [Constraint] -> Maybe Subst
 solve = foldM go mempty where
     go s (Equality a b) = applySubst s a `mgu` applySubst s b
+
+infer :: RlpExpr PsName -> Cofree (RlpExprF PsName) (Type PsName)
+infer = undefined
 
 demoContext :: Context'
 demoContext = H.fromList
