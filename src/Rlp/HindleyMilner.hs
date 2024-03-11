@@ -15,6 +15,7 @@ import Control.Monad.State
 import Control.Monad
 import Control.Monad.Writer.Strict
 import Data.Text                qualified as T
+import Data.Pretty
 import Data.Hashable
 import Data.HashMap.Strict      (HashMap)
 import Data.HashMap.Strict      qualified as H
@@ -50,69 +51,72 @@ fixCofree = iso sa bt where
 lookupVar :: PsName -> Context -> HM (Type PsName)
 lookupVar n g = case g ^. contextVars . at n of
     Just t -> pure t
-    Nothing -> addFatal (TyErrUntypedVariable n)
+    Nothing -> addFatal $ TyErrUntypedVariable n
 
--- | Instantiate a polytype by replacing the bound type variables with fresh
--- monotype (free) variables
-inst :: Type PsName -> HM (Type PsName)
-inst = para \case
-    ForallTF x (_,t) -> do
-        m <- t
-        tv <- freshTv
-        pure $ subst x tv m
-    -- discard the recursive results by selected fst
-    t -> pure . embed . fmap fst $ t
+gather :: Context -> RlpExpr PsName -> HM (Type PsName)
+gather g = \case
 
-generalise :: Type PsName -> Type PsName
-generalise = foldr ForallT <*> toListOf tyVars
+    Finl (LitF (IntL _)) -> pure IntT
 
-tyVars :: Traversal (Type b) (Type b') b b'
-tyVars = traverse
+    Finl (AppF f x) -> do
+        tf <- gather g f
+        tx <- gather g x
+        tfx <- freshTv
+        addConstraint $ Equality tf (tx :-> tfx)
+        pure tfx
 
-polytypeBinds :: Traversal' (Type b) b
-polytypeBinds k (ForallT x m) = ForallT <$> k x <*> polytypeBinds k m
-polytypeBinds k t             = pure t
+    Finl (VarF n) -> lookupVar n g
 
-subst :: PsName -> Type PsName -> Type PsName -> Type PsName
-subst n t' = para \case
-    VarTF m               | n == m    -> t'
-    ForallTF m (pre,post) | n == m    -> pre
-                          | otherwise -> post
-    t -> embed . fmap snd $ t
+    Finl (LamF bs e) -> do
+        tbs <- for bs $ \b -> (b,) <$> freshTv
+        te <- gather (supplement tbs g) e
+        pure $ foldrOf (each . _2) (:->) te tbs
+
+unify :: Context -> [Constraint] -> HM Context
+
+unify g [] = pure g
+
+unify g (Equality (sx :-> sy) (tx :-> ty) : cs) =
+    unify g $ Equality sx tx : Equality sy ty : cs
+
+-- elim
+unify g (Equality (ConT s) (ConT t) : cs) | s == t = unify g cs
+unify g (Equality (VarT s) (VarT t) : cs) | s == t = unify g cs
+
+unify g (Equality (VarT s) t : cs)
+    | occurs s t = addFatal $ TyErrRecursiveType s t
+    | otherwise  = unify g' cs'
+  where
+    g' = supplement [(s,t)] g
+    cs' = cs & each . constraintTypes %~ subst s t
+
+-- swap
+unify g (Equality s (VarT t) : cs) = unify g (Equality (VarT t) s : cs)
+
+unify _ (Equality s t : _) = addFatal $ TyErrCouldNotUnify s t
+
+solve :: Context -> RlpExpr PsName -> HM (Type PsName)
+solve g e = do
+    (t,cs) <- listen $ gather g e
+    g' <- unify g cs
+    pure $ ifoldrOf (contextVars . itraversed) subst t g'
 
 occurs :: PsName -> Type PsName -> Bool
 occurs n = cata \case
     VarTF m | n == m -> True
     t                -> or t
 
-infer :: Context -> RlpExpr PsName -> HM (Type PsName)
-infer g = \case
+subst :: PsName -> Type PsName -> Type PsName -> Type PsName
+subst n t' = para \case
+    VarTF m | n == m -> t'
+    -- shadowing
+    ForallTF x (pre,post) | x == n    -> ForallT x pre
+                          | otherwise -> ForallT x post
+    t -> embed $ t <&> view _2
 
-    Finl (LitF (IntL _)) -> pure IntT
-    
-    {- Var
-     -   x : τ ∈ Γ
-     -   τ' = inst τ
-     -   -----------
-     -   Γ |- x : τ'
-     -}
-    Finl (VarF x) -> do
-        t <- lookupVar x g
-        let t' = inst t
-        t'
-
-    Finl (AppF f x) -> do
-        te <- infer g f
-        tx <- infer g x
-        t' <- freshTv
-        undefined
-
-unify :: Context -> Type PsName -> Type PsName -> Context
-unify g = \cases
-    IntT IntT -> g
-    (VarT a) b | Just a' <- g ^. contextTyVars . at a -> unify g a' b
-    b (VarT a) | Just a' <- g ^. contextTyVars . at a -> unify g b a'
-
-    s@(VarT a) b | Nothing <- g ^. contextTyVars . at a
-                 | s == b
+prettyHM :: (Pretty a)
+         => Either [TypeError] (a, [Constraint])
+         -> Either [TypeError] (String, [String])
+prettyHM = over (mapped . _1) rpretty
+         . over (mapped . _2 . each) rpretty
 

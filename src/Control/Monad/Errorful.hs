@@ -14,6 +14,7 @@ module Control.Monad.Errorful
     where
 ----------------------------------------------------------------------------------
 import Control.Monad.State.Strict
+import Control.Monad.Writer
 import Control.Monad.Reader
 import Control.Monad.Trans
 import Data.Functor.Identity
@@ -87,4 +88,10 @@ instance (Monad m, MonadErrorful e m) => MonadErrorful e (ReaderT r m) where
 
 instance (Monad m, MonadState s m) => MonadState s (ErrorfulT e m) where
     state = lift . state
+
+instance (Monoid w, Monad m, MonadWriter w m) => MonadWriter w (ErrorfulT e m) where
+    tell = lift . tell
+    listen (ErrorfulT m) = ErrorfulT $ listen m <&> \ ((ma,es),w) ->
+        ((,w) <$> ma, es)
+    pass (ErrorfulT m) = undefined
 

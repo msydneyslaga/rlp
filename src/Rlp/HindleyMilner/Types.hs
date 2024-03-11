@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Rlp.HindleyMilner.Types
     where
@@ -22,9 +23,8 @@ import Compiler.RlpcError
 import Rlp.AltSyntax
 --------------------------------------------------------------------------------
 
-data Context = Context
+newtype Context = Context
     { _contextVars      :: HashMap PsName (Type PsName)
-    , _contextTyVars    :: HashMap PsName (Type PsName)
     }
 
 data Constraint = Equality (Type PsName) (Type PsName)
@@ -38,7 +38,7 @@ data PartialJudgement = PartialJudgement [Constraint]
 
 instance Hashable Constraint
 
-type HM = ErrorfulT TypeError (State Int)
+type HM = ErrorfulT TypeError (StateT Int (Writer [Constraint]))
 
 -- | Type error enum.
 data TypeError
@@ -112,12 +112,33 @@ freshTv = do
     modify succ
     pure . VarT $ "$a" <> T.pack (show n)
 
-runHM' :: HM a -> Either [TypeError] a
-runHM' e = maybe (Left es) Right ma
+runHM' :: HM a -> Either [TypeError] (a, [Constraint])
+runHM' e = maybe (Left es) (Right . (,cs)) ma
     where
-        (ma,es) = (`evalState` 0) . runErrorfulT $ e
+        ((ma,es),cs) = runWriter . (`evalStateT` 0) . runErrorfulT $ e
+
+addConstraint :: Constraint -> HM ()
+addConstraint = tell . pure
 
 -- makePrisms ''PartialJudgement
 
 makeLenses ''Context
+makePrisms ''Constraint
+
+supplement :: [(PsName, Type PsName)] -> Context -> Context
+supplement bs = contextVars %~ (H.fromList bs <>)
+
+demoContext :: Context
+demoContext = Context
+    { _contextVars =
+        [ ("+#", IntT :-> IntT :-> IntT)
+        ]
+    }
+
+constraintTypes :: Traversal' Constraint (Type PsName)
+constraintTypes k (Equality s t) = Equality <$> k s <*> k t
+
+instance Pretty Constraint where
+    pretty (Equality s t) =
+        hsep [prettyPrec appPrec1 s, "~", prettyPrec appPrec1 t]
 

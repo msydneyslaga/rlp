@@ -4,6 +4,7 @@ module Data.Pretty
     , prettyPrec1
     , rpretty
     , ttext
+    , Showing(..)
     -- * Pretty-printing lens combinators
     , hsepOf, vsepOf, vcatOf, vlinesOf, vsepTerm
     , vsep
