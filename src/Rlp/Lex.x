@@ -14,6 +14,7 @@ module Rlp.Lex
     , popLexState
     , programInitState
     , runP'
+    , popLayout
     )
     where
 import Codec.Binary.UTF8.String (encodeChar)

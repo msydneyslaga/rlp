@@ -84,7 +84,7 @@ VL  : vlbrace       { () }
 
 VR  :: { () }
 VR  : vrbrace       { () }
-    | error         { () }
+    | error         {% void popLayout }
 
 VS                  :: { () }
 VS                  : ';'                   { () }
