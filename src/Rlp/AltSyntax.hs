@@ -63,7 +63,7 @@ data Type b = VarT b
             | AppT (Type b) (Type b)
             | FunT
             | ForallT b (Type b)
-            deriving (Show, Eq, Generic)
+            deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
 
 instance (Hashable b) => Hashable (Type b)
 

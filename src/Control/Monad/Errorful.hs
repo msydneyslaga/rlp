@@ -85,3 +85,6 @@ instance (Monad m, MonadErrorful e m) => MonadErrorful e (ReaderT r m) where
     addWound = lift . addWound
     addFatal = lift . addFatal
 
+instance (Monad m, MonadState s m) => MonadState s (ErrorfulT e m) where
+    state = lift . state
+
