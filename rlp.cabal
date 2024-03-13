@@ -38,6 +38,7 @@ library
                     , Rlp.HindleyMilner.Types
                     , Rlp.Syntax.Backstage
                     , Rlp.Syntax.Types
+                    , Rlp.Syntax.Good
                     -- , Rlp.Parse.Decls
                     , Rlp.Parse
                     , Rlp.Parse.Associate

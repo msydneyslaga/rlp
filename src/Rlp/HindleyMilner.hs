@@ -2,11 +2,12 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Rlp.HindleyMilner
-    -- ( infer
-    -- , check
-    -- , TypeError(..)
-    -- , HMError
-    -- )
+    ( typeCheckRlpProgR
+    , solve
+    , TypeError(..)
+    , runHM'
+    , HM
+    )
     where
 --------------------------------------------------------------------------------
 import Control.Lens             hiding (Context', Context, (:<), para)
@@ -31,6 +32,7 @@ import Data.Fix                 hiding (cata, para)
 import Control.Comonad.Cofree
 import Control.Comonad
 
+import Compiler.RLPC
 import Compiler.RlpcError
 import Rlp.AltSyntax            as Rlp
 import Core.Syntax              qualified as Core
@@ -119,4 +121,16 @@ prettyHM :: (Pretty a)
          -> Either [TypeError] (String, [String])
 prettyHM = over (mapped . _1) rpretty
          . over (mapped . _2 . each) rpretty
+
+fixtend :: (f (Fix f) -> b) -> Fix f -> Cofree f b
+fixtend = undefined
+
+infer :: RlpExpr PsName -> HM (Cofree (RlpExprF PsName) (Type PsName))
+infer = _ . fixtend (solve _ . wrapFix)
+
+typeCheckRlpProgR :: (Monad m)
+                  => Program PsName (RlpExpr PsName)
+                  -> RLPCT m (Program PsName
+                      (Cofree (RlpExprF PsName) (Type PsName)))
+typeCheckRlpProgR = undefined
 

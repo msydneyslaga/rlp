@@ -26,6 +26,9 @@ import Rlp.AltSyntax
 newtype Context = Context
     { _contextVars      :: HashMap PsName (Type PsName)
     }
+    deriving (Generic)
+    deriving (Semigroup, Monoid)
+        via Generically Context
 
 data Constraint = Equality (Type PsName) (Type PsName)
     deriving (Eq, Generic, Show)
@@ -49,6 +52,7 @@ data TypeError
     -- | Untyped, potentially undefined variable
     | TyErrUntypedVariable Name
     | TyErrMissingTypeSig Name
+    | TyErrNonHomogenousCaseAlternatives (RlpExpr PsName)
     deriving (Show)
 
 instance IsRlpcError TypeError where
@@ -124,6 +128,7 @@ addConstraint = tell . pure
 
 makeLenses ''Context
 makePrisms ''Constraint
+makePrisms ''TypeError
 
 supplement :: [(PsName, Type PsName)] -> Context -> Context
 supplement bs = contextVars %~ (H.fromList bs <>)
