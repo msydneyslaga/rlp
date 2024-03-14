@@ -15,5 +15,5 @@ import GM
 
 driver :: RLPCIO ()
 driver = forFiles_ $ \f ->
-    withSource f (parseRlpProgR >=> desugarRlpProgR >=> evalProgR)
+    withSource f (parseRlpProgR >=> undefined >=> desugarRlpProgR >=> evalProgR)
 

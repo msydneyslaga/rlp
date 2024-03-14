@@ -59,7 +59,9 @@ import Data.Functor.Classes
 import Data.Text                    qualified as T
 import Data.Char
 import Data.These
-import GHC.Generics                 (Generic, Generic1, Generically(..))
+import Data.Aeson
+import GHC.Generics                 ( Generic, Generic1
+                                    , Generically(..), Generically1(..))
 import Text.Show.Deriving
 import Data.Eq.Deriving
 import Data.Kind                    qualified
@@ -110,7 +112,7 @@ type Kind = Type
 --     deriving (Eq, Show, Lift)
 
 data Var = MkVar Name Type
-    deriving (Eq, Show, Lift)
+    deriving (Eq, Show, Lift, Generic)
 
 pattern (:^) :: Name -> Type -> Var
 pattern n :^ t = MkVar n t
@@ -779,4 +781,22 @@ instance (Hashable b, Hashable a) => Hashable (ExprF b a)
 instance Hashable b => Hashable1 (AlterF b)
 instance Hashable b => Hashable1 (BindingF b)
 instance Hashable b => Hashable1 (ExprF b)
+
+deriving via (Generically Rec)
+    instance ToJSON Rec
+deriving via (Generically Lit)
+    instance ToJSON Lit
+deriving via (Generically AltCon)
+    instance ToJSON AltCon
+deriving via (Generically Type)
+    instance ToJSON Type
+deriving via (Generically Var)
+    instance ToJSON Var
+
+deriving via (Generically1 (BindingF b))
+    instance ToJSON b => ToJSON1 (BindingF b)
+deriving via (Generically1 (AlterF b))
+    instance ToJSON b => ToJSON1 (AlterF b)
+deriving via (Generically1 (ExprF b))
+    instance ToJSON b => ToJSON1 (ExprF b)
 

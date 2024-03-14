@@ -93,6 +93,9 @@ library
                     , clay
                     , jmacro
                     , js-jquery
+                    , aeson
+                    , lens-aeson
+                    -- , servant
 
     hs-source-dirs:   src
     default-language: GHC2021
@@ -113,6 +116,7 @@ executable rlpc
     main-is:          Main.hs
     other-modules:    RlpDriver
                     , CoreDriver
+                    , Server
 
     build-depends: base >=4.17.0.0 && <4.20.0.0
                  , rlp
@@ -121,6 +125,9 @@ executable rlpc
                  , unordered-containers >= 0.2.20 && < 0.3
                  , lens >=5.2.3 && <6.0
                  , text >= 2.0.2 && < 2.2
+                 , websockets
+                 , aeson
+                 , recursion-schemes >= 5.2.2 && < 5.3
 
     hs-source-dirs:   app
     default-language: GHC2021

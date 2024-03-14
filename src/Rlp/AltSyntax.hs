@@ -18,23 +18,29 @@ module Rlp.AltSyntax
 
     -- * Functor-related tools
     , Fix(..), Cofree(..), Sum(..), pattern Finl, pattern Finr
+
+    -- * Misc
+    , serialiseCofree
     )
     where
 --------------------------------------------------------------------------------
 import Data.Functor.Sum
 import Control.Comonad.Cofree
-import Data.Fix
+import Data.Fix                 hiding (cata)
+import Data.Functor.Foldable
 import Data.Function            (fix)
-import GHC.Generics             (Generic, Generic1)
+import GHC.Generics             ( Generic, Generic1
+                                , Generically(..), Generically1(..))
 import Data.Hashable
 import Data.Hashable.Lifted
 import GHC.Exts                 (IsString)
-import Control.Lens
+import Control.Lens             hiding ((.=))
 
 import Data.Functor.Foldable.TH
 import Text.Show.Deriving
 import Data.Eq.Deriving
 import Data.Text                qualified as T
+import Data.Aeson
 import Data.Pretty
 import Misc.Lift1
 
@@ -45,7 +51,7 @@ import Core.Syntax              qualified as Core
 type PsName = T.Text
 
 newtype Program b a = Program [Decl b a]
-    deriving Show
+    deriving (Show, Functor, Foldable, Traversable)
 
 programDecls :: Lens' (Program b a) [Decl b a]
 programDecls = lens (\ (Program ds) -> ds) (const Program)
@@ -53,7 +59,7 @@ programDecls = lens (\ (Program ds) -> ds) (const Program)
 data Decl b a = FunD b [Pat b] a
               | DataD b [b] [DataCon b]
               | TySigD b (Type b)
-              deriving (Show, Functor)
+              deriving (Show, Functor, Foldable, Traversable)
 
 data DataCon b = DataCon b [Type b]
     deriving (Show, Generic)
@@ -101,7 +107,7 @@ type RlpExpr b = Fix (RlpExprF b)
 data Pat b = VarP b
            | ConP b
            | AppP (Pat b) (Pat b)
-           deriving (Eq, Show, Generic)
+           deriving (Eq, Show, Generic, Generic1)
 
 deriveShow1 ''Alter
 deriveShow1 ''Binding
@@ -220,4 +226,22 @@ makeBaseFunctor ''Type
 instance Core.HasArrowStops (Type b) (Type b) (Type b) (Type b) where
     arrowStops k (s Core.:-> t) = (Core.:->) <$> k s <*> Core.arrowStops k t
     arrowStops k t         = k t
+
+deriving via (Generically1 Pat)
+    instance ToJSON1 Pat
+deriving via (Generically (Pat b))
+    instance ToJSON b => ToJSON (Pat b)
+deriving via (Generically1 (Alter b))
+    instance ToJSON b => ToJSON1 (Alter b)
+deriving via (Generically1 (Binding b))
+    instance ToJSON b => ToJSON1 (Binding b)
+deriving via (Generically1 (ExprF b))
+    instance ToJSON b => ToJSON1 (ExprF b)
+deriving via (Generically1 (RlpExprF b))
+    instance ToJSON b => ToJSON1 (RlpExprF b)
+
+serialiseCofree :: (Functor f, ToJSON1 f, ToJSON a) => Cofree f a -> Value
+serialiseCofree = cata \case
+    ann :<$ e -> object [ "ann" .= ann
+                        , "val" .= toJSON1 e ]
 

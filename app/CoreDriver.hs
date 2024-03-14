@@ -15,10 +15,11 @@ import GM
 
 driver :: RLPCIO ()
 driver = forFiles_ $ \f ->
-    withSource f (lexCoreR >=> parseCoreProgR >=> evalProgR)
+    withSource f (lexCoreR >=> parseCoreProgR >=> undefined >=> evalProgR)
 
 driverSource :: T.Text -> RLPCIO ()
-driverSource = lexCoreR >=> parseCoreProgR >=> evalProgR >=> printRes
+driverSource = lexCoreR >=> parseCoreProgR
+            >=> undefined >=> evalProgR >=> printRes
     where
         printRes = liftIO . print . view _1
 

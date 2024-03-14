@@ -163,11 +163,14 @@ fixtend :: Functor f => (f (Fix f) -> b) -> Fix f -> Cofree f b
 fixtend c (Fix f) = c f :< fmap (fixtend c) f
 
 infer :: RlpExpr PsName -> HM (Cofree (RlpExprF PsName) (Type PsName))
-infer = undefined
+infer = sequenceA . fixtend (infer1 . wrapFix)
 
 typeCheckRlpProgR :: (Monad m)
                   => Program PsName (RlpExpr PsName)
                   -> RLPCT m (Program PsName
                       (Cofree (RlpExprF PsName) (Type PsName)))
-typeCheckRlpProgR = undefined
+typeCheckRlpProgR = liftHM . traverse infer
+
+liftHM :: (Monad m) => HM a -> RLPCT m a
+liftHM = liftEither . runHM'
 

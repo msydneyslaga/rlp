@@ -26,8 +26,9 @@ module Compiler.RLPC
     , DebugFlag(..), CompilerFlag(..)
     -- ** Lenses
     , rlpcLogFile, rlpcDFlags, rlpcEvaluator, rlpcInputFiles, rlpcLanguage
+    , rlpcServer
     -- * Misc. MTL-style functions
-    , liftErrorful, liftMaybe, hoistRlpcT
+    , liftErrorful, liftEither, liftMaybe, hoistRlpcT
     -- * Misc. Rlpc Monad -related types
     , RLPCOptions(RLPCOptions), IsRlpcError(..), RlpcError(..)
     , MsgEnvelope(..), Severity(..)
@@ -111,6 +112,11 @@ liftErrorful e = RLPCT $ lift (fmap liftRlpcError `mapErrorful` e)
 liftMaybe :: (Monad m) => Maybe a -> RLPCT m a
 liftMaybe m = RLPCT . lift . ErrorfulT . pure $ (m, [])
 
+liftEither :: (Monad m, IsRlpcError e)
+           => Either [e] a -> RLPCT m a
+liftEither = RLPCT . lift . ErrorfulT . pure
+           . either (const (Nothing,[])) ((,[]) . Just)
+
 hoistRlpcT :: (forall a. m a -> n a)
          -> RLPCT m a -> RLPCT n a
 hoistRlpcT f rma = RLPCT $ ReaderT $ \opt ->
@@ -123,6 +129,7 @@ data RLPCOptions = RLPCOptions
     , _rlpcEvaluator   :: Evaluator
     , _rlpcHeapTrigger :: Int
     , _rlpcLanguage    :: Maybe Language
+    , _rlpcServer      :: Bool
     , _rlpcInputFiles  :: [FilePath]
     }
     deriving Show
@@ -143,6 +150,7 @@ instance Default RLPCOptions where
         , _rlpcEvaluator = EvaluatorGM
         , _rlpcHeapTrigger = 200
         , _rlpcInputFiles = []
+        , _rlpcServer = False
         , _rlpcLanguage = Nothing
         }
 

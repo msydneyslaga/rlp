@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 ----------------------------------------------------------------------------------
+import Control.Lens             hiding (argument)
 import Compiler.RLPC
 import Compiler.RlpcError
 import Control.Exception
@@ -23,6 +24,7 @@ import Control.Lens.Combinators hiding (argument)
 
 import CoreDriver               qualified
 import RlpDriver                qualified
+import Server                   qualified
 ----------------------------------------------------------------------------------
 
 optParser :: ParserInfo RLPCOptions
@@ -74,7 +76,11 @@ options = RLPCOptions
         <> metavar "rlp|core"
         <> help "the language to be compiled -- see README"
         )
-    <*> some (argument str $ metavar "FILES...")
+    <*> switch
+        (  long "server"
+        <> short 's'
+        )
+    <*> many (argument str $ metavar "FILES...")
     where
         infixr 9 #
         f # x = f x
@@ -107,7 +113,9 @@ mmany v = liftA2 (<>) v (mmany v)
 main :: IO ()
 main = do
     opts <- execParser optParser
-    void $ evalRLPCIO opts dispatch
+    if opts ^. rlpcServer
+    then Server.server
+    else void $ evalRLPCIO opts dispatch
 
 dispatch :: RLPCIO ()
 dispatch = getLang >>= \case
