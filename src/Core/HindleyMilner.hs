@@ -16,22 +16,9 @@ module Core.HindleyMilner
     )
     where
 ----------------------------------------------------------------------------------
-import Control.Lens             hiding (Context', Context)
-import Data.Maybe               (fromMaybe)
-import Data.Text                qualified as T
-import Data.Pretty              (rpretty)
-import Data.HashMap.Strict      qualified as H
-import Data.Foldable            (traverse_)
-import Data.Functor
-import Data.Functor.Identity
 import Compiler.RLPC
-import Compiler.Types
-import Compiler.RlpcError
-import Control.Monad            (foldM, void, forM)
+import Data.Text qualified as T
 import Control.Monad.Errorful
-import Control.Monad.State
-import Control.Monad.Utils      (mapAccumLM, generalise)
-import Text.Printf
 import Core.Syntax
 ----------------------------------------------------------------------------------
 
@@ -60,21 +47,7 @@ data TypeError
     deriving (Show, Eq)
 
 instance IsRlpcError TypeError where
-    liftRlpcError = \case
-        -- todo: use anti-parser instead of show
-        TyErrCouldNotUnify t u -> Text
-            [ T.pack $ printf "Could not match type `%s` with `%s`."
-                              (rpretty @String t) (rpretty @String u)
-            , "Expected: " <> rpretty t
-            , "Got: " <> rpretty u
-            ]
-        TyErrUntypedVariable n -> Text
-            [ "Untyped (likely undefined) variable `" <> n <> "`"
-            ]
-        TyErrRecursiveType t x -> Text
-            [ T.pack $ printf "Recursive type: `%s' occurs in `%s'"
-                              (rpretty @String t) (rpretty @String x)
-            ]
+    liftRlpcError = undefined
 
 -- | Synonym for @Errorful [TypeError]@. This means an @HMError@ action may
 -- throw any number of fatal or nonfatal errors. Run with @runErrorful@.

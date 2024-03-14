@@ -1,26 +1,26 @@
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE QuantifiedConstraints, UndecidableInstances #-}
 module Data.Pretty
-    ( Pretty(..), Pretty1(..)
-    , prettyPrec1
-    , rpretty
+    ( Out(..), Out1(..)
+    , outPrec1
+    , rout
     , ttext
     , Showing(..)
-    -- * Pretty-printing lens combinators
-    , hsepOf, vsepOf, vcatOf, vlinesOf, vsepTerm
-    , vsep
-    , module Text.PrettyPrint
+    -- * Out-printing lens combinators
+    , hsepOf, vsepOf, vcatOf, vlinesOf
+    , module Prettyprinter
     , maybeParens
     , appPrec
     , appPrec1
     )
     where
 ----------------------------------------------------------------------------------
-import Text.PrettyPrint             hiding ((<>))
-import Text.PrettyPrint.HughesPJ    hiding ((<>))
+import Prettyprinter
 import Text.Printf
 import Data.String                  (IsString(..))
 import Data.Text.Lens               hiding ((:<))
 import Data.Monoid                  hiding (Sum)
+import Data.Bool
 import Control.Lens
 
 -- instances
@@ -30,83 +30,80 @@ import Data.Functor.Sum
 import Data.Fix                     (Fix(..))
 ----------------------------------------------------------------------------------
 
-class Pretty a where
-    pretty :: a -> Doc
-    prettyPrec :: Int -> a -> Doc
+class Out a where
+    out :: a -> Doc ann
+    outPrec :: Int -> a -> Doc ann
 
-    {-# MINIMAL pretty | prettyPrec #-}
-    pretty = prettyPrec 0
-    prettyPrec = const pretty
+    {-# MINIMAL out | outPrec #-}
+    out = outPrec 0
+    outPrec = const out
 
-rpretty :: (IsString s, Pretty a) => a -> s
-rpretty = fromString . render . pretty
+rout :: (IsString s, Out a) => a -> s
+rout = fromString . show . out
 
-instance Pretty Doc where
-    pretty = id
+-- instance Out (Doc ann) where
+--     out = id
 
-instance Pretty String where
-    pretty = Text.PrettyPrint.text
+instance Out String where
+    out = pretty
 
-instance Pretty T.Text where
-    pretty = Text.PrettyPrint.text . view unpacked
+instance Out T.Text where
+    out = pretty
 
 newtype Showing a = Showing a
 
-instance (Show a) => Pretty (Showing a) where
-    prettyPrec p (Showing a) = fromString $ showsPrec p a ""
+instance (Show a) => Out (Showing a) where
+    outPrec p (Showing a) = fromString $ showsPrec p a ""
 
-deriving via Showing Int instance Pretty Int
+deriving via Showing Int instance Out Int
 
-class (forall a. Pretty a => Pretty (f a)) => Pretty1 f where
-    liftPrettyPrec :: (Int -> a -> Doc) -> Int -> f a -> Doc
+class (forall a. Out a => Out (f a)) => Out1 f where
+    liftOutPrec :: (Int -> a -> Doc ann) -> Int -> f a -> Doc ann
 
-prettyPrec1 :: (Pretty1 f, Pretty a) => Int -> f a -> Doc
-prettyPrec1 = liftPrettyPrec prettyPrec
+outPrec1 :: (Out1 f, Out a) => Int -> f a -> Doc ann
+outPrec1 = liftOutPrec outPrec
 
-instance (Pretty1 f, Pretty1 g, Pretty a) => Pretty (Sum f g a) where
-    prettyPrec p (InL fa) = prettyPrec1 p fa
-    prettyPrec p (InR ga) = prettyPrec1 p ga
+instance (Out1 f, Out1 g, Out a) => Out (Sum f g a) where
+    outPrec p (InL fa) = outPrec1 p fa
+    outPrec p (InR ga) = outPrec1 p ga
 
-instance (Pretty1 f, Pretty1 g) => Pretty1 (Sum f g) where
-    liftPrettyPrec pr p (InL fa) = liftPrettyPrec pr p fa
-    liftPrettyPrec pr p (InR ga) = liftPrettyPrec pr p ga
+instance (Out1 f, Out1 g) => Out1 (Sum f g) where
+    liftOutPrec pr p (InL fa) = liftOutPrec pr p fa
+    liftOutPrec pr p (InR ga) = liftOutPrec pr p ga
 
-instance (Pretty (f (Fix f))) => Pretty (Fix f) where
-    prettyPrec d (Fix f) = prettyPrec d f
+instance (Out (f (Fix f))) => Out (Fix f) where
+    outPrec d (Fix f) = outPrec d f
 
 --------------------------------------------------------------------------------
 
-ttext :: Pretty t => t -> Doc
-ttext = pretty
+ttext :: Out t => t -> Doc ann
+ttext = out
 
-hsepOf :: Getting (Endo Doc) s Doc -> s -> Doc
+hsepOf :: Getting (Endo (Doc ann)) s (Doc ann) -> s -> Doc ann
 hsepOf l = foldrOf l (<+>) mempty
 
-vsepOf :: Getting (Endo Doc) s Doc -> s -> Doc
-vsepOf l = foldrOf l ($+$) mempty
+vsepOf :: _ -> s -> Doc ann
+vsepOf l = vsep . toListOf l
 
-vcatOf :: Getting (Endo Doc) s Doc -> s -> Doc
-vcatOf l = foldrOf l ($$) mempty
+vcatOf :: _ -> s -> Doc ann
+vcatOf l = vcat . toListOf l
 
-vlinesOf :: Getting (Endo Doc) s Doc -> s -> Doc
-vlinesOf l = foldrOf l (\a b -> a $+$ "" $+$ b) mempty
+vlinesOf :: Getting (Endo (Doc ann)) s (Doc ann) -> s -> Doc ann
+vlinesOf l = foldrOf l (\a b -> a <> line <> b) mempty
 -- hack(?) to separate chunks with a blankline
 
-vsepTerm :: Doc -> Doc -> Doc -> Doc
-vsepTerm term a b = (a <> term) $+$ b
-
-vsep :: [Doc] -> Doc
-vsep = foldr ($+$) mempty
-
 --------------------------------------------------------------------------------
+
+maybeParens :: Bool -> Doc ann -> Doc ann
+maybeParens = bool id parens
 
 appPrec, appPrec1 :: Int
 appPrec  = 10
 appPrec1 = 11
 
-instance PrintfArg Doc where
+instance PrintfArg (Doc ann) where
     formatArg d fmt
-        | fmtChar (vFmt 'D' fmt) == 'D' = formatString (render d) fmt'
+        | fmtChar (vFmt 'D' fmt) == 'D' = formatString (show d) fmt'
         | otherwise                     = errorBadFormat $ fmtChar fmt
       where
         fmt' = fmt { fmtChar = 's', fmtPrecision = Nothing }

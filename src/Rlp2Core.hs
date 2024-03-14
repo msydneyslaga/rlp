@@ -38,7 +38,7 @@ import Text.Show.Deriving
 import Core.Syntax                      as Core
 import Rlp.AltSyntax                    as Rlp
 import Compiler.Types
-import Data.Pretty                      (render, pretty)
+import Data.Pretty
 --------------------------------------------------------------------------------
 
 type Tree a = Either Name (Name, Branch a)
@@ -64,7 +64,7 @@ desugarRlpProgR :: forall m a. (Monad m)
                 -> RLPCT m Core.Program'
 desugarRlpProgR p = do
     let p' = desugarRlpProg p
-    addDebugMsg "dump-desugared" $ render (pretty p')
+    addDebugMsg "dump-desugared" $ show (out p')
     pure p'
 
 desugarRlpProg = undefined

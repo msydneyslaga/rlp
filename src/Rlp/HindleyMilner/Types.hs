@@ -73,16 +73,16 @@ instance IsRlpcError TypeError where
         -- todo: use anti-parser instead of show
         TyErrCouldNotUnify t u -> Text
             [ T.pack $ printf "Could not match type `%s` with `%s`."
-                              (rpretty @String t) (rpretty @String u)
-            , "Expected: " <> rpretty t
-            , "Got: " <> rpretty u
+                              (rout @String t) (rout @String u)
+            , "Expected: " <> rout t
+            , "Got: " <> rout u
             ]
         TyErrUntypedVariable n -> Text
             [ "Untyped (likely undefined) variable `" <> n <> "`"
             ]
         TyErrRecursiveType t x -> Text
             [ T.pack $ printf "Recursive type: `%s' occurs in `%s'"
-                              (rpretty @String t) (rpretty @String x)
+                              (rout @String t) (rout @String x)
             ]
 
 -- type Memo t = HashMap t (Type PsName, PartialJudgement)
@@ -156,7 +156,7 @@ demoContext = Context
 constraintTypes :: Traversal' Constraint (Type PsName)
 constraintTypes k (Equality s t) = Equality <$> k s <*> k t
 
-instance Pretty Constraint where
-    pretty (Equality s t) =
-        hsep [prettyPrec appPrec1 s, "~", prettyPrec appPrec1 t]
+instance Out Constraint where
+    out (Equality s t) =
+        hsep [outPrec appPrec1 s, "~", outPrec appPrec1 t]
 

@@ -65,11 +65,11 @@ justTypeCheckCore s = typechk (T.pack s)
                     & rlpcToEither
     where typechk = lexCoreR >=> parseCoreProgR >=> checkCoreProgR
 
-makeItPretty :: (Pretty a) => Either e a -> Either e Doc
-makeItPretty = fmap pretty
+makeItPretty :: (Out a) => Either e a -> Either e (Doc ann)
+makeItPretty = fmap out
 
-makeItPretty' :: (Pretty (WithTerseBinds a)) => Either e a -> Either e Doc
-makeItPretty' = fmap (pretty . WithTerseBinds)
+makeItPretty' :: (Out (WithTerseBinds a)) => Either e a -> Either e (Doc ann)
+makeItPretty' = fmap (out . WithTerseBinds)
 
 rlpcToEither :: RLPC a -> Either [MsgEnvelope RlpcError] a
 rlpcToEither r = case evalRLPC def r of

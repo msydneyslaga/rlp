@@ -29,8 +29,8 @@ module Core.Syntax
     , pattern Con, pattern Var, pattern App, pattern Lam, pattern Let
     , pattern Case, pattern Type, pattern Lit
 
-    -- * Pretty-printing
-    , Pretty(pretty), WithTerseBinds(..)
+    -- * pretty-printing
+    , Out(out), WithTerseBinds(..)
 
     -- * Optics
     , HasArrowSyntax(..)
@@ -335,11 +335,11 @@ instance MakeTerse Var where
     type AsTerse Var = Name
     asTerse (MkVar n _) = n
 
-instance (Hashable b, Pretty b, Pretty (AsTerse b), MakeTerse b)
-      => Pretty (WithTerseBinds (Program b)) where
-    pretty (WithTerseBinds p)
-            = (datatags <> "\n")
-          $+$ defs
+instance (Hashable b, Out b, Out (AsTerse b), MakeTerse b)
+      => Out (WithTerseBinds (Program b)) where
+    out (WithTerseBinds p)
+            = vsep [ (datatags <> "\n")
+                   , defs ]
         where
             datatags = ifoldrOf (programDataTags . ifolded) cataDataTag mempty p
             defs = vlinesOf (programJoinedDefs . to prettyGroup) p
@@ -355,17 +355,17 @@ instance (Hashable b, Pretty b, Pretty (AsTerse b), MakeTerse b)
             thatSc = foldMap $ \sc ->
                 H.singleton (sc ^. _lhs . _1) (That sc)
 
-            prettyGroup :: These (b, Type) (ScDef b) -> Doc
+            prettyGroup :: These (b, Type) (ScDef b) -> Doc ann
             prettyGroup = bifoldr vs vs mempty
                         . bimap (uncurry prettyTySig')
-                                (pretty . WithTerseBinds)
-                where vs = vsepTerm ";"
+                                (out . WithTerseBinds)
+                where vs a b = a <> ";" <> line <> b
 
-            cataDataTag n (t,a) acc = prettyDataTag n t a $+$ acc
+            cataDataTag n (t,a) acc = prettyDataTag n t a <> line <> acc
 
-instance (Hashable b, Pretty b) => Pretty (Program b) where
-    pretty p = (datatags <> "\n")
-           $+$ defs
+instance (Hashable b, Out b) => Out (Program b) where
+    out p = vsep [ datatags <> "\n"
+                 , defs ]
         where
             datatags = ifoldrOf (programDataTags . ifolded) cataDataTag mempty p
             defs = vlinesOf (programJoinedDefs . to prettyGroup) p
@@ -381,139 +381,139 @@ instance (Hashable b, Pretty b) => Pretty (Program b) where
             thatSc = foldMap $ \sc ->
                 H.singleton (sc ^. _lhs . _1) (That sc)
 
-            prettyGroup :: These (b, Type) (ScDef b) -> Doc
+            prettyGroup :: These (b, Type) (ScDef b) -> Doc ann
             prettyGroup = bifoldr vs vs mempty
-                        . bimap (uncurry prettyTySig) pretty
-                where vs = vsepTerm ";"
+                        . bimap (uncurry prettyTySig) out
+                where vs a b = a <> ";" <> line <> b
 
-            cataDataTag n (t,a) acc = prettyDataTag n t a $+$ acc
+            cataDataTag n (t,a) acc = prettyDataTag n t a <> line <> acc
 
 unionThese :: These a b -> These a b -> These a b
 unionThese (This a) (That b) = These a b
 unionThese (That b) (This a) = These a b
 unionThese (These a b) _     = These a b
 
-prettyDataTag :: (Pretty n, Pretty t, Pretty a)
-              => n -> t -> a -> Doc
+prettyDataTag :: (Out n, Out t, Out a)
+              => n -> t -> a -> Doc ann
 prettyDataTag n t a =
     hsep ["{-#", "PackData", ttext n, ttext t, ttext a, "#-}"]
 
-prettyTySig :: (Pretty n, Pretty t) => n -> t -> Doc
-prettyTySig n t = hsep [ttext n, ":", pretty t]
+prettyTySig :: (Out n, Out t) => n -> t -> Doc ann
+prettyTySig n t = hsep [ttext n, ":", out t]
 
-prettyTySig' :: (MakeTerse n, Pretty (AsTerse n), Pretty t) => n -> t -> Doc
-prettyTySig' n t = hsep [ttext (asTerse n), ":", pretty t]
+prettyTySig' :: (MakeTerse n, Out (AsTerse n), Out t) => n -> t -> Doc ann
+prettyTySig' n t = hsep [ttext (asTerse n), ":", out t]
 
--- Pretty Type
+-- out Type
 -- TyApp | appPrec   | left
 -- (:->) | appPrec-1 | right
 
-instance Pretty Type where
-    prettyPrec _ (TyVar n)   = ttext n
-    prettyPrec _ TyFun       = "(->)"
-    prettyPrec _ (TyCon n)   = ttext n
-    prettyPrec p (a :-> b)   = maybeParens (p>appPrec-1) $
-        hsep [prettyPrec appPrec a, "->", prettyPrec (appPrec-1) b]
-    prettyPrec p (TyApp f x) = maybeParens (p>appPrec) $
-        prettyPrec appPrec f <+> prettyPrec appPrec1 x
-    prettyPrec p (TyForall a m) = maybeParens (p>appPrec-2) $
-        "∀" <+> (prettyPrec appPrec1 a <> ".") <+> pretty m
-    prettyPrec _ TyKindType = "Type"
+instance Out Type where
+    outPrec _ (TyVar n)   = ttext n
+    outPrec _ TyFun       = "(->)"
+    outPrec _ (TyCon n)   = ttext n
+    outPrec p (a :-> b)   = maybeParens (p>appPrec-1) $
+        hsep [outPrec appPrec a, "->", outPrec (appPrec-1) b]
+    outPrec p (TyApp f x) = maybeParens (p>appPrec) $
+        outPrec appPrec f <+> outPrec appPrec1 x
+    outPrec p (TyForall a m) = maybeParens (p>appPrec-2) $
+        "∀" <+> (outPrec appPrec1 a <> ".") <+> out m
+    outPrec _ TyKindType = "Type"
 
-instance (Pretty b, Pretty (AsTerse b), MakeTerse b)
-      => Pretty (WithTerseBinds (ScDef b)) where
-    pretty (WithTerseBinds sc) = hsep [name, as, "=", hang empty 1 e]
+instance (Out b, Out (AsTerse b), MakeTerse b)
+      => Out (WithTerseBinds (ScDef b)) where
+    out (WithTerseBinds sc) = hsep [name, as, "=", hang 1 e]
         where
             name = ttext $ sc ^. _lhs . _1 . to asTerse
             as = sc & hsepOf (_lhs . _2 . each . to asTerse . to ttext)
-            e = pretty $ sc ^. _rhs
+            e = out $ sc ^. _rhs
 
-instance (Pretty b) => Pretty (ScDef b) where
-    pretty sc = hsep [name, as, "=", hang empty 1 e]
+instance (Out b) => Out (ScDef b) where
+    out sc = hsep [name, as, "=", hang 1 e]
         where
             name = ttext $ sc ^. _lhs . _1
             as = sc & hsepOf (_lhs . _2 . each . to ttext)
-            e = pretty $ sc ^. _rhs
+            e = out $ sc ^. _rhs
 
--- Pretty Expr
+-- out Expr
 -- LamF | appPrec1 | right
 -- AppF | appPrec  | left
 
-instance (Pretty b, Pretty a) => Pretty (ExprF b a) where
-    prettyPrec = prettyPrec1
+instance (Out b, Out a) => Out (ExprF b a) where
+    outPrec = outPrec1
 
-    -- prettyPrec _ (VarF n) = ttext n
-    -- prettyPrec _ (ConF t a) = "Pack{" <> (ttext t <+> ttext a) <> "}"
-    -- prettyPrec p (LamF bs e) = maybeParens (p>0) $
-    --     hsep ["λ", hsep (prettyPrec appPrec1 <$> bs), "->", pretty e]
-    -- prettyPrec p (LetF r bs e) = maybeParens (p>0)
-    --                            $ hsep [pretty r, explicitLayout bs]
-    --                          $+$ hsep ["in", pretty e]
-    -- prettyPrec p (AppF f x) = maybeParens (p>appPrec) $
-    --     prettyPrec appPrec f <+> prettyPrec appPrec1 x
-    -- prettyPrec p (LitF l) = prettyPrec p l
-    -- prettyPrec p (CaseF e as) = maybeParens (p>0) $
-    --     "case" <+> pretty e <+> "of"
+    -- outPrec _ (VarF n) = ttext n
+    -- outPrec _ (ConF t a) = "Pack{" <> (ttext t <+> ttext a) <> "}"
+    -- outPrec p (LamF bs e) = maybeParens (p>0) $
+    --     hsep ["λ", hsep (outPrec appPrec1 <$> bs), "->", out e]
+    -- outPrec p (LetF r bs e) = maybeParens (p>0)
+    --                            $ hsep [out r, explicitLayout bs]
+    --                          $+$ hsep ["in", out e]
+    -- outPrec p (AppF f x) = maybeParens (p>appPrec) $
+    --     outPrec appPrec f <+> outPrec appPrec1 x
+    -- outPrec p (LitF l) = outPrec p l
+    -- outPrec p (CaseF e as) = maybeParens (p>0) $
+    --     "case" <+> out e <+> "of"
     --     $+$ nest 2 (explicitLayout as)
-    -- prettyPrec p (TypeF t) = "@" <> prettyPrec appPrec1 t
+    -- outPrec p (TypeF t) = "@" <> outPrec appPrec1 t
 
-instance (Pretty b) => Pretty1 (ExprF b) where
-    liftPrettyPrec pr _ (VarF n) = ttext n
-    liftPrettyPrec pr _ (ConF t a) = "Pack{" <> (ttext t <+> ttext a) <> "}"
-    liftPrettyPrec pr p (LamF bs e) = maybeParens (p>0) $
-        hsep ["λ", hsep (prettyPrec appPrec1 <$> bs), "->", pr 0 e]
-    liftPrettyPrec pr p (LetF r bs e) = maybeParens (p>0)
-                               $ hsep [pretty r, bs']
-                             $+$ hsep ["in", pr 0 e]
-        where bs' = liftExplicitLayout (liftPrettyPrec pr 0) bs
-    liftPrettyPrec pr p (AppF f x) = maybeParens (p>appPrec) $
+instance (Out b) => Out1 (ExprF b) where
+    liftOutPrec pr _ (VarF n) = ttext n
+    liftOutPrec pr _ (ConF t a) = "Pack{" <> (ttext t <+> ttext a) <> "}"
+    liftOutPrec pr p (LamF bs e) = maybeParens (p>0) $
+        hsep ["λ", hsep (outPrec appPrec1 <$> bs), "->", pr 0 e]
+    liftOutPrec pr p (LetF r bs e) = maybeParens (p>0)
+                               $ vsep [ hsep [out r, bs']
+                                      , hsep ["in", pr 0 e] ]
+        where bs' = liftExplicitLayout (liftOutPrec pr 0) bs
+    liftOutPrec pr p (AppF f x) = maybeParens (p>appPrec) $
         pr appPrec f <+> pr appPrec1 x
-    liftPrettyPrec pr p (LitF l) = prettyPrec p l
-    liftPrettyPrec pr p (CaseF e as) = maybeParens (p>0) $
-            "case" <+> pr 0 e <+> "of"
-            $+$ nest 2 as'
-        where as' = liftExplicitLayout (liftPrettyPrec pr 0) as
-    liftPrettyPrec pr p (TypeF t) = "@" <> prettyPrec appPrec1 t
+    liftOutPrec pr p (LitF l) = outPrec p l
+    liftOutPrec pr p (CaseF e as) = maybeParens (p>0) $
+            vsep [ "case" <+> pr 0 e <+> "of"
+                 , nest 2 as' ]
+        where as' = liftExplicitLayout (liftOutPrec pr 0) as
+    liftOutPrec pr p (TypeF t) = "@" <> outPrec appPrec1 t
 
-instance Pretty Rec where
-    pretty Rec = "letrec"
-    pretty NonRec = "let"
+instance Out Rec where
+    out Rec = "letrec"
+    out NonRec = "let"
 
-instance (Pretty b, Pretty a) => Pretty (AlterF b a) where
-    prettyPrec = prettyPrec1
+instance (Out b, Out a) => Out (AlterF b a) where
+    outPrec = outPrec1
 
-instance (Pretty b) => Pretty1 (AlterF b) where
-    liftPrettyPrec pr _ (AlterF c as e) =
-        hsep [pretty c, hsep (pretty <$> as), "->", liftPrettyPrec pr 0 e]
+instance (Out b) => Out1 (AlterF b) where
+    liftOutPrec pr _ (AlterF c as e) =
+        hsep [out c, hsep (out <$> as), "->", liftOutPrec pr 0 e]
 
-instance Pretty AltCon where
-    pretty (AltData n) = ttext n
-    pretty (AltLit l) = pretty l
-    pretty (AltTag t) = "<" <> ttext t <> ">"
-    pretty AltDefault = "_"
+instance Out AltCon where
+    out (AltData n) = ttext n
+    out (AltLit l) = out l
+    out (AltTag t) = "<" <> ttext t <> ">"
+    out AltDefault = "_"
 
-instance Pretty Lit where
-    pretty (IntL n) = ttext n
+instance Out Lit where
+    out (IntL n) = ttext n
 
-instance (Pretty b, Pretty a) => Pretty (BindingF b a) where
-    prettyPrec = prettyPrec1
+instance (Out b, Out a) => Out (BindingF b a) where
+    outPrec = outPrec1
 
-instance Pretty b => Pretty1 (BindingF b) where
-    liftPrettyPrec pr _ (BindingF k v) = hsep [pretty k, "=", liftPrettyPrec pr 0 v]
+instance Out b => Out1 (BindingF b) where
+    liftOutPrec pr _ (BindingF k v) = hsep [out k, "=", liftOutPrec pr 0 v]
 
-liftExplicitLayout :: (a -> Doc) -> [a] -> Doc
+liftExplicitLayout :: (a -> Doc ann) -> [a] -> Doc ann
 liftExplicitLayout pr as = vcat inner <+> "}" where
     inner = zipWith (<+>) delims (pr <$> as)
     delims = "{" : repeat ";"
 
-explicitLayout :: (Pretty a) => [a] -> Doc
+explicitLayout :: (Out a) => [a] -> Doc ann
 explicitLayout as = vcat inner <+> "}" where
-    inner = zipWith (<+>) delims (pretty <$> as)
+    inner = zipWith (<+>) delims (out <$> as)
     delims = "{" : repeat ";"
 
-instance Pretty Var where
-    prettyPrec p (MkVar n t) = maybeParens (p>0) $
-        hsep [pretty n, ":", pretty t]
+instance Out Var where
+    outPrec p (MkVar n t) = maybeParens (p>0) $
+        hsep [out n, ":", out t]
 
 --------------------------------------------------------------------------------
 

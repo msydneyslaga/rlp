@@ -29,9 +29,9 @@ import Data.Tuple                   (swap)
 import Control.Lens
 import Data.Text.Lens               (IsText, packed, unpacked)
 import Text.Printf
-import Text.PrettyPrint             hiding ((<>))
-import Text.PrettyPrint.HughesPJ    (maybeParens)
 import Data.Foldable                (traverse_)
+import Prettyprinter
+import Data.Pretty
 import System.IO                    (Handle, hPutStrLn)
 -- TODO: an actual output system
 -- TODO: an actual output system
@@ -165,7 +165,7 @@ hdbgProg p hio = do
     renderOut . showStats $ sts
     pure final
     where
-        renderOut r = hPutStrLn hio $ render r ++ "\n"
+        renderOut r = hPutStrLn hio $ show r ++ "\n"
 
         states = eval $ compile p
         final = last states
@@ -182,7 +182,7 @@ evalProgR p = do
     renderOut . showStats $ sts
     pure (res, sts)
     where
-        renderOut r = addDebugMsg "dump-eval" $ render r ++ "\n"
+        renderOut r = addDebugMsg "dump-eval" $ show r ++ "\n"
         states = eval . compile $ p
         final = last states
 
@@ -823,13 +823,13 @@ showCon t n = printf "Pack{%d %d}" t n ^. packed
 pprTabstop :: Int
 pprTabstop = 4
 
-qquotes :: Doc -> Doc
+qquotes :: Doc ann -> Doc ann
 qquotes d = "`" <> d <> "'"
 
-showStats :: Stats -> Doc
-showStats sts = "==== Stats ============" $$ stats
+showStats :: Stats -> Doc ann
+showStats sts = "==== Stats ============" <> line <> stats
     where
-        stats = text $ printf
+        stats = textt @String $ printf
             "Reductions      : %5d\n\
             \Prim Reductions : %5d\n\
             \Allocations     : %5d\n\
@@ -839,10 +839,10 @@ showStats sts = "==== Stats ============" $$ stats
             (sts ^. stsAllocations)
             (sts ^. stsGCCycles)
 
-showState :: GmState -> Doc
+showState :: GmState -> Doc ann
 showState st = vcat
         [ "==== GmState " <> int stnum <> " "
-            <> text (replicate (28 - 13 - 1 - digitalWidth stnum) '=')
+            <> textt (replicate (28 - 13 - 1 - digitalWidth stnum) '=')
         , "-- Next instructions -------"
         , info $ showCodeShort c
         , "-- Stack -------------------"
@@ -859,23 +859,23 @@ showState st = vcat
         -- indent data
         info = nest pprTabstop
 
-showCodeShort :: Code -> Doc
+showCodeShort :: Code -> Doc ann
 showCodeShort c = braces c'
     where
         c' | length c > 3 = list (showInstr <$> take 3 c) <> "; ..."
            | otherwise    = list (showInstr <$> c)
         list = hcat . punctuate "; "
 
-showStackShort :: Stack -> Doc
+showStackShort :: Stack -> Doc ann
 showStackShort s = brackets s'
     where
            -- no access to heap, otherwise we'd use showNodeAt
         s' | length s > 3 = list (showEntry <$> take 3 s) <> ", ..."
            | otherwise    = list (showEntry <$> s)
         list = hcat . punctuate ", "
-        showEntry = text . show
+        showEntry = textt . show
 
-showStack :: GmState -> Doc
+showStack :: GmState -> Doc ann
 showStack st = vcat $ uncurry showEntry <$> si
     where
         h = st ^. gmHeap
@@ -887,10 +887,9 @@ showStack st = vcat $ uncurry showEntry <$> si
         w = maxWidth (addresses h)
         showIndex n = padInt w n <> ": "
 
-        showEntry :: Int -> Addr -> Doc
         showEntry n a = showIndex n <> showNodeAt st a
 
-showDump :: GmState -> Doc
+showDump :: GmState -> Doc ann
 showDump st = vcat $ uncurry showEntry <$> di
     where
         d = st ^. gmDump
@@ -899,14 +898,13 @@ showDump st = vcat $ uncurry showEntry <$> di
         showIndex n = padInt w n <> ": "
         w = maxWidth (fst <$> di)
 
-        showEntry :: Int -> (Code, Stack) -> Doc
         showEntry n (c,s) = showIndex n <> nest pprTabstop entry
             where
-                entry = ("Stack : " <> showCodeShort c)
-                     $$ ("Code  : " <> showStackShort s)
+                entry = vsep [ "Stack : " <> showCodeShort c
+                             , "Code  : " <> showStackShort s ]
 
-padInt :: Int -> Int -> Doc
-padInt m n = text (replicate (m - digitalWidth n) ' ') <> int n
+padInt :: Int -> Int -> Doc ann
+padInt m n = textt (replicate (m - digitalWidth n) ' ') <> int n
 
 maxWidth :: [Int] -> Int
 maxWidth ns = digitalWidth $ maximum ns
@@ -914,7 +912,7 @@ maxWidth ns = digitalWidth $ maximum ns
 digitalWidth :: Int -> Int
 digitalWidth = length . show
 
-showHeap :: GmState -> Doc
+showHeap :: GmState -> Doc ann
 showHeap st = vcat $ showEntry <$> addrs
     where
         showAddr n = padInt w n <> ": "
@@ -923,13 +921,12 @@ showHeap st = vcat $ showEntry <$> addrs
         h = st ^. gmHeap
         addrs = addresses h
 
-        showEntry :: Addr -> Doc
         showEntry a = showAddr a <> showNodeAt st a
 
-showNodeAt :: GmState -> Addr -> Doc
+showNodeAt :: GmState -> Addr -> Doc ann
 showNodeAt = showNodeAtP 0
 
-showNodeAtP :: Int -> GmState -> Addr -> Doc
+showNodeAtP :: Int -> GmState -> Addr -> Doc ann
 showNodeAtP p st a = case hLookup a h of
     Just (NNum n)        -> int n <> "#"
     Just (NGlobal _ _)   -> textt name
@@ -953,9 +950,9 @@ showNodeAtP p st a = case hLookup a h of
         h = st ^. gmHeap
         pprec = maybeParens (p > 0)
 
-showSc :: GmState -> (Name, Addr) -> Doc
-showSc st (k,a) = "Supercomb " <> qquotes (textt k) <> colon
-               $$ code
+showSc :: GmState -> (Name, Addr) -> Doc ann
+showSc st (k,a) = vcat [ "Supercomb " <> qquotes (textt k) <> colon
+                       , code ]
     where
         code = case hLookup a (st ^. gmHeap) of
             Just (NGlobal _ c) -> showCode c
@@ -966,19 +963,21 @@ errTxtInvalidObject, errTxtInvalidAddress :: (IsString a) => a
 errTxtInvalidObject = "<invalid object>"
 errTxtInvalidAddress = "<invalid address>"
 
-showCode :: Code -> Doc
+showCode :: Code -> Doc ann
 showCode c = "Code" <+> braces instrs
     where instrs = vcat $ showInstr <$> c
 
-showInstr :: Instr -> Doc
-showInstr (CaseJump alts) = "CaseJump" $$ nest pprTabstop alternatives
+showInstr :: Instr -> Doc ann
+showInstr (CaseJump alts) = vcat [ "CaseJump", nest pprTabstop alternatives ]
     where
         showAlt (t,c) = "<" <> int t <> ">" <> showCodeShort c
-        alternatives = foldr (\a acc -> showAlt a $$ acc) mempty alts
-showInstr i = text $ show i
+        alternatives = foldr (\a acc -> showAlt a <> line <> acc) mempty alts
+showInstr i = textt $ show i
 
-textt :: (IsText a) => a -> Doc
-textt t = t ^. unpacked & text
+int = pretty
+
+textt :: (Pretty a) => a -> Doc ann
+textt = pretty
 
 ----------------------------------------------------------------------------------
 

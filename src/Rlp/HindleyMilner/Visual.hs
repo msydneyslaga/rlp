@@ -9,7 +9,7 @@ import Control.Monad
 import System.IO
 import Data.Text                        qualified as T
 import Data.Text.IO                     qualified as T
-import Data.Pretty
+import Data.Pretty                      hiding (annotate)
 import Data.String                      (IsString(..))
 import Data.Foldable
 import Misc.CofreeF
@@ -77,14 +77,14 @@ withTooltip normal hover =
 --           -- ! onload "installHoverListener(this)"
 --         $ normal
 
-annExpr :: (ann -> Doc) -> AnnExpr ann -> Html
+annExpr :: (a -> Doc ann) -> AnnExpr a -> Html
 annExpr sf = code . cata \case
-    t :<$ InL (LitF l)   -> withTooltip (rpretty l) (sf' t)
-    t :<$ InL (VarF n)   -> withTooltip (rpretty n) (sf' t)
+    t :<$ InL (LitF l)   -> withTooltip (rout l) (sf' t)
+    t :<$ InL (VarF n)   -> withTooltip (rout n) (sf' t)
     t :<$ InL (AppF f x) -> withTooltip (f *> " " *> x) (sf' t)
     t :<$ InL (LamF bs e) -> withTooltip ("λ" *> bs' *> " -> " *> e) (sf' t)
         where
-            bs' = fromString . render . hsep $ prettyPrec appPrec1 <$> bs
+            bs' = fromString . show . hsep $ outPrec appPrec1 <$> bs
   where
     sf' = fromString . show . sf
 
@@ -129,5 +129,5 @@ renderExpr e = case runHM' . annotate $ e of
 renderExpr' :: RlpExpr PsName -> IO ()
 renderExpr' e = case runHM' . solve $ e of
     Left es -> error (show es)
-    Right e' -> renderTmp' . annExpr pretty $ e'
+    Right e' -> renderTmp' . annExpr out $ e'
 

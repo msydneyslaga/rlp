@@ -54,6 +54,7 @@ import Data.Default.Class
 import Data.Foldable
 import GHC.Generics             (Generic)
 import Data.Maybe
+import Data.Pretty
 import Data.Hashable            (Hashable)
 import Data.HashSet             (HashSet)
 import Data.HashSet             qualified as S
@@ -63,7 +64,6 @@ import Data.Text                qualified as T
 import Data.Text.IO             qualified as T
 import System.IO
 import Text.ANSI                qualified as Ansi
-import Text.PrettyPrint         hiding ((<>))
 import Control.Lens
 import Data.Text.Lens           (packed, unpacked, IsText)
 import System.Exit
@@ -203,7 +203,7 @@ renderRlpcErrs opts = (if don'tBother then id else filter byTag)
 
 prettyRlpcMsg :: MsgEnvelope RlpcError -> String
 prettyRlpcMsg m@(view msgSeverity -> SevDebug _) = prettyRlpcDebugMsg m
-prettyRlpcMsg m                                  = render $ docRlpcErr m
+prettyRlpcMsg m                                  = show $ docRlpcErr m
 
 prettyRlpcDebugMsg :: MsgEnvelope RlpcError -> String
 prettyRlpcDebugMsg msg =
@@ -213,10 +213,10 @@ prettyRlpcDebugMsg msg =
         Text ts = msg ^. msgDiagnostic
         SevDebug tag = msg ^. msgSeverity
 
-docRlpcErr :: MsgEnvelope RlpcError -> Doc
-docRlpcErr msg = header
-                 $$ nest 2 bullets
-                 $$ source
+docRlpcErr :: MsgEnvelope RlpcError -> Doc ann
+docRlpcErr msg = vcat [ header
+                      , nest 2 bullets
+                      , source ]
     where
         source = vcat $ zipWith (<+>) rule srclines
             where
@@ -231,11 +231,10 @@ docRlpcErr msg = header
                         <> errorColour "error" <> msgColour ":"
 
         bullets = let Text ts = msg ^. msgDiagnostic
-                  in vcat $ hang "•" 2 . ttext . msgColour <$> ts
+                  in vcat $ ("•" <>) . hang 2 . ttext . msgColour <$> ts
 
         msgColour = Ansi.white . Ansi.bold
         errorColour = Ansi.red . Ansi.bold
-        ttext = text . T.unpack
         tshow :: (Show a) => a -> Text
         tshow = T.pack . show
 

@@ -37,7 +37,7 @@ core2core p = undefined
 gmPrepR :: (Monad m) => Program' -> RLPCT m Program'
 gmPrepR p = do
     let p' = gmPrep p
-    addDebugMsg "dump-gm-preprocessed" $ render . pretty $ p'
+    addDebugMsg "dump-gm-preprocessed" $ show . out $ p'
     pure p'
 
 -- | G-machine-specific preprocessing.

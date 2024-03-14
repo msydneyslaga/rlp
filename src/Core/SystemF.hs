@@ -91,14 +91,14 @@ instance IsRlpcError SystemFError where
             undefinedVariableErr n
         SystemFErrorKindMismatch k k' ->
             Text [ T.pack $ printf "Could not match kind `%s' with `%s'"
-                                   (pretty k) (pretty k')
+                                   (out k) (out k')
                  ]
         SystemFErrorCouldNotMatch t t' ->
             Text [ T.pack $ printf "Could not match type `%s' with `%s'"
-                                   (pretty t) (pretty t')
+                                   (out t) (out t')
                  ]
 
-justLintCoreExpr = fmap (fmap (prettyPrec appPrec1)) . lintE demoContext
+justLintCoreExpr = fmap (fmap (outPrec appPrec1)) . lintE demoContext
 
 lintE :: Gamma -> Expr Var -> SysF ET
 lintE g = \case

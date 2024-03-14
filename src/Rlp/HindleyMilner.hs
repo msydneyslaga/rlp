@@ -20,7 +20,7 @@ import Control.Monad
 import Control.Arrow            ((>>>))
 import Control.Monad.Writer.Strict
 import Data.Text                qualified as T
-import Data.Pretty
+import Data.Pretty              hiding (annotate)
 import Data.Hashable
 import Data.HashMap.Strict      (HashMap)
 import Data.HashMap.Strict      qualified as H
@@ -153,11 +153,11 @@ subst n t' = para \case
                           | otherwise -> ForallT x post
     t -> embed $ t <&> view _2
 
-prettyHM :: (Pretty a)
+prettyHM :: (Out a)
          => Either [TypeError] (a, [Constraint])
          -> Either [TypeError] (String, [String])
-prettyHM = over (mapped . _1) rpretty
-         . over (mapped . _2 . each) rpretty
+prettyHM = over (mapped . _1) rout
+         . over (mapped . _2 . each) rout
 
 fixtend :: Functor f => (f (Fix f) -> b) -> Fix f -> Cofree f b
 fixtend c (Fix f) = c f :< fmap (fixtend c) f

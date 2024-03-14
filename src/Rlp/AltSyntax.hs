@@ -116,67 +116,67 @@ pattern Finr ga = Fix (InR ga)
 
 --------------------------------------------------------------------------------
 
-instance (Pretty b, Pretty a) => Pretty (ExprF b a) where
-    prettyPrec = prettyPrec1
+instance (Out b, Out a) => Out (ExprF b a) where
+    outPrec = outPrec1
 
-instance (Pretty b, Pretty a) => Pretty (Alter b a) where
-    prettyPrec = prettyPrec1
+instance (Out b, Out a) => Out (Alter b a) where
+    outPrec = outPrec1
 
-instance (Pretty b) => Pretty1 (Alter b) where
-    liftPrettyPrec pr _ (Alter p e) =
-        hsep [ pretty p, "->", pr 0 e]
+instance (Out b) => Out1 (Alter b) where
+    liftOutPrec pr _ (Alter p e) =
+        hsep [ out p, "->", pr 0 e]
 
-instance Pretty b => Pretty1 (ExprF b) where
-    liftPrettyPrec pr p (InfixEF o a b) = maybeParens (p>0) $
-        pr 1 a <+> pretty o <+> pr 1 b
-    liftPrettyPrec pr p (CaseEF e as) = maybeParens (p>0) $
-        hsep [ "case", pr 0 e, "of" ]
-        $+$ nest 2 (vcat $ liftPrettyPrec pr 0 <$> as)
+instance Out b => Out1 (ExprF b) where
+    liftOutPrec pr p (InfixEF o a b) = maybeParens (p>0) $
+        pr 1 a <+> out o <+> pr 1 b
+    liftOutPrec pr p (CaseEF e as) = maybeParens (p>0) $
+        vsep [ hsep [ "case", pr 0 e, "of" ]
+             , nest 2 (vcat $ liftOutPrec pr 0 <$> as) ]
 
-instance (Pretty b, Pretty a) => Pretty (Decl b a) where
-    prettyPrec = prettyPrec1
+instance (Out b, Out a) => Out (Decl b a) where
+    outPrec = outPrec1
 
-instance (Pretty b) => Pretty1 (Decl b) where
-    liftPrettyPrec pr _ (FunD f as e) =
-        hsep [ ttext f, hsep (prettyPrec appPrec1 <$> as)
+instance (Out b) => Out1 (Decl b) where
+    liftOutPrec pr _ (FunD f as e) =
+        hsep [ ttext f, hsep (outPrec appPrec1 <$> as)
              , "=", pr 0 e ]
 
-    liftPrettyPrec _ _ (DataD f as []) =
-        hsep [ "data", ttext f, hsep (pretty <$> as) ]
+    liftOutPrec _ _ (DataD f as []) =
+        hsep [ "data", ttext f, hsep (out <$> as) ]
 
-    liftPrettyPrec _ _ (DataD f as ds) =
-        hsep [ "data", ttext f, hsep (pretty <$> as), cons ]
+    liftOutPrec _ _ (DataD f as ds) =
+        hsep [ "data", ttext f, hsep (out <$> as), cons ]
       where
-        cons = vcat $ zipWith (<+>) delims (pretty <$> ds)
+        cons = vcat $ zipWith (<+>) delims (out <$> ds)
         delims = "=" : repeat "|"
 
-    liftPrettyPrec _ _ (TySigD n t) =
-        hsep [ ttext n, ":", pretty t ]
+    liftOutPrec _ _ (TySigD n t) =
+        hsep [ ttext n, ":", out t ]
 
-instance (Pretty b) => Pretty (DataCon b) where
-    pretty (DataCon n as) = ttext n <+> hsep (prettyPrec appPrec1 <$> as)
+instance (Out b) => Out (DataCon b) where
+    out (DataCon n as) = ttext n <+> hsep (outPrec appPrec1 <$> as)
 
 -- (->) is given prec `appPrec-1`
-instance (Pretty b) => Pretty (Type b) where
-    prettyPrec _ (VarT n) = ttext n
-    prettyPrec _ (ConT n) = ttext n
-    prettyPrec p (s Core.:-> t) = maybeParens (p>appPrec-1) $
-        hsep [ prettyPrec appPrec s, "->", prettyPrec (appPrec-1) t ]
-    prettyPrec p (AppT f x) = maybeParens (p>appPrec) $
-        prettyPrec appPrec f <+> prettyPrec appPrec1 x
-    prettyPrec p FunT = maybeParens (p>0) "->"
+instance (Out b) => Out (Type b) where
+    outPrec _ (VarT n) = ttext n
+    outPrec _ (ConT n) = ttext n
+    outPrec p (s Core.:-> t) = maybeParens (p>appPrec-1) $
+        hsep [ outPrec appPrec s, "->", outPrec (appPrec-1) t ]
+    outPrec p (AppT f x) = maybeParens (p>appPrec) $
+        outPrec appPrec f <+> outPrec appPrec1 x
+    outPrec p FunT = maybeParens (p>0) "->"
 
-instance (Pretty b) => Pretty (Pat b) where
-    prettyPrec p (VarP b) = prettyPrec p b
-    prettyPrec p (ConP b) = prettyPrec p b
-    prettyPrec p (AppP c x) = maybeParens (p>appPrec) $
-        prettyPrec appPrec c <+> prettyPrec appPrec1 x
+instance (Out b) => Out (Pat b) where
+    outPrec p (VarP b) = outPrec p b
+    outPrec p (ConP b) = outPrec p b
+    outPrec p (AppP c x) = maybeParens (p>appPrec) $
+        outPrec appPrec c <+> outPrec appPrec1 x
 
-instance (Pretty a, Pretty b) => Pretty (Program b a) where
-    prettyPrec = prettyPrec1
+instance (Out a, Out b) => Out (Program b a) where
+    outPrec = outPrec1
 
-instance (Pretty b) => Pretty1 (Program b) where
-    liftPrettyPrec pr p (Program ds) = vsep $ liftPrettyPrec pr p <$> ds
+instance (Out b) => Out1 (Program b) where
+    liftOutPrec pr p (Program ds) = vsep $ liftOutPrec pr p <$> ds
 
 makePrisms ''Pat
 makePrisms ''Binding
