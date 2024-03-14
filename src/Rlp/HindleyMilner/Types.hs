@@ -12,10 +12,13 @@ import GHC.Generics             (Generic(..), Generically(..))
 import Data.Kind                qualified
 import Data.Text                qualified as T
 import Control.Monad.Writer
+import Control.Monad.Accum
+import Control.Monad.Trans.Accum
 import Control.Monad.Errorful
 import Control.Monad.State
 import Text.Printf
 import Data.Pretty
+import Data.Function
 
 import Control.Lens             hiding (Context', Context)
 
@@ -26,22 +29,32 @@ import Rlp.AltSyntax
 newtype Context = Context
     { _contextVars      :: HashMap PsName (Type PsName)
     }
-    deriving (Generic)
+    deriving (Show, Generic)
     deriving (Semigroup, Monoid)
         via Generically Context
 
 data Constraint = Equality (Type PsName) (Type PsName)
     deriving (Eq, Generic, Show)
 
-data PartialJudgement = PartialJudgement [Constraint]
-                                         (HashMap PsName [Type PsName])
+data PartialJudgement = PartialJudgement
+    { _constraints :: [Constraint]
+    , _assumptions :: HashMap PsName [Type PsName]
+    }
     deriving (Generic, Show)
-    deriving (Semigroup, Monoid)
+    deriving (Monoid)
         via Generically PartialJudgement
+
+instance Semigroup PartialJudgement where
+    a <> b = PartialJudgement
+        { _constraints = ((<>) `on` _constraints) a b
+        , _assumptions = (H.unionWith (<>) `on` _assumptions) a b
+        }
 
 instance Hashable Constraint
 
-type HM = ErrorfulT TypeError (StateT Int (Writer [Constraint]))
+type Memo = HashMap (RlpExpr PsName) (Type PsName, PartialJudgement)
+
+type HM = ErrorfulT TypeError (StateT Int (Accum Memo))
 
 -- | Type error enum.
 data TypeError
@@ -116,16 +129,16 @@ freshTv = do
     modify succ
     pure . VarT $ "$a" <> T.pack (show n)
 
-runHM' :: HM a -> Either [TypeError] (a, [Constraint])
-runHM' e = maybe (Left es) (Right . (,cs)) ma
+runHM' :: HM a -> Either [TypeError] a
+runHM' e = maybe (Left es) Right ma
     where
-        ((ma,es),cs) = runWriter . (`evalStateT` 0) . runErrorfulT $ e
+        ((ma,es),m) = (`runAccum` mempty) . (`evalStateT` 0) . runErrorfulT $ e
 
-addConstraint :: Constraint -> HM ()
-addConstraint = tell . pure
+-- addConstraint :: Constraint -> HM ()
+-- addConstraint = tell . pure
 
--- makePrisms ''PartialJudgement
-
+makePrisms ''PartialJudgement
+makeLenses ''PartialJudgement
 makeLenses ''Context
 makePrisms ''Constraint
 makePrisms ''TypeError

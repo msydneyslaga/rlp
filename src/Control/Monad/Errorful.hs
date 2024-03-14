@@ -16,6 +16,7 @@ module Control.Monad.Errorful
 import Control.Monad.State.Strict
 import Control.Monad.Writer
 import Control.Monad.Reader
+import Control.Monad.Accum
 import Control.Monad.Trans
 import Data.Functor.Identity
 import Data.Coerce
@@ -94,4 +95,8 @@ instance (Monoid w, Monad m, MonadWriter w m) => MonadWriter w (ErrorfulT e m) w
     listen (ErrorfulT m) = ErrorfulT $ listen m <&> \ ((ma,es),w) ->
         ((,w) <$> ma, es)
     pass (ErrorfulT m) = undefined
+
+instance (Monoid w, Monad m, MonadAccum w m)
+      => MonadAccum w (ErrorfulT e m) where
+    accum = lift . accum
 

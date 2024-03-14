@@ -128,7 +128,6 @@ Expr                :: { RlpExpr PsName }
                     : AppE                  { $1 }
                     | LetE                  { $1 }
                     | CaseE                 { $1 }
-                    | Expr1                 { $1 }
                     | LamE                  { $1 }
 
 LamE                :: { RlpExpr PsName }
@@ -155,6 +154,7 @@ Expr1               :: { RlpExpr PsName }
                     | litint                { $1 ^. to extract
                                                   . singular _TokenLitInt
                                                   . to (Finl . Core.LitF . Core.IntL) }
+                    | '(' Expr ')'          { $2 }
 
 AppE                :: { RlpExpr PsName }
                     : AppE Expr1            { Finl $ Core.AppF $1 $2 }
