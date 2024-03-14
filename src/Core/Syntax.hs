@@ -720,7 +720,7 @@ class HasArrowStops s t a b | s -> a, t -> b, s b -> t, t a -> s where
 
 instance HasArrowStops Type Type Type Type where
     arrowStops k (s :-> t) = (:->) <$> k s <*> arrowStops k t
-    arrowStops k t = k t
+    arrowStops k t         = k t
 
 --------------------------------------------------------------------------------
 

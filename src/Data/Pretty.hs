@@ -41,6 +41,9 @@ class Pretty a where
 rpretty :: (IsString s, Pretty a) => a -> s
 rpretty = fromString . render . pretty
 
+instance Pretty Doc where
+    pretty = id
+
 instance Pretty String where
     pretty = Text.PrettyPrint.text
 
@@ -70,9 +73,6 @@ instance (Pretty1 f, Pretty1 g) => Pretty1 (Sum f g) where
 
 instance (Pretty (f (Fix f))) => Pretty (Fix f) where
     prettyPrec d (Fix f) = prettyPrec d f
-
--- instance (Pretty1 f) => Pretty (Fix f) where
---     prettyPrec d (Fix f) = prettyPrec1 d f
 
 --------------------------------------------------------------------------------
 

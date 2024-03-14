@@ -53,7 +53,7 @@ programDecls = lens (\ (Program ds) -> ds) (const Program)
 data Decl b a = FunD b [Pat b] a
               | DataD b [b] [DataCon b]
               | TySigD b (Type b)
-              deriving Show
+              deriving (Show, Functor)
 
 data DataCon b = DataCon b [Type b]
     deriving (Show, Generic)
@@ -216,4 +216,8 @@ instance (Hashable b) => Hashable1 (Binding b)
 instance (Hashable b) => Hashable1 (ExprF b)
 
 makeBaseFunctor ''Type
+
+instance Core.HasArrowStops (Type b) (Type b) (Type b) (Type b) where
+    arrowStops k (s Core.:-> t) = (Core.:->) <$> k s <*> Core.arrowStops k t
+    arrowStops k t         = k t
 

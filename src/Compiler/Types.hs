@@ -27,8 +27,6 @@ import Language.Haskell.TH.Syntax   (Lift)
 
 import Control.Comonad
 import Control.Comonad.Cofree
-import Control.Comonad.Trans.Cofree qualified as Trans.Cofree
-import Control.Comonad.Trans.Cofree (CofreeF)
 import Data.Functor.Apply
 import Data.Functor.Bind
 import Data.Functor.Compose
@@ -40,14 +38,12 @@ import Control.Lens                 hiding ((<<~), (:<))
 
 import Data.List.NonEmpty           (NonEmpty)
 import Data.Function                (on)
+import Misc.CofreeF
 --------------------------------------------------------------------------------
 
 -- | Token wrapped with a span (line, column, absolute, length)
 data Located a = Located SrcSpan a
     deriving (Show, Lift, Functor)
-
-pattern (:<$) :: a -> f b -> Trans.Cofree.CofreeF f a b
-pattern a :<$ b = a Trans.Cofree.:< b
 
 (<~>) :: a -> b -> SrcSpan
 (<~>) = undefined

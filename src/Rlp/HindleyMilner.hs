@@ -4,6 +4,7 @@
 module Rlp.HindleyMilner
     ( typeCheckRlpProgR
     , solve
+    , annotate
     , TypeError(..)
     , runHM'
     , HM
@@ -11,6 +12,7 @@ module Rlp.HindleyMilner
     where
 --------------------------------------------------------------------------------
 import Control.Lens             hiding (Context', Context, (:<), para)
+import Control.Lens.Unsound
 import Control.Monad.Errorful
 import Control.Monad.State
 import Control.Monad.Accum
@@ -77,14 +79,27 @@ gather' = \case
         let jtfx = mempty & constraints .~ [Equality tf (tx :-> tfx)]
         pure (tfx, jf <> jx <> jtfx)
 
-    Finl (LamF [b] e) -> do
-        tb <- freshTv
+    Finl (LamF bs e) -> do
+        tbs <- for bs (const freshTv)
         (te,je) <- gather e
-        let cs = maybe [] (fmap $ Equality tb) (je ^. assumptions . at b)
-            as = je ^. assumptions & at b .~ Nothing
+        let cs = concatMap (uncurry . equals $ je ^. assumptions) $ bs `zip` tbs
+            as = foldr H.delete (je ^. assumptions) bs
             j = mempty & constraints .~ cs & assumptions .~ as
-            t = tb :-> te
+            t = foldr (:->) te tbs
         pure (t,j)
+      where
+        equals as b tb = maybe []
+            (fmap $ Equality tb)
+            (as ^. at b)
+
+    -- Finl (LamF [b] e) -> do
+    --     tb <- freshTv
+    --     (te,je) <- gather e
+    --     let cs = maybe [] (fmap $ Equality tb) (je ^. assumptions . at b)
+    --         as = je ^. assumptions & at b .~ Nothing
+    --         j = mempty & constraints .~ cs & assumptions .~ as
+    --         t = tb :-> te
+    --     pure (t,j)
 
 unify :: [Constraint] -> HM Context
 
@@ -122,11 +137,8 @@ infer1 e = do
     g <- unify (j ^. constraints)
     pure $ ifoldrOf (contextVars . itraversed) subst t g
 
-solve = undefined
--- solve g e = do
---     (t,j) <- gather e
---     g' <- unify cs
---     pure $ ifoldrOf (contextVars . itraversed) subst t g'
+solve :: RlpExpr PsName -> HM (Cofree (RlpExprF PsName) (Type PsName))
+solve e = sequenceA $ fixtend (infer1 . wrapFix) e
 
 occurs :: PsName -> Type PsName -> Bool
 occurs n = cata \case

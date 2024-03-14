@@ -35,10 +35,10 @@ library
                     , Rlp.AltSyntax
                     , Rlp.AltParse
                     , Rlp.HindleyMilner
+                    , Rlp.HindleyMilner.Visual
                     , Rlp.HindleyMilner.Types
                     , Rlp.Syntax.Backstage
                     , Rlp.Syntax.Types
-                    , Rlp.Syntax.Good
                     -- , Rlp.Parse.Decls
                     , Rlp.Parse
                     , Rlp.Parse.Associate
@@ -56,6 +56,7 @@ library
                     , Control.Monad.Utils
                     , Misc
                     , Misc.Lift1
+                    , Misc.CofreeF
                     , Core.SystemF
 
     build-tool-depends: happy:happy, alex:alex
@@ -87,6 +88,11 @@ library
                     , these >=0.2 && <2.0
                     , free >=5.2
                     , bifunctors >=5.2
+                    , blaze-html
+                    , blaze-markup
+                    , clay
+                    , jmacro
+                    , js-jquery
 
     hs-source-dirs:   src
     default-language: GHC2021
