@@ -15,6 +15,7 @@ module Rlp.AltSyntax
     -- * Optics
     , programDecls
     , _VarP, _FunB, _VarB
+    , _TySigD, _FunD
 
     -- * Functor-related tools
     , Fix(..), Cofree(..), Sum(..), pattern Finl, pattern Finr
@@ -186,6 +187,7 @@ instance (Out b) => Out1 (Program b) where
 
 makePrisms ''Pat
 makePrisms ''Binding
+makePrisms ''Decl
 
 deriving instance (Lift b, Lift a) => Lift (Program b a)
 deriving instance (Lift b, Lift a) => Lift (Decl b a)

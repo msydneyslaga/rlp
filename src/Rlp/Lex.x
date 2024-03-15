@@ -283,7 +283,7 @@ lexStream = fmap extract <$> lexStream'
 lexStream' :: P [Located RlpToken]
 lexStream' = lexToken >>= \case
     t@(Located _ TokenEOF) -> pure [t]
-    t        -> (t:) <$> lexStream'
+    t                      -> (t:) <$> lexStream'
 
 lexDebug :: (Located RlpToken -> P a) -> P a
 lexDebug k = do
