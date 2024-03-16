@@ -24,8 +24,11 @@ import Control.Monad.Errorful
 import Data.Text                (Text)
 import Data.Text                qualified as T
 import GHC.Exts                 (IsString(..))
-import Control.Lens
+import GHC.Generics
+import Control.Lens             hiding ((.=))
 import Compiler.Types
+
+import Data.Aeson
 ----------------------------------------------------------------------------------
 
 data MsgEnvelope e = MsgEnvelope
@@ -35,8 +38,17 @@ data MsgEnvelope e = MsgEnvelope
    }
    deriving (Functor, Show)
 
+instance (ToJSON e) => ToJSON (MsgEnvelope e) where
+    toJSON msg = object
+        [ "span" .= _msgSpan msg
+        , "severity" .= _msgSeverity msg
+        , "diagnostic" .= _msgDiagnostic msg
+        ]
+
 newtype RlpcError = Text [Text]
-               deriving Show
+    deriving (Show, Generic)
+    deriving (ToJSON)
+        via Generically [Text]
 
 instance IsString RlpcError where
     fromString = Text . pure . T.pack
@@ -50,7 +62,9 @@ instance IsRlpcError RlpcError where
 data Severity = SevWarning
               | SevError
               | SevDebug Text -- ^ Tag
-              deriving Show
+              deriving (Show, Generic)
+              deriving (ToJSON)
+                via Generically Severity
 
 makeLenses ''MsgEnvelope
 

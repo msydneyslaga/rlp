@@ -17,6 +17,7 @@ module Rlp.Parse.Types
     -- * Other parser types
     , RlpToken(..), AlexInput(..), Position(..), spanFromPos, LexerAction
     , Located(..), PsName
+    , srcSpanLen
     -- ** Lenses
     , _TokenLitInt, _TokenVarName, _TokenConName, _TokenVarSym, _TokenConSym
     , aiPrevChar, aiSource, aiBytes, aiPos, posLine, posColumn
@@ -277,7 +278,7 @@ initAlexInput s = AlexInput
     { _aiPrevChar   = '\0'
     , _aiSource     = s
     , _aiBytes      = []
-    , _aiPos        = (1,0,0)
+    , _aiPos        = (1,1,0)
     }
 
 --------------------------------------------------------------------------------

@@ -7,17 +7,25 @@ module Server
     where
 --------------------------------------------------------------------------------
 import GHC.Generics                 (Generic, Generically(..))
+import Data.Text.Encoding           qualified as T
 import Data.Text                    (Text)
 import Data.Text                    qualified as T
 import Data.Text.IO                 qualified as T
 import Data.Pretty
 import Data.Aeson
+import Data.Function
+import Control.Arrow
 import Control.Applicative
 import Control.Monad
 import Control.Concurrent
 import Network.WebSockets           qualified as WS
+import Control.Exception
+import GHC.IO
+import Control.Lens                 hiding ((.=))
 
 import Data.Functor.Foldable
+
+import Compiler.RLPC
 
 import Misc.CofreeF
 import Rlp.AltSyntax
@@ -27,19 +35,21 @@ import Rlp.AltParse
 
 server :: IO ()
 server = do
+    T.putStrLn "rlpc server started at 127.0.0.1:9002"
     WS.runServer "127.0.0.1" 9002 application
 
 application :: WS.ServerApp
-application pending =
+application pending = do
     WS.acceptRequest pending >>= talk
 
 newtype Command = Annotate Text
+    deriving Show
 
 instance FromJSON Command where
     parseJSON = withObject "command object" $ \v -> do
         cmd :: Text <- v .: "command"
         case cmd of
-            "annotate" -> Annotate <$> v .: "data"
+            "annotate" -> Annotate <$> v .: "source"
             _          -> empty
 
 data Response = Annotated Value
@@ -49,20 +59,44 @@ data Response = Annotated Value
         via Generically Response
 
 talk :: WS.Connection -> IO ()
-talk conn = forever $ do
+talk conn = (`catchAny` print) . forever $ do
     msg <- WS.receiveData @Text conn
     T.putStrLn $ "received: " <> msg
-    case decodeStrictText msg of
-        Just c -> doCommand c
-        Nothing -> WS.sendTextData @Text conn "\"error while parsing json\""
+    doCommand conn `traverse` decodeStrictText msg
 
-doCommand :: Command -> IO ()
-doCommand (Annotate s) = undefined
+doCommand :: WS.Connection -> Command -> IO ()
+doCommand conn c = do
+    putStr "sending: "
+    let r = encode . respond $ c
+    print r
+    WS.sendTextData conn r
 
-parse = undefined
+respond :: Command -> Response
+respond (Annotate s)
+    = s & (parseRlpProgR >=> typeCheckRlpProgR)
+        & fmap (\p -> p ^.. programDecls . each . _FunD <&> serialiseSc)
+        & runRLPCJsonDef
+        & Annotated
+  where
+    serialiseSc (n,as,e) = object
+        [ "name" .= n
+        , "args" .= as
+        , "body" .= serialiseAnnotated e ]
 
-serialisedAnnotated :: Cofree (RlpExprF PsName) (Type PsName)
+serialiseAnnotated :: Cofree (RlpExprF PsName) (Type PsName)
                     -> Value
-serialisedAnnotated = cata \case
+serialiseAnnotated = cata \case
     t :<$ e -> object [ "e" .= e, "type" .= rout @Text t ]
+
+runRLPCJsonWithDef :: (a -> Value) -> RLPC a -> Value
+runRLPCJsonWithDef f = runRLPCJsonWith f def
+
+runRLPCJsonDef :: (ToJSON a) => RLPC a -> Value
+runRLPCJsonDef = runRLPCJsonWith toJSON def
+
+runRLPCJsonWith :: (a -> Value) -> RLPCOptions -> RLPC a -> Value
+runRLPCJsonWith f o r = object
+    [ "errors" .= es
+    , "result" .= (f <$> ma) ]
+  where (ma,es) = evalRLPC o r
 

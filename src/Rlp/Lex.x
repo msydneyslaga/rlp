@@ -330,6 +330,7 @@ insertRBrace    = {- traceM "inserting rbrace" >> -} insertToken TokenRBraceV
 cmpLayout :: P Ordering
 cmpLayout = do
     i <- indentLevel
+    -- traceM $ "i: " <> show i
     ctx <- preuse (psLayoutStack . _head)
     case ctx of
         Just (Implicit n) -> pure (i `compare` n)
@@ -338,8 +339,6 @@ cmpLayout = do
 doBol :: LexerAction (Located RlpToken)
 doBol inp l = do
     off <- cmpLayout
-    i <- indentLevel
-    -- traceM $ "i: " <> show i
     -- important that we pop the lex state lest we find our lexer diverging
     case off of
         -- the line is aligned with the previous. it therefore belongs to the

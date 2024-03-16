@@ -33,8 +33,10 @@ import Data.Functor.Compose
 import Data.Functor.Foldable
 import Data.Semigroup.Foldable
 import Data.Fix                     hiding (cata, ana)
+
 import Data.Kind
-import Control.Lens                 hiding ((<<~), (:<))
+import Data.Aeson
+import Control.Lens                 hiding ((<<~), (:<), (.=))
 
 import Data.List.NonEmpty           (NonEmpty)
 import Data.Function                (on)
@@ -44,6 +46,13 @@ import Misc.CofreeF
 -- | Token wrapped with a span (line, column, absolute, length)
 data Located a = Located SrcSpan a
     deriving (Show, Lift, Functor)
+
+instance ToJSON SrcSpan where
+    toJSON (SrcSpan l c a s) = object
+        [ "line" .= l
+        , "column" .= c
+        , "abs" .= a
+        , "length" .= s]
 
 (<~>) :: a -> b -> SrcSpan
 (<~>) = undefined

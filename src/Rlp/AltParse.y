@@ -195,8 +195,9 @@ list0(p) : {- epsilon -}            { [] }
          | list0(p) p             { $1 `snoc` $2 }
 
 -- layout0(p : β) :: [β]
-layout0(p)  : '{' layout_list0(';',p) '}'   { $2 }
-            | VL  layout_list0(VS,p)  VR    { $2 }
+layout0(p)  : '{' '}'                   { [] }
+            | VL  VR                    { [] }
+            | layout1(p)                { $1 }
 
 -- layout_list0(sep : α, p : β) :: [β]
 layout_list0(sep,p) : p                          { [$1] }
@@ -205,6 +206,7 @@ layout_list0(sep,p) : p                          { [$1] }
 
 -- layout1(p : β) :: [β]
 layout1(p)  : '{' layout_list1(';',p) '}'   { $2 }
+            | VL  layout_list1(VS,p) VS VR     { $2 }
             | VL  layout_list1(VS,p) VR     { $2 }
 
 -- layout_list1(sep : α, p : β) :: [β]
@@ -225,7 +227,9 @@ parseRlpExprR s = liftErrorful $ errorful (ma,es)
     where
         (_,es,ma) = runP' parseRlpExpr s
 
-parseError = error "explode"
+parseError :: (Located RlpToken, [String]) -> P a
+parseError (Located ss t,ts) = addFatalHere (ss ^. srcSpanLen) $
+    RlpParErrUnexpectedToken t ts
 
 extractName = view $ to extract . singular _TokenVarName
 
