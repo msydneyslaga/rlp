@@ -207,7 +207,7 @@ typeCheckRlpProgR :: (Monad m)
 typeCheckRlpProgR p = tc p
   where
     g = buildInitialContext p
-    tc = liftHM . traverse (infer' g) . etaExpandAll
+    tc = liftHM . traverse (solve' g) . etaExpandAll
     etaExpandAll = programDecls . each %~ etaExpand
 
 etaExpand :: Decl b (RlpExpr b) -> Decl b (RlpExpr b)
