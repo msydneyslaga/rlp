@@ -136,7 +136,7 @@ infer1' g1 e = do
     ((t,j) :< _) <- annotate e
     g2 <- unify (j ^. constraints)
     g <- unionContextWithKeyM unifyTypes g1 g2
-    pure $ ifoldrOf (contextVars . itraversed) subst t g
+    pure $ ifoldlOf (contextVars . itraversed) subst t g
   where
     -- intuitively, we'd return mgu(s,t) but the union is left-biased making `s`
     -- the user-specified type: prioritise her.
