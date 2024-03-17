@@ -167,8 +167,10 @@ instance (Out b) => Out (DataCon b) where
 instance (Out b) => Out (Type b) where
     outPrec _ (VarT n) = ttext n
     outPrec _ (ConT n) = ttext n
-    outPrec p (s Core.:-> t) = maybeParens (p>appPrec-1) $
-        hsep [ outPrec appPrec s, "->", outPrec (appPrec-1) t ]
+    outPrec p (s Core.:-> t) = maybeParens (p>arrPrec) $
+        hsep [ outPrec arrPrec1 s, "->", outPrec arrPrec t ]
+      where arrPrec = appPrec-1
+            arrPrec1 = appPrec
     outPrec p (AppT f x) = maybeParens (p>appPrec) $
         outPrec appPrec f <+> outPrec appPrec1 x
     outPrec p FunT = maybeParens (p>0) "->"
