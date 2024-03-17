@@ -85,7 +85,8 @@ gather' = \case
         (te,je) <- gather e
         let cs = concatMap (uncurry . equals $ je ^. assumptions) $ bs `zip` tbs
             as = foldr H.delete (je ^. assumptions) bs
-            j = mempty & constraints .~ cs & assumptions .~ as
+            j = mempty & constraints .~ (je ^. constraints <> cs)
+                       & assumptions .~ as
             t = foldr (:->) te tbs
         pure (t,j)
       where
