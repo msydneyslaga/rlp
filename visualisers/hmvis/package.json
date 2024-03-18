@@ -5,6 +5,7 @@
   "dependencies": {
     "ace-builds": "^1.32.7",
     "react": "16.13.0",
+    "react-ace": "^10.1.0",
     "react-dom": "16.13.0"
   }
 }

@@ -1,16 +1,21 @@
 (ns main
   (:require [clojure.spec.alpha :as s]
+            ["react-ace$default" :as AceEditor]
+            ["ace-builds/src-noconflict/mode-haskell"]
+            ["ace-builds/src-noconflict/theme-solarized_light"]
+            ["ace-builds/src-noconflict/keybinding-vim"]
             [wscljs.client :as ws]
             [wscljs.format :as fmt]
             [cljs.core.match :refer-macros [match]]
             [hmvis.annotated :as annotated]
+            [reagent.core :as r]
             [reagent.dom :as rdom]))
 
-(def *editor
-  (doto (js/ace.edit "editor")
-        (.setTheme "ace/theme/solarized_light")
-        (.setKeyboardHandler "ace/keyboard/vim")
-        (.setOption "mode" "ace/mode/haskell")))
+; (def *editor
+;   (doto (js/ace.edit "editor")
+;         (.setTheme "ace/theme/solarized_light")
+;         (.setKeyboardHandler "ace/keyboard/vim")
+;         (.setOption "mode" "ace/mode/haskell")))
 
 (def *output (.querySelector js/document "#output"))
 
@@ -42,20 +47,55 @@
 (defn send [msg]
   (ws/send *socket msg fmt/json))
 
-(defn init-type-check-button []
-  (let [b (.querySelector js/document "#type-check")]
-    (.addEventListener b "click"
-                       #(send {:command "annotate"
-                               :source (.getValue *editor)}))))
+; (defn init-type-check-button []
+;   (let [b (.querySelector js/document "#type-check")]
+;     (.addEventListener b "click"
+;                        #(send {:command "annotate"
+;                                :source (.getValue *editor)}))))
+
+(defonce *editor nil)
+
+(defn TypeCheckButton []
+  [:button {:id "type-check-button"
+            :on-click #(send {:command "annotate"
+                              :source (.getValue *editor)})}
+   "type-check"])
+
+(defn Editor []
+  [:div {:class "editor-container"}
+    [(r/adapt-react-class AceEditor)
+     {:mode "haskell"
+      :theme "solarized_light"
+      :keyboardHandler "vim"
+      :defaultValue (str "id = \\x -> x\n"
+                         "flip f x y = f y x\n")
+      :style {:width "100%"
+              :height "100%"}
+      :on-load (fn [editor]
+                 (set! *editor editor)
+                 (set! (.. editor -container -style -resize) "both")
+                 (js/document.addEventListener
+                   "mouseup"
+                   #(.resize editor)))
+      :name "editor"} ]])
+
+(defn Main []
+  [:<>
+    [:div {:class "main-view-container"}
+     [TypeCheckButton]
+     [Editor]
+     [annotated/TypeChecker]
+     #_ [:div {:id "type-check-output"}
+      "doge soge quoge"]]
+   #_ [annotated/TypeChecker]])
 
 ;; start is called by init and after code reloading finishes
 (defn ^:dev/after-load start []
-  ; (rdom/render [type-checker] (js/document.getElementById "output"))
-  (annotated/init)
+  (rdom/render [Main]
+               (js/document.getElementById "mount"))
   (js/console.log "start"))
 
 (defn init []
-  (init-type-check-button)
   ;; init is called ONCE when the page loads
   ;; this is called in the index.html and must be exported
   ;; so it is available even in :advanced release builds
