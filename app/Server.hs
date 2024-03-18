@@ -23,6 +23,7 @@ import Control.Exception
 import GHC.IO
 import Control.Lens                 hiding ((.=))
 
+import Control.Comonad
 import Data.Functor.Foldable
 
 import Compiler.RLPC
@@ -74,17 +75,19 @@ doCommand conn c = do
 respond :: Command -> Response
 respond (Annotate s)
     = s & (parseRlpProgR >=> typeCheckRlpProgR)
-        & fmap (\p -> p ^.. programDecls . each . _FunD <&> serialiseSc)
+        & fmap (\p -> p ^.. programDecls . each . _FunD
+           <&> serialiseSc)
         & runRLPCJsonDef
         & Annotated
   where
     serialiseSc (n,as,e) = object
         [ "name" .= n
         , "args" .= as
-        , "body" .= serialiseAnnotated e ]
+        , "body" .= let rootType = extract e
+                    in serialiseAnnotated (e <&> prettyVars rootType) ]
 
 serialiseAnnotated :: Cofree (RlpExprF PsName) (Type PsName)
-                    -> Value
+                   -> Value
 serialiseAnnotated = cata \case
     t :<$ e -> object [ "e" .= e, "type" .= rout @Text t ]
 

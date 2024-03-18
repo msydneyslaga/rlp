@@ -41,13 +41,13 @@ body {
 
 .annotation-wrapper
 { display: inline-block
+; padding-bottom: 1em
+; border-style: solid
+; border-color: green
+; border-width: 0 0 4px 0
 }
 
 .annotation-wrapper .annotation
-{ display: hidden
-}
-
-.annotation-wrapper.hovering .annotation
-{ display: sticky
+{ position: fixed
 }
 
