@@ -36,9 +36,11 @@ newtype Context = Context
 data Constraint = Equality (Type PsName) (Type PsName)
     deriving (Eq, Generic, Show)
 
+type Assumptions = HashMap PsName [Type PsName]
+
 data PartialJudgement = PartialJudgement
     { _constraints :: [Constraint]
-    , _assumptions :: HashMap PsName [Type PsName]
+    , _assumptions :: Assumptions
     }
     deriving (Generic, Show)
     deriving (Monoid)

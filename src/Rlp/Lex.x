@@ -59,7 +59,7 @@ $asciisym       = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~\:]
 
 @reservedname = 
     case|data|do|import|in|let|letrec|module|of|where
-    |infixr|infixl|infix
+    |infixr|infixl|infix|forall
 
 @reservedop =
     "=" | \\ | "->" | "|" | ":"
@@ -163,6 +163,7 @@ lexReservedName = \case
     "infix"     -> TokenInfix
     "infixl"    -> TokenInfixL
     "infixr"    -> TokenInfixR
+    "forall"    -> TokenForall
     s           -> error (show s)
 
 lexReservedOp :: Text -> RlpToken

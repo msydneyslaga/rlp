@@ -1,5 +1,6 @@
 -- repl extensions
 :set -XOverloadedStrings
+:set -XQuasiQuotes
 
 --------------------------------------------------------------------------------
 

@@ -109,6 +109,7 @@ data RlpToken
     | TokenInfixL
     | TokenInfixR
     | TokenInfix
+    | TokenForall
     -- reserved ops
     | TokenArrow
     | TokenPipe

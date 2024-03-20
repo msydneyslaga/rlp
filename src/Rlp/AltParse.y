@@ -60,6 +60,7 @@ import Core.Syntax              qualified as Core
     let             { Located _ TokenLet }
     letrec          { Located _ TokenLetrec }
     in              { Located _ TokenIn }
+    forall          { Located _ TokenForall }
 
 %nonassoc '='
 %right '->'

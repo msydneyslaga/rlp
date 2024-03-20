@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedLists #-}
 module Core.SystemF
     ( lintCoreProgR
+    , kindOf
     )
     where
 --------------------------------------------------------------------------------

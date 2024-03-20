@@ -76,6 +76,7 @@ library
                     , text >= 2.0.2 && < 2.2
                     , unordered-containers >= 0.2.20 && < 0.3
                     , recursion-schemes >= 5.2.2 && < 5.3
+                    , monadic-recursion-schemes
                     , data-fix >= 0.3.2 && < 0.4
                     , utf8-string >= 1.0.2 && < 1.1
                     , extra >= 1.7.0 && <2

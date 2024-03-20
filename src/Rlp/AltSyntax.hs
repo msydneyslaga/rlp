@@ -7,6 +7,7 @@ module Rlp.AltSyntax
     , DataCon(..), Type(..)
     , pattern IntT
 
+    , AnnotatedRlpExpr, TypedRlpExpr
     , TypeF(..)
 
     , Core.Name, PsName
@@ -49,6 +50,10 @@ import Compiler.Types
 import Core.Syntax              qualified as Core
 --------------------------------------------------------------------------------
 
+type AnnotatedRlpExpr b = Cofree (RlpExprF b)
+
+type TypedRlpExpr b = Cofree (RlpExprF b) (Type b)
+
 type PsName = T.Text
 
 newtype Program b a = Program [Decl b a]
@@ -58,15 +63,15 @@ programDecls :: Lens' (Program b a) [Decl b a]
 programDecls = lens (\ (Program ds) -> ds) (const Program)
 
 data Decl b a = FunD b [Pat b] a
-              | DataD b [b] [DataCon b]
-              | TySigD b (Type b)
+              | DataD Core.Name [Core.Name] [DataCon b]
+              | TySigD Core.Name (Type b)
               deriving (Show, Functor, Foldable, Traversable)
 
-data DataCon b = DataCon b [Type b]
+data DataCon b = DataCon Core.Name [Type b]
     deriving (Show, Generic)
 
-data Type b = VarT b
-            | ConT b
+data Type b = VarT Core.Name
+            | ConT Core.Name
             | AppT (Type b) (Type b)
             | FunT
             | ForallT b (Type b)
