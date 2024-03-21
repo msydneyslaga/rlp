@@ -5,6 +5,7 @@ module Rlp.HindleyMilner
     , annotate
     , TypeError(..)
     , runHM'
+    , liftHM
     , HM
     , prettyVars
     , prettyVars'
@@ -29,6 +30,7 @@ import Data.Hashable
 import Data.HashMap.Strict      (HashMap)
 import Data.HashMap.Strict      qualified as H
 import Data.HashSet             (HashSet)
+import Data.HashSet.Lens
 import Data.HashSet             qualified as S
 import Data.Maybe               (fromMaybe)
 import Data.Traversable
@@ -95,6 +97,15 @@ gather' = \case
             t = foldr (:->) te tbs
         pure (t,j)
 
+    Finr (LetEF NonRec [VarB (VarP x) y] e) -> do
+        (ty,jy) <- gather y
+        (te,je) <- gather e
+        traceM $ "ty: " <> show ty
+        traceM $ "jy: " <> show jy
+        traceM $ "te: " <> show te
+        traceM $ "je: " <> show je
+        undefined
+
     -- Finl (LamF [b] e) -> do
     --     tb <- freshTv
     --     (te,je) <- gather e
@@ -103,6 +114,12 @@ gather' = \case
     --         j = mempty & constraints .~ cs & assumptions .~ as
     --         t = tb :-> te
     --     pure (t,j)
+
+generalise :: Context -> Type PsName -> Type PsName
+generalise g t = ifoldr (\n _ s -> ForallT n s) t vs
+    where
+        vs = H.difference (freeVariables t ^. hashMap)
+                          (g ^. contextTyVars)
 
 unify :: [Constraint] -> HM [(PsName, Type PsName)]
 
@@ -124,6 +141,7 @@ unify (Equality (VarT s) t : cs)
 -- swap
 unify (Equality s (VarT t) : cs) = unify (Equality (VarT t) s : cs)
 
+-- failure!
 unify (Equality s t : _) = addFatal $ TyErrCouldNotUnify s t
 
 annotate :: RlpExpr PsName
@@ -134,10 +152,6 @@ assocs :: IndexedTraversal k [(k,v)] [(k,v')] v v'
 assocs f []         = pure []
 assocs f ((k,v):xs) = (\v' xs' -> (k,v') : xs')
                   <$> indexed f k v <*> assocs f xs
-
-traceSubst k v t = trace ("subst " <> show' k <> " " <> show' v <> " " <> show' t)
-                 $ subst k v t
-                 where show' a = showsPrec 11 a mempty
 
 elimAssumptions :: Assumptions -> PsName -> Type PsName -> [Constraint]
 -- elimAssumptions b tb as = maybe [] (fmap $ Equality tb) (as ^. at b)
@@ -166,23 +180,23 @@ infer g0 e = do
 infer1 :: Context -> RlpExpr PsName -> HM (Type PsName)
 infer1 g = fmap extract . infer g
 
-unionContextWithKeyM :: Monad m
-                     => (PsName -> Type PsName -> Type PsName
-                                               -> m (Type PsName))
-                     -> Context -> Context -> m Context
-unionContextWithKeyM f a b = Context <$> unionWithKeyM f a' b'
-    where
-        a' = a ^. contextVars
-        b' = b ^. contextVars
+-- unionContextWithKeyM :: Monad m
+--                      => (PsName -> Type PsName -> Type PsName
+--                                                -> m (Type PsName))
+--                      -> Context -> Context -> m Context
+-- unionContextWithKeyM f a b = Context <$> unionWithKeyM f a' b'
+--     where
+--         a' = a ^. contextVars
+--         b' = b ^. contextVars
 
-unionWithKeyM :: forall m k v. (Eq k, Hashable k, Monad m)
-              => (k -> v -> v -> m v) -> HashMap k v -> HashMap k v
-              -> m (HashMap k v)
-unionWithKeyM f a b = sequenceA $ H.unionWithKey f' ma mb
-    where
-        f' k x y = join $ liftA2 (f k) x y
-        ma = fmap (pure @m) a
-        mb = fmap (pure @m) b
+-- unionWithKeyM :: forall m k v. (Eq k, Hashable k, Monad m)
+--               => (k -> v -> v -> m v) -> HashMap k v -> HashMap k v
+--               -> m (HashMap k v)
+-- unionWithKeyM f a b = sequenceA $ H.unionWithKey f' ma mb
+--     where
+--         f' k x y = join $ liftA2 (f k) x y
+--         ma = fmap (pure @m) a
+--         mb = fmap (pure @m) b
 
 -- solve :: RlpExpr PsName -> HM (Cofree (RlpExprF PsName) (Type PsName))
 -- solve = solve' mempty
@@ -213,8 +227,8 @@ fixtend :: Functor f => (f (Fix f) -> b) -> Fix f -> Cofree f b
 fixtend c (Fix f) = c f :< fmap (fixtend c) f
 
 buildInitialContext :: Program PsName a -> Context
-buildInitialContext =
-    Context . H.fromList . toListOf (programDecls . each . _TySigD)
+buildInitialContext = const mempty
+    -- Context . H.fromList . toListOf (programDecls . each . _TySigD)
 
 typeCheckRlpProgR :: (Monad m)
                   => Program PsName (RlpExpr PsName)
@@ -241,7 +255,7 @@ liftHM = liftEither . runHM'
 freeVariables :: Type PsName -> HashSet PsName
 freeVariables = cata \case
     VarTF x -> S.singleton x
-    ForallTF x m -> m `S.difference` S.singleton x
+    ForallTF x m -> S.delete x m
     vs -> fold vs
 
 boundVariables :: Type PsName -> HashSet PsName

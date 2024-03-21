@@ -11,7 +11,7 @@ import Data.Text.Encoding           qualified as T
 import Data.Text                    (Text)
 import Data.Text                    qualified as T
 import Data.Text.IO                 qualified as T
-import Data.Pretty
+import Data.Pretty                  hiding (annotate)
 import Data.Aeson
 import Data.Function
 import Control.Arrow
@@ -43,14 +43,16 @@ application :: WS.ServerApp
 application pending = do
     WS.acceptRequest pending >>= talk
 
-newtype Command = Annotate Text
+data Command = Annotate Text
+             | PartiallyAnnotate Text
     deriving Show
 
 instance FromJSON Command where
     parseJSON = withObject "command object" $ \v -> do
         cmd :: Text <- v .: "command"
         case cmd of
-            "annotate" -> Annotate <$> v .: "source"
+            "annotate"           -> Annotate <$> v .: "source"
+            "partially-annotate" -> PartiallyAnnotate <$> v .: "source"
             _          -> empty
 
 data Response = Annotated Value
@@ -75,16 +77,24 @@ doCommand conn c = do
 respond :: Command -> Response
 respond (Annotate s)
     = s & (parseRlpProgR >=> typeCheckRlpProgR)
-        & fmap (\p -> p ^.. programDecls . each . _FunD
-           <&> serialiseSc)
+        & fmap (\p -> p ^.. funDs
+           <&> \sc -> serialiseSc (sc & _3 . mapped %~ rout @String))
         & runRLPCJsonDef
         & Annotated
-  where
-    serialiseSc (n,as,e) = object
-        [ "name" .= n
-        , "args" .= as
-        , "body" .= let rootType = extract e
-                    in serialiseAnnotated (e <&> prettyVars rootType) ]
+
+showPartialAnn = undefined
+
+funDs :: Traversal' (Program b a) (b, [Pat b], a)
+funDs = programDecls . each . _FunD
+
+serialiseSc :: ToJSON a
+            => (PsName, [Pat PsName], Cofree (RlpExprF PsName) a)
+            -> Value
+serialiseSc (n,as,e) = object
+    [ "name" .= n
+    , "args" .= as
+    , "body" .= let rootType = extract e
+                in serialiseAnnotated (e <&> prettyVars rootType) ]
 
 serialiseAnnotated :: Cofree (RlpExprF PsName) (Type PsName)
                    -> Value

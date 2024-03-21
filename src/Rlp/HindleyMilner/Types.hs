@@ -26,8 +26,9 @@ import Compiler.RlpcError
 import Rlp.AltSyntax
 --------------------------------------------------------------------------------
 
-newtype Context = Context
+data Context = Context
     { _contextVars      :: HashMap PsName (Type PsName)
+    , _contextTyVars    :: HashMap PsName (Type PsName)
     }
     deriving (Show, Generic)
     deriving (Semigroup, Monoid)

@@ -6,6 +6,7 @@ module Rlp.AltSyntax
     , RlpExprF, RlpExpr, Binding(..), Alter(..)
     , DataCon(..), Type(..)
     , pattern IntT
+    , Core.Rec(..)
 
     , AnnotatedRlpExpr, TypedRlpExpr
     , TypeF(..)
@@ -179,6 +180,8 @@ instance (Out b) => Out (Type b) where
     outPrec p (AppT f x) = maybeParens (p>appPrec) $
         outPrec appPrec f <+> outPrec appPrec1 x
     outPrec p FunT = maybeParens (p>0) "->"
+    outPrec p (ForallT x m) = maybeParens (p>0) $
+        hsep [ "∀", ttext x, outPrec 0 m ]
 
 instance (Out b) => Out (Pat b) where
     outPrec p (VarP b) = outPrec p b
