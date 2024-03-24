@@ -22,7 +22,7 @@ import Text.Printf
 import Control.Comonad
 import Control.Comonad.Cofree
 import Data.Fix
-import Data.Functor
+import Data.Functor                 hiding (unzip)
 
 import Control.Lens                 hiding ((:<))
 import Control.Lens.Unsound

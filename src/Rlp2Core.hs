@@ -30,7 +30,6 @@ import Numeric
 import Data.Fix                         hiding (cata, para, cataM)
 import Data.Functor.Bind
 import Data.Functor.Foldable
-import Data.Functor.Foldable.Monadic
 import Control.Comonad
 
 import Effectful.State.Static.Local
@@ -103,11 +102,7 @@ typeToCore (VarT n) = TyVar n
 exprToCore :: (NameSupply :> es)
            => TypedRlpExpr PsName
            -> Eff es (Cofree (Core.ExprF Var) Core.Type)
-exprToCore = cataM \case
-    t :<$ InL e -> pure $ t' :< annotateVar t' e
-        where t' = typeToCore t
-    -- InL e -> pure . annotateVars . Fix $ e
-    -- InR e -> rlpExprToCore e
+exprToCore = undefined
 
 annotateVar :: Core.Type -> Core.ExprF PsName a -> Core.ExprF Var a
 

@@ -62,11 +62,11 @@ library
     build-tool-depends: happy:happy, alex:alex
 
     -- other-extensions:
-    build-depends:    base >=4.17 && <4.20
+    build-depends:    base >=4.17 && <4.21
                     -- required for happy
                     , array >= 0.5.5 && < 0.6
                     , containers >= 0.6.7 && < 0.7
-                    , template-haskell >= 2.20.0 && < 2.21
+                    , template-haskell >= 2.20.0 && < 2.22
                     , prettyprinter
                     , data-default >= 0.7.1 && < 0.8
                     , data-default-class >= 0.1.2 && < 0.2
@@ -76,7 +76,6 @@ library
                     , text >= 2.0.2 && < 2.2
                     , unordered-containers >= 0.2.20 && < 0.3
                     , recursion-schemes >= 5.2.2 && < 5.3
-                    , monadic-recursion-schemes
                     , data-fix >= 0.3.2 && < 0.4
                     , utf8-string >= 1.0.2 && < 1.1
                     , extra >= 1.7.0 && <2
@@ -89,14 +88,8 @@ library
                     , these >=0.2 && <2.0
                     , free >=5.2
                     , bifunctors >=5.2
-                    , blaze-html
-                    , blaze-markup
-                    , clay
-                    , jmacro
-                    , js-jquery
-                    , aeson
+                    , aeson >=2.2.1.0 && <2.3.1.0
                     , lens-aeson
-                    -- , servant
 
     hs-source-dirs:   src
     default-language: GHC2021

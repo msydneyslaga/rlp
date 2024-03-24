@@ -37,7 +37,7 @@ import Data.Traversable
 import GHC.Generics             (Generic, Generically(..))
 import Debug.Trace
 
-import Data.Functor
+import Data.Functor             hiding (unzip)
 import Data.Functor.Foldable    hiding (fold)
 import Data.Fix                 hiding (cata, para)
 import Control.Comonad.Cofree
@@ -120,6 +120,12 @@ generalise g t = ifoldr (\n _ s -> ForallT n s) t vs
     where
         vs = H.difference (freeVariables t ^. hashMap)
                           (g ^. contextTyVars)
+
+instantiate :: Type PsName -> HM (Type PsName)
+instantiate (ForallT x m) = do
+    tv <- freshTv
+    subst x tv <$> instantiate m
+instantiate x = pure x
 
 unify :: [Constraint] -> HM [(PsName, Type PsName)]
 

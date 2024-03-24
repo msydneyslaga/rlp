@@ -5,7 +5,7 @@ ALEX = alex
 ALEX_OPTS = -g
 
 SRC = src
-CABAL_BUILD = $(shell ./find-build.cl)
+CABAL_BUILD = $(shell ./find-build.clj)
 
 all: parsers lexers
 
