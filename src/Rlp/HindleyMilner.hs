@@ -238,7 +238,8 @@ infer g0 e = do
         pure (csa <> cs)
     g <- unify cs'
     let sub t = ifoldrOf (reversed . assocs) subst t g
-    pure $ generaliseG g0 <$> sub . view _1 <$> e'
+    pure $ e' & fmap (sub . view _1)
+              & _extract %~ generaliseG g0
   where
     -- intuitively, we'd return mgu(s,t) but the union is left-biased making `s`
     -- the user-specified type: prioritise her.
@@ -353,23 +354,44 @@ prettyVars root = appEndo (foldMap Endo subs)
                        (freeVariablesLTR root)
                        names
 
-renamePrettily :: Type PsName -> Type PsName
-renamePrettily
-    = (`evalState` alphabetNames)
-    . (renameFrees <=< renameForalls)
+renamePrettily' :: Type PsName -> Type PsName
+renamePrettily' = join renamePrettily
+
+renamePrettily :: Type PsName -> Type PsName -> Type PsName
+renamePrettily root = (`evalState` alphabetNames) . (renameFree <=< renameBound)
   where
-    -- TODO:
-    renameFrees root = pure root
-    renameForalls = cata \case
+    renameBound :: Type PsName -> State [PsName] (Type PsName)
+    renameBound = cata \case
         ForallTF x m -> do
             n <- getName
             ForallT n <$> (subst x (VarT n) <$> m)
         t -> embed <$> sequenceA t
 
+    renameFree :: Type PsName -> State [PsName] (Type PsName)
+    renameFree t = do
+        subs <- forM (freeVariablesLTR root) $ \v -> do
+            n <- getName
+            pure $ Endo (subst v (VarT n))
+        pure . appEndo (fold subs) $ t
+
+    getName :: State [PsName] PsName
     getName = do
         n <- use _head
         modify tail
         pure n
+
+-- renamePrettily :: Type PsName -> Type PsName
+-- renamePrettily
+--     = (`evalState` alphabetNames)
+--     . (renameFrees <=< renameForalls)
+--   where
+--     -- TODO:
+--     renameFrees root = pure root
+--     renameForalls = cata \case
+--         ForallTF x m -> do
+--             n <- getName
+--             ForallT n <$> (subst x (VarT n) <$> m)
+--         t -> embed <$> sequenceA t
 
 alphabetNames :: [PsName]
 alphabetNames = alphabet ++ concatMap appendAlphabet alphabetNames

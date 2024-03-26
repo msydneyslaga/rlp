@@ -92,7 +92,9 @@ serialiseSc :: (PsName, [Pat PsName], Cofree (RlpExprF PsName) (Type PsName))
 serialiseSc (n,as,e) = object
     [ "name" .= n
     , "args" .= as
-    , "body" .= serialiseAnnotated (e <&> renamePrettily) ]
+    , "body" .= let root = extract e
+                in serialiseAnnotated (e <&> renamePrettily root)
+    ]
 
 serialiseAnnotated :: Cofree (RlpExprF PsName) (Type PsName)
                    -> Value
