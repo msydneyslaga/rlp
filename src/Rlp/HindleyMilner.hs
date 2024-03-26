@@ -11,7 +11,7 @@ module Rlp.HindleyMilner
     )
     where
 --------------------------------------------------------------------------------
-import Control.Lens             hiding (Context', Context, (:<), para)
+import Control.Lens             hiding (Context', Context, (:<), para, uncons)
 import Control.Lens.Unsound
 import Control.Monad.Errorful
 import Control.Monad.State
@@ -20,12 +20,14 @@ import Control.Monad
 import Control.Monad.Extra
 import Control.Arrow            ((>>>))
 import Control.Monad.Writer.Strict
+
 import Data.List
 import Data.Monoid
 import Data.Text                qualified as T
 import Data.Foldable            (fold)
 import Data.Function
 import Data.Pretty              hiding (annotate)
+import Data.Maybe
 import Data.Hashable
 import Data.HashMap.Strict      (HashMap)
 import Data.HashMap.Strict      qualified as H
@@ -375,10 +377,7 @@ renamePrettily root = (`evalState` alphabetNames) . (renameFree <=< renameBound)
         pure . appEndo (fold subs) $ t
 
     getName :: State [PsName] PsName
-    getName = do
-        n <- use _head
-        modify tail
-        pure n
+    getName = state (fromJust . uncons)
 
 -- renamePrettily :: Type PsName -> Type PsName
 -- renamePrettily
