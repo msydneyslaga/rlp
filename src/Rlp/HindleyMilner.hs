@@ -7,8 +7,7 @@ module Rlp.HindleyMilner
     , runHM'
     , liftHM
     , HM
-    , prettyVars
-    , prettyVars'
+    , renamePrettily
     )
     where
 --------------------------------------------------------------------------------
@@ -98,19 +97,30 @@ gather' = \case
             t = foldr (:->) te tbs
         pure (t,j)
 
-    Finr (LetEF NonRec [VarB (VarP k) x] e) -> do
-        ((tx,jx),freeTvs) <- listenFreshTvNames $ gather x
-        let tx' = generalise freeTvs tx
+    Finr (LetEF NonRec bs e) -> do
+        let ks = bs ^.. each . singular _VarB . _1 . singular _VarP
+        (txs,jxs) <- unzip <$> generaliseGatherBinds bs
         (te,je) <- gather e
-        (cs,m) <- elimAssumptionsMap (je ^. assumptions) k tx'
-        traceM $ "m : " <> show m
-        let jxcs = jx ^. constraints
+        (cs,m) <- fmap fold . for (ks `zip` txs) $ \ (k,t) ->
+            elimAssumptionsMap (je ^. assumptions) k t
+        let jxcs = jxs ^. each . constraints
                  & each . constraintTypes %~ substMap m
-            as = H.delete k (je ^. assumptions)
+            as = foldr H.delete (je ^. assumptions) ks
             j = mempty & constraints .~ (je ^. constraints <> jxcs <> cs)
                        & assumptions .~ as
-        traceM $ "jxcs : " <> show jxcs
-        pure (te, jx <> j)
+        pure (te, fold jxs <> j)
+
+    -- Finr (LetEF NonRec [VarB (VarP k) x] e) -> do
+    --     ((tx,jx),freeTvs) <- listenFreshTvNames $ gather x
+    --     let tx' = generalise freeTvs tx
+    --     (te,je) <- gather e
+    --     (cs,m) <- elimAssumptionsMap (je ^. assumptions) k tx'
+    --     let jxcs = jx ^. constraints
+    --              & each . constraintTypes %~ substMap m
+    --         as = H.delete k (je ^. assumptions)
+    --         j = mempty & constraints .~ (je ^. constraints <> jxcs <> cs)
+    --                    & assumptions .~ as
+    --     pure (te, jx <> j)
 
     -- Finl (LamF [b] e) -> do
     --     tb <- freshTv
@@ -120,6 +130,16 @@ gather' = \case
     --         j = mempty & constraints .~ cs & assumptions .~ as
     --         t = tb :-> te
     --     pure (t,j)
+
+generaliseGatherBinds :: [Binding PsName (RlpExpr PsName)]
+                      -> HM [(Type PsName, PartialJudgement)]
+generaliseGatherBinds = traverse \b ->
+    b ^. singular _VarB . _2 & generaliseGather
+
+generaliseGather :: RlpExpr PsName -> HM (Type PsName, PartialJudgement)
+generaliseGather e = do
+    (a,frees) <- listenFreshTvNames $ gather e
+    pure $ a & _1 %~ generalise frees
 
 generalise :: [PsName] -> Type PsName -> Type PsName
 generalise freeTvs t = foldr ForallT t freeTvs
@@ -198,17 +218,8 @@ elimAssumptionsMap as b tb =
         (t',w') <- lift $ instantiateMap t
         writer (Equality tb' t', w <> w')
 
-substTrace k v t = trace ("subst " <> show' k <> " " <> show' v <> " " <> show' t)
-                         (subst k v t)
-    where show' a = showsPrec 11 a ""
-
 substMap :: HashMap PsName (Type PsName) -> Type PsName -> Type PsName
-substMap m t = ifoldr substTrace t m
-
-elimAssumptionsGen :: Assumptions -> PsName -> Type PsName -> HM [Constraint]
-elimAssumptionsGen as b tb =
-    as ^. at b . non' _Empty & traverseOf each k
-  where k t = GeneralisedEquality tb <$> instantiate t
+substMap m t = ifoldr subst t m
 
 elimAssumptionsG :: Context -> Assumptions -> HM [Constraint]
 elimAssumptionsG g as
@@ -341,4 +352,27 @@ prettyVars root = appEndo (foldMap Endo subs)
         subs = zipWith (\k v -> subst k (VarT v))
                        (freeVariablesLTR root)
                        names
+
+renamePrettily :: Type PsName -> Type PsName
+renamePrettily
+    = (`evalState` alphabetNames)
+    . (renameFrees <=< renameForalls)
+  where
+    -- TODO:
+    renameFrees root = pure root
+    renameForalls = cata \case
+        ForallTF x m -> do
+            n <- getName
+            ForallT n <$> (subst x (VarT n) <$> m)
+        t -> embed <$> sequenceA t
+
+    getName = do
+        n <- use _head
+        modify tail
+        pure n
+
+alphabetNames :: [PsName]
+alphabetNames = alphabet ++ concatMap appendAlphabet alphabetNames
+    where alphabet = [ T.pack [c] | c <- ['a'..'z'] ]
+          appendAlphabet c = [ c <> c' | c' <- alphabet ]
 
