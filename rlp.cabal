@@ -35,6 +35,7 @@ library
                     , Rlp.AltSyntax
                     , Rlp.AltParse
                     , Rlp.HindleyMilner
+                    , Rlp.HindleyMilner2
                     , Rlp.HindleyMilner.Visual
                     , Rlp.HindleyMilner.Types
                     , Rlp.Syntax.Backstage

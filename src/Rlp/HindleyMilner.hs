@@ -18,6 +18,7 @@ import Control.Monad.Errorful
 import Control.Monad.State
 import Control.Monad.Accum
 import Control.Monad
+import Control.Monad.Extra
 import Control.Arrow            ((>>>))
 import Control.Monad.Writer.Strict
 import Data.List
@@ -89,22 +90,27 @@ gather' = \case
     Finl (LamF bs e) -> do
         tbs <- for bs (const freshTv)
         (te,je) <- gather e
-        let cs = bs `zip` tbs
-               & concatMap (uncurry $ elimAssumptions (je ^. assumptions))
-            as = foldr H.delete (je ^. assumptions) bs
+        cs <- bs `zip` tbs
+            & concatMapM (uncurry $ elimAssumptions (je ^. assumptions))
+        let as = foldr H.delete (je ^. assumptions) bs
             j = mempty & constraints .~ (je ^. constraints <> cs)
                        & assumptions .~ as
             t = foldr (:->) te tbs
         pure (t,j)
 
-    Finr (LetEF NonRec [VarB (VarP x) y] e) -> do
-        (ty,jy) <- gather y
+    Finr (LetEF NonRec [VarB (VarP k) x] e) -> do
+        ((tx,jx),freeTvs) <- listenFreshTvNames $ gather x
+        let tx' = generalise freeTvs tx
         (te,je) <- gather e
-        traceM $ "ty: " <> show ty
-        traceM $ "jy: " <> show jy
-        traceM $ "te: " <> show te
-        traceM $ "je: " <> show je
-        undefined
+        (cs,m) <- elimAssumptionsMap (je ^. assumptions) k tx'
+        traceM $ "m : " <> show m
+        let jxcs = jx ^. constraints
+                 & each . constraintTypes %~ substMap m
+            as = H.delete k (je ^. assumptions)
+            j = mempty & constraints .~ (je ^. constraints <> jxcs <> cs)
+                       & assumptions .~ as
+        traceM $ "jxcs : " <> show jxcs
+        pure (te, jx <> j)
 
     -- Finl (LamF [b] e) -> do
     --     tb <- freshTv
@@ -115,17 +121,26 @@ gather' = \case
     --         t = tb :-> te
     --     pure (t,j)
 
-generalise :: Context -> Type PsName -> Type PsName
-generalise g t = ifoldr (\n _ s -> ForallT n s) t vs
-    where
-        vs = H.difference (freeVariables t ^. hashMap)
-                          (g ^. contextTyVars)
+generalise :: [PsName] -> Type PsName -> Type PsName
+generalise freeTvs t = foldr ForallT t freeTvs
+
+generaliseG :: Context -> Type PsName -> Type PsName
+generaliseG g t = ifoldr (\n _ s -> ForallT n s) t vs where
+    vs = H.difference (freeVariables t ^. hashMap)
+                      (g ^. contextTyVars)
 
 instantiate :: Type PsName -> HM (Type PsName)
 instantiate (ForallT x m) = do
     tv <- freshTv
     subst x tv <$> instantiate m
 instantiate x = pure x
+
+instantiateMap :: Type PsName -> HM (Type PsName, HashMap PsName (Type PsName))
+instantiateMap (ForallT x m) = do
+    tv <- freshTv
+    instantiateMap m & mapped . _2 %~ H.insert x tv
+                     & mapped . _1 %~ subst x tv
+instantiateMap t = pure (t, mempty)
 
 unify :: [Constraint] -> HM [(PsName, Type PsName)]
 
@@ -159,14 +174,47 @@ assocs f []         = pure []
 assocs f ((k,v):xs) = (\v' xs' -> (k,v') : xs')
                   <$> indexed f k v <*> assocs f xs
 
-elimAssumptions :: Assumptions -> PsName -> Type PsName -> [Constraint]
--- elimAssumptions b tb as = maybe [] (fmap $ Equality tb) (as ^. at b)
-elimAssumptions as b tb =
-    as ^. at b . non' _Empty & each %~ Equality tb
+-- | @elimAssumptions as b tb@ eliminates each assumption in @as@ involving @b@
+-- by translating the assumptions into constraints equating @b@'s assumed type
+-- with @tb@
 
-elimAssumptionsG :: Context -> Assumptions -> [Constraint]
-elimAssumptionsG g as =
-    iconcatMapOf (contextVars . itraversed) (elimAssumptions as) g
+elimAssumptions :: Assumptions -> PsName -> Type PsName -> HM [Constraint]
+elimAssumptions as b tb =
+    as ^. at b . non' _Empty & traverseOf each k
+  where k t = Equality tb <$> instantiate t
+
+elimAssumptions' :: Assumptions -> PsName -> Type PsName -> HM [Constraint]
+elimAssumptions' as b tb =
+    as ^. at b . non' _Empty & traverseOf each k
+  where k t = Equality <$> instantiate tb <*> instantiate t
+
+elimAssumptionsMap :: Assumptions -> PsName -> Type PsName
+                   -> HM ([Constraint], HashMap PsName (Type PsName))
+elimAssumptionsMap as b tb =
+    runWriterT $ as ^. at b . non' _Empty & traverseOf each k
+  where
+    k t = do
+        (tb',w) <- lift $ instantiateMap tb
+        (t',w') <- lift $ instantiateMap t
+        writer (Equality tb' t', w <> w')
+
+substTrace k v t = trace ("subst " <> show' k <> " " <> show' v <> " " <> show' t)
+                         (subst k v t)
+    where show' a = showsPrec 11 a ""
+
+substMap :: HashMap PsName (Type PsName) -> Type PsName -> Type PsName
+substMap m t = ifoldr substTrace t m
+
+elimAssumptionsGen :: Assumptions -> PsName -> Type PsName -> HM [Constraint]
+elimAssumptionsGen as b tb =
+    as ^. at b . non' _Empty & traverseOf each k
+  where k t = GeneralisedEquality tb <$> instantiate t
+
+elimAssumptionsG :: Context -> Assumptions -> HM [Constraint]
+elimAssumptionsG g as
+    = g ^. contextVars
+    & itraverse (elimAssumptions' as)
+    & fmap (H.elems >>> concat)
 
 infer :: Context -> RlpExpr PsName
       -> HM (Cofree (RlpExprF PsName) (Type PsName))
@@ -174,10 +222,12 @@ infer g0 e = do
     e' <- annotate e
     let (as, concat -> cs) = unzip $ e' ^.. folded . _2
                                           . lensProduct assumptions constraints
-        cs' = concatMap (elimAssumptionsG g0) as <> cs
+    cs' <- do
+        csa <- concatMapM (elimAssumptionsG g0) as
+        pure (csa <> cs)
     g <- unify cs'
     let sub t = ifoldrOf (reversed . assocs) subst t g
-    pure $ sub . view _1 <$> e'
+    pure $ generaliseG g0 <$> sub . view _1 <$> e'
   where
     -- intuitively, we'd return mgu(s,t) but the union is left-biased making `s`
     -- the user-specified type: prioritise her.

@@ -35,7 +35,8 @@ data Context = Context
         via Generically Context
 
 data Constraint = Equality (Type PsName) (Type PsName)
-    deriving (Eq, Generic, Show)
+                | GeneralisedEquality (Type PsName) (Type PsName)
+                deriving (Eq, Generic, Show)
 
 type Assumptions = HashMap PsName [Type PsName]
 
@@ -126,11 +127,24 @@ instance IsRlpcError TypeError where
 --         let (a,n') = f n
 --         in (a,n',m)
 
+tvNameOfInt :: Int -> PsName
+tvNameOfInt n = "$a" <> T.pack (show n)
+
 freshTv :: HM (Type PsName)
 freshTv = do
     n <- get
     modify succ
-    pure . VarT $ "$a" <> T.pack (show n)
+    pure (VarT $ tvNameOfInt n)
+
+listenFreshTvs :: HM a -> HM (a, [Type PsName])
+listenFreshTvs hm = listenFreshTvNames hm & mapped . _2 . each %~ VarT
+
+listenFreshTvNames :: HM a -> HM (a, [PsName])
+listenFreshTvNames hm = do
+    n <- get
+    a <- hm
+    n' <- get
+    pure (a, [ tvNameOfInt k | k <- [n .. pred n'] ])
 
 runHM' :: HM a -> Either [TypeError] a
 runHM' e = maybe (Left es) Right ma
@@ -158,6 +172,8 @@ demoContext = Context
 
 constraintTypes :: Traversal' Constraint (Type PsName)
 constraintTypes k (Equality s t) = Equality <$> k s <*> k t
+constraintTypes k (GeneralisedEquality s t) =
+    GeneralisedEquality <$> k s <*> k t
 
 instance Out Constraint where
     out (Equality s t) =

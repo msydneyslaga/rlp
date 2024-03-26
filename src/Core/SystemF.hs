@@ -44,7 +44,7 @@ data Gamma = Gamma
 makeLenses ''Gamma
 
 lintCoreProgR :: (Monad m) => Program Var -> RLPCT m (Program Name)
-lintCoreProgR = undefined
+lintCoreProgR = liftEither . (_Left %~ pure) . lint
 
 lintDontCheck :: Program Var -> Program Name
 lintDontCheck = binders %~ view (_MkVar . _1)
@@ -165,7 +165,7 @@ lintE g = \case
         (ts,as') <- unzip <$> checkAlt et `traverse` as
         case allUnify ts of
             Just err -> Left err
-            Nothing  -> pure $ head ts  :< CaseF e' as'
+            Nothing  -> pure $ head ts :< CaseF e' as'
       where
         checkAlt :: Type -> Alter Var -> SysF (Type, AlterF Var ET)
         checkAlt scrutineeType (AlterF (AltData con) bs e) = do

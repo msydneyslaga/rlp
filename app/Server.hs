@@ -78,7 +78,7 @@ respond :: Command -> Response
 respond (Annotate s)
     = s & (parseRlpProgR >=> typeCheckRlpProgR)
         & fmap (\p -> p ^.. funDs
-           <&> \sc -> serialiseSc (sc & _3 . mapped %~ rout @String))
+           <&> serialiseSc)
         & runRLPCJsonDef
         & Annotated
 
@@ -87,8 +87,7 @@ showPartialAnn = undefined
 funDs :: Traversal' (Program b a) (b, [Pat b], a)
 funDs = programDecls . each . _FunD
 
-serialiseSc :: ToJSON a
-            => (PsName, [Pat PsName], Cofree (RlpExprF PsName) a)
+serialiseSc :: (PsName, [Pat PsName], Cofree (RlpExprF PsName) (Type PsName))
             -> Value
 serialiseSc (n,as,e) = object
     [ "name" .= n
