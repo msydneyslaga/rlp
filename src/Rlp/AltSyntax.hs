@@ -169,6 +169,14 @@ instance (Out b) => Out1 (Decl b) where
 instance (Out b) => Out (DataCon b) where
     out (DataCon n as) = ttext n <+> hsep (outPrec appPrec1 <$> as)
 
+collapseForalls :: Prism' (Type b) ([b], Type b)
+collapseForalls = prism' up down where
+    up (bs,m) = foldr ForallT m bs
+    down (ForallT x m) = case down m of
+        Just (xs,m') -> Just (x : xs, m')
+        Nothing      -> Just ([x],m)
+    down _ = Nothing
+
 -- (->) is given prec `appPrec-1`
 instance (Out b) => Out (Type b) where
     outPrec _ (VarT n) = ttext n
@@ -180,8 +188,10 @@ instance (Out b) => Out (Type b) where
     outPrec p (AppT f x) = maybeParens (p>appPrec) $
         outPrec appPrec f <+> outPrec appPrec1 x
     outPrec p FunT = maybeParens (p>0) "->"
-    outPrec p (ForallT x m) = maybeParens (p>0) $
-        hsep [ "∀", ttext x <> ".", outPrec 0 m ]
+    outPrec p t@(ForallT _ _) = maybeParens (p>0) $
+        t ^. singular collapseForalls & \(bs,m) ->
+            let bs' = "∀" <> (hsep $ outPrec appPrec1 <$> bs) <> "."
+            in bs' <+> outPrec 0 m
 
 instance (Out b) => Out (Pat b) where
     outPrec p (VarP b) = outPrec p b
