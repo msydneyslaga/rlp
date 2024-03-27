@@ -38,20 +38,14 @@
            :else
              (js/console.warn "unrecognisable response from rlp"))))
 
-(def *socket (ws/create "ws://127.0.0.1:9002"
-                        {:on-message on-message
-                         :on-open #(println "socket opened")
-                         :on-close #(println "socket closed")
-                         :on-error #(println "error: " %)}))
+(defonce *socket (ws/create "ws://127.0.0.1:9002"
+                            {:on-message on-message
+                             :on-open #(println "socket opened")
+                             :on-close #(println "socket closed")
+                             :on-error #(println "error: " %)}))
 
 (defn send [msg]
   (ws/send *socket msg fmt/json))
-
-; (defn init-type-check-button []
-;   (let [b (.querySelector js/document "#type-check")]
-;     (.addEventListener b "click"
-;                        #(send {:command "annotate"
-;                                :source (.getValue *editor)}))))
 
 (defonce *editor nil)
 
@@ -68,7 +62,8 @@
       :theme "solarized_light"
       :keyboardHandler "vim"
       :defaultValue (str "id = \\x -> x\n"
-                         "flip f x y = f y x\n")
+                         "flip f x y = f y x\n"
+                         "fix f = letrec x = f x in x")
       :style {:width "100%"
               :height "100%"}
       :on-load (fn [editor]
@@ -104,6 +99,5 @@
 
 ;; this is called before any code is reloaded
 (defn ^:dev/before-load stop []
-  (ws/close *socket)
   (js/console.log "stop"))
 

@@ -6,15 +6,24 @@
             [reagent.core :as r]
             [reagent.dom :as rdom]
             [clojure.pprint :refer [cl-format]]
-            [hmvis.ppr :as ppr]))
+            [hmvis.ppr :as ppr]
+            [clojure.pprint :refer [pprint]]
+            [clojure.string :as str]))
 
 (defonce tc-input (r/atom nil))
 
 (defonce current-annotation-text (r/atom nil))
 
+(defn unicodify [s]
+  (str/replace s #"->" "→"))
+
+(defn punctuate [p & as]
+  (match as
+         [] ""
+         _  (reduce #(str %1 p %2) as)))
+
 (defn hsep [& as]
-  (let [f (fn [a b] (str a " " b))]
-    (reduce f as)))
+  (apply punctuate " " as))
 
 (defn maybe-parens [c s]
   (if c
@@ -52,7 +61,7 @@
                            "typed-wrapper")
                 }
           [:div {:class "code-wrapper"} child]]
-         [Annotation colour t hovering?]])))
+         [Annotation colour (unicodify t) hovering?]])))
 
 (declare Expr)
 
@@ -70,6 +79,27 @@
        " "
        [Expr colours ppr/app-prec1 x]])
 
+(defn let-or-letrec [rec]
+  (match rec
+         "Rec"    "letrec"
+         "NonRec" "let"))
+
+(defn Pat [colours p {:keys [tag contents]}]
+  (match tag
+         "VarP" contents))
+
+(defn Binding [colours {:keys [tag contents]}]
+  (match tag
+         "VarB" (let [[p v] contents]
+                  [:<> [Pat colours 0 p] " = " [Expr colours 0 v]])))
+
+(defn LetExpr [colours rec bs e]
+  [:<> (let-or-letrec rec)
+       " "
+       (apply punctuate "; " (map (partial Binding colours) bs))
+       " in "
+       (Expr colours 0 e)])
+
 (defn Expr [[c & colours] p {e :e t :type}]
   (match e
     {:InL {:tag "LamF" :contents [bs body & _]}}
@@ -80,6 +110,9 @@
     {:InL {:tag "AppF" :contents [f x]}}
       (maybe-parens (< ppr/app-prec p)
                     [Typed c t [AppExpr colours f x]])
+    {:InR {:tag "LetEF" :contents [r bs body]}}
+      (maybe-parens (< ppr/app-prec1 p)
+                    [Typed c t [LetExpr colours r bs body]])
     :else [:code "<expr>"]))
 
 (def rainbow-cycle (cycle ["red"

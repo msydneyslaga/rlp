@@ -209,7 +209,7 @@ layout_list0(sep,p) : p                          { [$1] }
 
 -- layout1(p : β) :: [β]
 layout1(p)  : '{' layout_list1(';',p) '}'   { $2 }
-            | VL  layout_list1(VS,p) VS VR     { $2 }
+            | VL  layout_list1(VS,p) VS VR  { $2 }
             | VL  layout_list1(VS,p) VR     { $2 }
 
 -- layout_list1(sep : α, p : β) :: [β]

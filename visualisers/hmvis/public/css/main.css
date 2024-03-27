@@ -72,7 +72,7 @@ body {
 .annotation-wrapper .annotation
 { position: relative
 ; bottom: 0
-; min-height: 0.50em
+; min-height: 0.60em
 }
 
 .annotation-text
@@ -85,6 +85,11 @@ body {
 
 .code-wrapper
 { display: inline-block
+}
+
+code
+{ font-family: monospace
+; font-size: 1em
 }
 
 /* .typed-wrapper.hovering > .code-wrapper */
