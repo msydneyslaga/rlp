@@ -41,10 +41,15 @@ runErrorful m = coerce (runErrorfulT m)
 class (Applicative m) => MonadErrorful e m | m -> e where
     addWound :: e -> m ()
     addFatal :: e -> m a
+    -- | Turn any wounds into fatals
+    bleedOut :: m a -> m a
 
 instance (Applicative m) => MonadErrorful e (ErrorfulT e m) where
     addWound e = ErrorfulT $ pure (Just (), [e])
     addFatal e = ErrorfulT $ pure (Nothing, [e])
+    bleedOut m = ErrorfulT $ runErrorfulT m <&> \case
+        (a, []) -> (a, [])
+        (_, es) -> (Nothing, es)
 
 instance MonadTrans (ErrorfulT e) where
     lift m = ErrorfulT ((\x -> (Just x,[])) <$> m)
@@ -86,6 +91,7 @@ hoistErrorfulT nt (ErrorfulT m) = ErrorfulT (nt m)
 instance (Monad m, MonadErrorful e m) => MonadErrorful e (ReaderT r m) where
     addWound = lift . addWound
     addFatal = lift . addFatal
+    bleedOut = mapReaderT bleedOut
 
 instance (Monad m, MonadState s m) => MonadState s (ErrorfulT e m) where
     state = lift . state
