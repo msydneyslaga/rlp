@@ -146,6 +146,8 @@ CaseAlt             :: { Alter PsName (RlpExpr PsName) }
 LetE                :: { RlpExpr PsName }
                     : let layout1(Binding) in Expr
                         { Finr $ LetEF Core.NonRec $2 $4 }
+                    | letrec layout1(Binding) in Expr
+                        { Finr $ LetEF Core.Rec $2 $4 }
 
 Binding             :: { Binding PsName (RlpExpr PsName) }
                     : Pat '=' Expr          { VarB $1 $3 }
