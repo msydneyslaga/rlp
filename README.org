@@ -1,0 +1,115 @@
+#+title: rl'
+#+author: Madeleine Sydney Slaga
+
+~rl'~ will be a lazily-evaluated, purely-functional, statically-typed language
+heavily imitating Haskell.
+
+* Architecture
+[[file:rlpc.drawio.svg]]
+
+* Build Info
+- ~rlpc~ is built using [[https://www.haskell.org/ghcup/][Cabal]]
+- ~rlpc~'s documentation is built using
+  [[https://www.sphinx-doc.org/en/master/][Sphinx]]
+
+#+BEGIN_SRC sh
+$ cabal build       # Build the rlpc compiler
+$ cabal install     # Install rlpc to $PATH
+$ cabal haddock     # Build the API docs w/ Haddock
+$ make -C doc html  # Build the primary docs w/ Sphinx
+
+# run the test suite
+$ cabal test --test-show-details=direct
+#+END_SRC
+
+* Use
+** TLDR
+#+begin_src sh
+# Compile and evaluate examples/rlp/QuickSort.rl
+$ rlpc examples/QuickSort.rl
+# Compile and evaluate t.cr, with evaluation info dumped to t.log
+$ rlpc -ddump-eval -l t.log t.cr
+# Compile and evaluate t.rl, dumping the desugared Core
+$ rlpc -ddump-desugared t.rl
+# Compile and evaluate t.rl with all compiler messages enabled
+$ rlpc -dALL t.rl
+#+end_src
+** Options
+#+begin_src sh
+Usage: rlpc [-l|--log FILE] [-d DEBUG FLAG] [-f COMPILATION FLAG]
+            [-e|--evaluator gm|ti] [--heap-trigger INT] [-x|--language rlp|core]
+            FILES...
+#+end_src
+
+Available debug flags include:
+- ~-ddump-desugared~: dump Core generated from rl'
+- ~-ddump-parsed-core~: dump raw Core AST
+- ~-ddump-parsed~: dump raw rl' AST
+- ~-ddump-eval~: dump evaluation logs
+- ~-dALL~: disable debug message filtering. enables *all* debug messages
+
+* Demos
+[]
+
+* To-do List
+** TODO rlp to core desugaring                                         :feature:
+
+** TODO README.md -> README.org                                           :docs:
+
+** TODO ~case~ inference                                               :feature:
+
+** TODO ADT support in Rlp/HindleyMilner.hs                            :feature:
+
+** TODO whole-program inference (wrap top-level in a ~letrec~)         :feature:
+
+** TODO user-supplied annotation support in Rlp/HindleyMilner.hs       :feature:
+
+** TODO update architecture diagram                                       :docs:
+
+** TODO pattern support; everywhere                                    :feature:
+
+** TODO G-machine visualiser                                              :docs:
+
+** TODO lambda calculus visualiser                                        :docs:
+
+** TODO in Rlp/HindleyMilner.hs, fix ~listenFreshTvNames~         :housekeeping:
+   it /does/ work in its current state, however it captures an unreasonably
+   excessive amount of names, even for a heuristic.
+
+** TODO up-to-date examples [0/2]                                         :docs:
+- [ ] quicksort (core and rlp)
+- [ ] factorial (core and rlp)
+
+* Releases
+** +December Release+
+- [X] Tests
+    - [ ] Core lexer
+    - [ ] Core parser
+    - [X] Evaluation model
+- [ ] Benchmarks
+- [X] Stable Core lexer
+- [X] Stable Core parser
+- [X] Stable evaluation model
+    - [X] Garbage Collection
+- [ ] Stable documentation for the evaluation model
+
+** +February Release Plan+
+- [X] Beta rl' to Core
+- [X] UX improvements
+    - [X] Actual compiler errors -- no more unexceptional `error` calls
+    - [X] Better CLI dump flags
+    - [X] Annotate the AST with token positions for errors (NOTE: As of Feb. 1,
+      this has been done, but the locational info is not yet used in error messages)
+- [X] Compiler architecture diagram
+- [X] More examples
+
+** March Release Plan
+- [ ] Tests
+    - [ ] rl' parser
+    - [ ] Type inference
+- [X] Ditch TTG in favour of a simpler AST focusing on extendability via Fix, Free, 
+  Cofree, etc. rather than boilerplate-heavy type families
+- [X] rl' type inference
+- [X] Core type checking
+
+
