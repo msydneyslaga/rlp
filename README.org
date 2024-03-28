@@ -61,6 +61,7 @@ Available debug flags include:
 ** TODO rlp to core desugaring                                         :feature:
 
 ** TODO [#A] HM memoisation prevents shadowing                             :bug:
+Example:
 #+begin_src haskell
 -- >>> runHM' $ infer1 [rlpExpr|let f = \x -> x in f (let f = 2 in f)|]
 -- Left [TyErrCouldNotUnify
@@ -69,6 +70,7 @@ Available debug flags include:
 -- >>> :t let f = \x -> x in f (let f = 2 in f)
 -- let f = \x -> x in f (let f = 2 in f) :: Int
 #+end_src
+For the time being, I just disabled the memoisation. This is very, very bad.
 
 ** DONE README.md -> README.org                                           :docs:
    CLOSED: [2024-03-28 Thu 10:44]

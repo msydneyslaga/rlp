@@ -114,8 +114,10 @@ liftMaybe m = RLPCT . lift . ErrorfulT . pure $ (m, [])
 
 liftEither :: (Monad m, IsRlpcError e)
            => Either [e] a -> RLPCT m a
-liftEither = RLPCT . lift . ErrorfulT . pure
-           . either (const (Nothing,[])) ((,[]) . Just)
+liftEither = RLPCT . lift . ErrorfulT . pure . f where
+    f (Left es) = (Nothing, errorMsg s . liftRlpcError <$> es)
+        where s = SrcSpan 0 0 0 0
+    f (Right a) = (Just a, [])
 
 hoistRlpcT :: (forall a. m a -> n a)
          -> RLPCT m a -> RLPCT n a

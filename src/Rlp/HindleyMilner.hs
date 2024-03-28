@@ -43,6 +43,7 @@ import GHC.Generics             (Generic, Generically(..))
 import Debug.Trace
 
 import Data.Functor             hiding (unzip)
+import Data.Functor.Extend
 import Data.Functor.Foldable    hiding (fold)
 import Data.Fix                 hiding (cata, para)
 import Control.Comonad.Cofree
@@ -68,11 +69,11 @@ lookupVar n g = case g ^. contextVars . at n of
     Nothing -> addFatal $ TyErrUntypedVariable n
 
 gather :: RlpExpr PsName -> HM (Type PsName, PartialJudgement)
-gather e = look >>= (H.lookup e >>> maybe memoise pure)
+gather e = use hmMemo >>= (H.lookup e >>> maybe memoise pure)
     where
         memoise = do
             r <- gather' e
-            add (H.singleton e r)
+            hmMemo <>= H.singleton e r
             pure r
 
 gather' :: RlpExpr PsName -> HM (Type PsName, PartialJudgement)
@@ -145,8 +146,8 @@ deleteKeys :: (Eq k, Hashable k) => [k] -> HashMap k v -> HashMap k v
 deleteKeys ks h = foldr H.delete h ks
 
 gatherBinds :: [Binding PsName (RlpExpr PsName)]
-            -> HM [( Type PsName
-                   , Type PsName
+            -> HM [( Type PsName -- inferred type
+                   , Type PsName -- generalised type
                    , PartialJudgement )]
 gatherBinds bs = for bs $ \ (VarB (VarP k) x) -> do
     ((tx,jx),frees) <- listenFreshTvNames $ gather x
@@ -201,10 +202,10 @@ unify [] = pure mempty
 unify (Equality (sx :-> sy) (tx :-> ty) : cs) =
     unify $ Equality sx tx : Equality sy ty : cs
 
-unify (Equality a@(ConT ca `AppT` as) b@(ConT cb `AppT` bs) : cs)
-  | ca == cb = do
-    cs' <- liftA2 (zipWith Equality) (saturated a) (saturated b)
-    unify $ cs' ++ cs
+-- unify (Equality a@(ConT ca `AppT` as) b@(ConT cb `AppT` bs) : cs)
+--   | ca == cb = do
+--     cs' <- liftA2 (zipWith Equality) (saturated a) (saturated b)
+--     unify $ cs' ++ cs
 
 -- elim
 unify (Equality (ConT s) (ConT t) : cs) | s == t = unify cs
@@ -274,7 +275,7 @@ infer e = do
     e' <- annotate e
     let (cs,as) = finalJudgement e' ^. lensProduct constraints assumptions
     cs' <- (<>cs) <$> elimAssumptionsG g0 as
-    checkUndefinedVariables e'
+    -- checkUndefinedVariables e'
     sub <- solve cs'
     pure $ e' & fmap (sub . view _1)
               & _extract %~ generaliseG g0
@@ -349,38 +350,57 @@ typeCheckRlpProgR :: (Monad m)
                   => Program PsName (RlpExpr PsName)
                   -> RLPCT m (Program PsName
                       (TypedRlpExpr PsName))
-typeCheckRlpProgR p = liftHM g (inferProg . etaExpandAll $ p)
+typeCheckRlpProgR p = liftHM g (inferProg p)
   where
     g = buildInitialContext p
-    etaExpandAll = programDecls . each %~ etaExpand
 
 inferProg :: Program PsName (RlpExpr PsName)
           -> HM (Program PsName (TypedRlpExpr PsName))
 inferProg p = do
     g0 <- ask
-    p' <- annotateProg p
-    let (cs,as) = foldOf (folded . folded . _2) p'
-                    ^. lensProduct constraints assumptions
-    cs' <- (<>cs) <$> elimAssumptionsG g0 as
+    -- we only wipe the memo here as a temporary solution to the memo shadowing
+    -- problem
+    p' <- (\e -> (hmMemo .= mempty) *> annotate e) `traverse` etaExpandAll p
+    traceM $ "p' : " <> show p'
+    let (cs,as) = foldMap finalJudgement p' ^. lensProduct constraints assumptions
+    cs' <- (cs <>) <$> elimAssumptionsG g0 as
+    traceM $ "cs' : " <> show cs'
     sub <- solve cs'
     pure $ p' & programDecls . traversed . _FunD . _3
                 %~ ((_extract %~ generaliseG g0) . fmap (sub . view _1))
+  where
+    etaExpandAll = programDecls . each %~ etaExpand
 
 annotateProg :: Program PsName (RlpExpr PsName)
-             -> HM (Program PsName
-                     (Cofree (RlpExprF PsName) (Type PsName, PartialJudgement)))
-annotateProg = traverse annotate
-
-gatherProg :: Program PsName (RlpExpr PsName)
-           -> HM [Constraint]
-gatherProg p = do
-    -- this should be nearly identical to the rule for `letrec` in gather'
-    let (ks,xs) = unzip $ funsToSimpleBinds (p ^. programDecls)
-    (txs,txs',jxs) <- unzip3 <$> gatherBinds (zipWith simpleBind ks xs)
-    let jxsa = foldOf (each . assumptions) jxs
-    jxcs <- elimWithBinds (ks `zip` txs) jxsa
+             -> HM ( Program PsName
+                      (Cofree (RlpExprF PsName) (Type PsName, PartialJudgement))
+                   , [Constraint] )
+annotateProg p = do
+    let bs = funsToSimpleBinds (p ^. programDecls)
+        (ks,xs) = unzip bs
+    xs' <- annotate `traverse` xs
+    let jxs = foldOf (each . _extract . _2) xs'
+        txs = xs' ^.. each . _extract . _1
+    cs <- elimWithBinds (ks `zip` txs) (jxs ^. assumptions)
+    -- let p' = annotateDecls (ks `zip` xs') p
+    p' <- annotate `traverse` p
     -- TODO: any remaining assumptions should be errors at this point
-    pure jxcs
+    pure (p',cs)
+
+-- this sucks! FunDs should probably be stored as a hashmap in Program...
+annotateDecls :: [( PsName
+                  , Cofree (RlpExprF PsName) (Type PsName, PartialJudgement) )]
+              -> Program PsName a
+              -> Program PsName
+                  (Cofree (RlpExprF PsName) (Type PsName, PartialJudgement))
+annotateDecls bs = programDecls . traversed . _FunD %~ \case
+    (n,_,_)
+        | Just e <- lookup n bs
+        -> (n,[],e)
+
+gatherBinds' :: [(PsName, RlpExpr PsName)]
+             -> HM [(Type PsName, Type PsName, PartialJudgement)]
+gatherBinds' = gatherBinds . fmap (uncurry simpleBind)
 
 elimWithBinds :: [(PsName, Type PsName)]
               -> Assumptions

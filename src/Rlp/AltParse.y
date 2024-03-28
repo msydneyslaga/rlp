@@ -158,6 +158,7 @@ Expr1               :: { RlpExpr PsName }
                                                   . singular _TokenLitInt
                                                   . to (Finl . Core.LitF . Core.IntL) }
                     | '(' Expr ')'          { $2 }
+                    | ConE                  { $1 }
 
 AppE                :: { RlpExpr PsName }
                     : AppE Expr1            { Finl $ Core.AppF $1 $2 }
@@ -165,6 +166,9 @@ AppE                :: { RlpExpr PsName }
 
 VarE                :: { RlpExpr PsName }
                     : Var                   { Finl $ Core.VarF $1 }
+
+ConE                :: { RlpExpr PsName }
+                    : Con                   { Finl $ Core.VarF $1 }
 
 Pat1s               :: { [Pat PsName] }
                     : list0(Pat1)           { $1 }

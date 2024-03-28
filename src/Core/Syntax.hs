@@ -444,21 +444,6 @@ instance (Out b) => Out (ScDef b) where
 instance (Out b, Out a) => Out (ExprF b a) where
     outPrec = outPrec1
 
-    -- outPrec _ (VarF n) = ttext n
-    -- outPrec _ (ConF t a) = "Pack{" <> (ttext t <+> ttext a) <> "}"
-    -- outPrec p (LamF bs e) = maybeParens (p>0) $
-    --     hsep ["λ", hsep (outPrec appPrec1 <$> bs), "->", out e]
-    -- outPrec p (LetF r bs e) = maybeParens (p>0)
-    --                            $ hsep [out r, explicitLayout bs]
-    --                          $+$ hsep ["in", out e]
-    -- outPrec p (AppF f x) = maybeParens (p>appPrec) $
-    --     outPrec appPrec f <+> outPrec appPrec1 x
-    -- outPrec p (LitF l) = outPrec p l
-    -- outPrec p (CaseF e as) = maybeParens (p>0) $
-    --     "case" <+> out e <+> "of"
-    --     $+$ nest 2 (explicitLayout as)
-    -- outPrec p (TypeF t) = "@" <> outPrec appPrec1 t
-
 instance (Out b) => Out1 (ExprF b) where
     liftOutPrec pr _ (VarF n) = ttext n
     liftOutPrec pr _ (ConF t a) = "Pack{" <> (ttext t <+> ttext a) <> "}"

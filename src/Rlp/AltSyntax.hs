@@ -41,6 +41,7 @@ import Data.Hashable.Lifted
 import GHC.Exts                 (IsString)
 import Control.Lens             hiding ((.=))
 
+import Data.Functor.Extend
 import Data.Functor.Foldable.TH
 import Text.Show.Deriving
 import Data.Eq.Deriving
@@ -61,6 +62,11 @@ type PsName = T.Text
 
 newtype Program b a = Program [Decl b a]
     deriving (Show, Functor, Foldable, Traversable)
+
+instance Extend (Decl b) where
+    extended c w@(FunD n as a) = FunD n as (c w)
+    extended _ (DataD n as cs) = DataD n as cs
+    extended _ (TySigD n t)    = TySigD n t
 
 programDecls :: Iso (Program b a) (Program b' a') [Decl b a] [Decl b' a']
 programDecls = iso sa bt where
@@ -158,6 +164,12 @@ instance Out b => Out1 (ExprF b) where
     liftOutPrec pr p (CaseEF e as) = maybeParens (p>0) $
         vsep [ hsep [ "case", pr 0 e, "of" ]
              , nest 2 (vcat $ liftOutPrec pr 0 <$> as) ]
+    liftOutPrec pr p (LetEF r bs e) = maybeParens (p>0) $
+        vsep [ hsep [ letword r, "<bs>" ]
+             , nest 2 (hsep [ "in", pr 0 e ]) ]
+      where
+        letword Core.Rec = "letrec"
+        letword Core.NonRec = "let"
 
 instance (Out b, Out a) => Out (Decl b a) where
     outPrec = outPrec1
