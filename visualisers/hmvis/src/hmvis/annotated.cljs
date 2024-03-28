@@ -100,6 +100,9 @@
        " in "
        (Expr colours 0 e)])
 
+(defn LitExpr [_ l]
+  [:code (str l)])
+
 (defn Expr [[c & colours] p {e :e t :type}]
   (match e
     {:InL {:tag "LamF" :contents [bs body & _]}}
@@ -113,6 +116,8 @@
     {:InR {:tag "LetEF" :contents [r bs body]}}
       (maybe-parens (< ppr/app-prec1 p)
                     [Typed c t [LetExpr colours r bs body]])
+    {:InL {:tag "LitF" :contents l}}
+      [Typed c t [LitExpr colours l]]
     :else [:code "<expr>"]))
 
 (def rainbow-cycle (cycle ["red"

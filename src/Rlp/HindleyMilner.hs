@@ -364,7 +364,7 @@ inferProg p = do
     (p',csroot) <- annotateProg (etaExpandAll p)
     traceM $ "p' : " <> show p'
     let (cs,as) = foldMap finalJudgement p' ^. lensProduct constraints assumptions
-    cs' <- (\a -> csroot <> cs <> a) <$> elimAssumptionsG g0 as
+    cs' <- (\a -> cs <> csroot <> a) <$> elimAssumptionsG g0 as
     traceM $ "cs' : " <> show cs'
     sub <- solve cs'
     pure $ p' & programDecls . traversed . _FunD . _3
@@ -388,8 +388,12 @@ annotateProg p = do
     -- we only wipe the memo here as a temporary solution to the memo shadowing
     -- problem
     p' <- (thenWipeMemo . annotate) `traverse` p
+    p'' <- forOf (traversed . traversed . _2) p' \ j -> do
+        c <- elimWithBinds (ks `zip` txs) (j ^. assumptions)
+        pure $ j & constraints <>~ c
+                 & assumptions %~ deleteKeys ks
     -- TODO: any remaining assumptions should be errors at this point
-    pure (p',cs)
+    pure (p'',cs)
   where
     thenWipeMemo a = (hmMemo .= mempty) *> a
 
