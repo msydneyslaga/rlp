@@ -102,6 +102,10 @@ instance (Monoid w, Monad m, MonadWriter w m) => MonadWriter w (ErrorfulT e m) w
         ((,w) <$> ma, es)
     pass (ErrorfulT m) = undefined
 
+instance (Monad m, MonadReader r m) => MonadReader r (ErrorfulT e m) where
+    ask      = lift ask
+    local rr = hoistErrorfulT (local rr)
+
 instance (Monoid w, Monad m, MonadAccum w m)
       => MonadAccum w (ErrorfulT e m) where
     accum = lift . accum

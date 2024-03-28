@@ -13,9 +13,11 @@ module Rlp.HindleyMilner
 --------------------------------------------------------------------------------
 import Control.Lens             hiding (Context', Context, (:<), para, uncons)
 import Control.Lens.Unsound
+import Control.Lens.Extras
 import Control.Monad.Errorful
 import Control.Monad.State
 import Control.Monad.Accum
+import Control.Monad.Reader
 import Control.Monad
 import Control.Monad.Extra
 import Control.Arrow            ((>>>))
@@ -117,8 +119,7 @@ gather' = \case
         let ks = bs ^.. each . singular _VarB . _1 . singular _VarP
         (txs,txs',jxs) <- unzip3 <$> gatherBinds bs
         let jxsa = foldOf (each . assumptions) jxs
-        jxcs <- fmap concat . for (ks `zip` txs) $ \ (k,t) ->
-            elimAssumptions' jxsa k t
+        jxcs <- elimWithBinds (ks `zip` txs) jxsa
         (te,je) <- gather e
         -- ... why don't we need the map?
         (cs,_) <- fmap fold . for (ks `zip` txs') $ \ (k,t) ->
@@ -183,12 +184,27 @@ instantiateMap (ForallT x m) = do
                      & mapped . _1 %~ subst x tv
 instantiateMap t = pure (t, mempty)
 
+saturated :: Type PsName -> HM [Type PsName]
+saturated (ConT con `AppT` as) = do
+    mk <- view $ contextTyCons . at con
+    case mk of
+      Nothing -> addFatal $ TyErrUntypedVariable con
+      Just k | lengthOf arrowStops k - 1 == lengthOf applicants1 as
+             -> pure (as ^.. applicants1)
+             | otherwise
+             -> undefined
+
 unify :: [Constraint] -> HM [(PsName, Type PsName)]
 
 unify [] = pure mempty
 
 unify (Equality (sx :-> sy) (tx :-> ty) : cs) =
     unify $ Equality sx tx : Equality sy ty : cs
+
+unify (Equality a@(ConT ca `AppT` as) b@(ConT cb `AppT` bs) : cs)
+  | ca == cb = do
+    cs' <- liftA2 (zipWith Equality) (saturated a) (saturated b)
+    unify $ cs' ++ cs
 
 -- elim
 unify (Equality (ConT s) (ConT t) : cs) | s == t = unify cs
@@ -248,24 +264,29 @@ elimAssumptionsG g as
     & itraverse (elimAssumptions' as)
     & fmap (H.elems >>> concat)
 
-infer :: Context -> RlpExpr PsName
-      -> HM (Cofree (RlpExprF PsName) (Type PsName))
-infer g0 e = do
+finalJudgement :: Cofree (RlpExprF PsName) (Type PsName, PartialJudgement)
+               -> PartialJudgement
+finalJudgement = foldOf (folded . _2)
+
+infer :: RlpExpr PsName -> HM (Cofree (RlpExprF PsName) (Type PsName))
+infer e = do
+    g0 <- ask
     e' <- annotate e
-    let (as, concat -> cs) = unzip $ e' ^.. folded . _2
-                                          . lensProduct assumptions constraints
-    cs' <- do
-        csa <- concatMapM (elimAssumptionsG g0) as
-        pure (csa <> cs)
-    g <- unify cs'
-    let sub t = ifoldrOf (reversed . assocs) subst t g
+    let (cs,as) = finalJudgement e' ^. lensProduct constraints assumptions
+    cs' <- (<>cs) <$> elimAssumptionsG g0 as
     checkUndefinedVariables e'
+    sub <- solve cs'
     pure $ e' & fmap (sub . view _1)
               & _extract %~ generaliseG g0
   where
     -- intuitively, we'd return mgu(s,t) but the union is left-biased making `s`
     -- the user-specified type: prioritise her.
     unifyTypes _ s t = unify [Equality s t] $> s
+
+solve :: [Constraint] -> HM (Type PsName -> Type PsName)
+solve cs = do
+    g <- unify cs
+    pure $ \t -> ifoldrOf (reversed . assocs) subst t g
 
 checkUndefinedVariables
     :: Cofree (RlpExprF PsName) (Type PsName, PartialJudgement)
@@ -276,33 +297,8 @@ checkUndefinedVariables ((_,j) :< es)
         as -> doErrs *> checkUndefinedVariables `traverse_` es
           where doErrs = ifor as \n _ -> addWound $ TyErrUntypedVariable n
 
-infer1 :: Context -> RlpExpr PsName -> HM (Type PsName)
-infer1 g = fmap extract . infer g
-
--- unionContextWithKeyM :: Monad m
---                      => (PsName -> Type PsName -> Type PsName
---                                                -> m (Type PsName))
---                      -> Context -> Context -> m Context
--- unionContextWithKeyM f a b = Context <$> unionWithKeyM f a' b'
---     where
---         a' = a ^. contextVars
---         b' = b ^. contextVars
-
--- unionWithKeyM :: forall m k v. (Eq k, Hashable k, Monad m)
---               => (k -> v -> v -> m v) -> HashMap k v -> HashMap k v
---               -> m (HashMap k v)
--- unionWithKeyM f a b = sequenceA $ H.unionWithKey f' ma mb
---     where
---         f' k x y = join $ liftA2 (f k) x y
---         ma = fmap (pure @m) a
---         mb = fmap (pure @m) b
-
--- solve :: RlpExpr PsName -> HM (Cofree (RlpExprF PsName) (Type PsName))
--- solve = solve' mempty
-
--- solve' :: Context -> RlpExpr PsName
---        -> HM (Cofree (RlpExprF PsName) (Type PsName))
--- solve' g = sequenceA . fixtend (infer1' g . wrapFix)
+infer1 :: RlpExpr PsName -> HM (Type PsName)
+infer1 = fmap extract . infer
 
 occurs :: PsName -> Type PsName -> Bool
 occurs n = cata \case
@@ -326,18 +322,99 @@ fixtend :: Functor f => (f (Fix f) -> b) -> Fix f -> Cofree f b
 fixtend c (Fix f) = c f :< fmap (fixtend c) f
 
 buildInitialContext :: Program PsName a -> Context
-buildInitialContext = const mempty
-    -- Context . H.fromList . toListOf (programDecls . each . _TySigD)
+buildInitialContext = foldMapOf (programDecls . each) \case
+    TySigD n t    -> contextOfTySig n t
+    DataD n as cs -> contextOfData n as cs
+    _             -> mempty
+
+contextOfTySig :: PsName -> Type PsName -> Context
+contextOfTySig = const $ const mempty
+
+contextOfData :: PsName -> [PsName] -> [DataCon PsName] -> Context
+contextOfData n as cs = kindCtx <> consCtx where
+    kindCtx = mempty & contextTyCons . at n ?~ kind
+        where kind = foldr (\_ t -> TypeT :-> t) TypeT as
+
+    consCtx = foldMap contextOfCon cs
+
+    contextOfCon (DataCon c as) =
+        mempty & contextVars . at c ?~ ty
+      where ty = foralls $ foldr (:->) base as 
+
+    base = foldl (\f x -> AppT f (VarT x)) (VarT n) as
+
+    foralls t = foldr ForallT t as
 
 typeCheckRlpProgR :: (Monad m)
                   => Program PsName (RlpExpr PsName)
                   -> RLPCT m (Program PsName
                       (TypedRlpExpr PsName))
-typeCheckRlpProgR p = tc p
+typeCheckRlpProgR p = liftHM g (inferProg . etaExpandAll $ p)
   where
     g = buildInitialContext p
-    tc = liftHM . traverse (infer g) . etaExpandAll
     etaExpandAll = programDecls . each %~ etaExpand
+
+inferProg :: Program PsName (RlpExpr PsName)
+          -> HM (Program PsName (TypedRlpExpr PsName))
+inferProg p = do
+    g0 <- ask
+    p' <- annotateProg p
+    let (cs,as) = foldOf (folded . folded . _2) p'
+                    ^. lensProduct constraints assumptions
+    cs' <- (<>cs) <$> elimAssumptionsG g0 as
+    sub <- solve cs'
+    pure $ p' & programDecls . traversed . _FunD . _3
+                %~ ((_extract %~ generaliseG g0) . fmap (sub . view _1))
+
+annotateProg :: Program PsName (RlpExpr PsName)
+             -> HM (Program PsName
+                     (Cofree (RlpExprF PsName) (Type PsName, PartialJudgement)))
+annotateProg = traverse annotate
+
+gatherProg :: Program PsName (RlpExpr PsName)
+           -> HM [Constraint]
+gatherProg p = do
+    -- this should be nearly identical to the rule for `letrec` in gather'
+    let (ks,xs) = unzip $ funsToSimpleBinds (p ^. programDecls)
+    (txs,txs',jxs) <- unzip3 <$> gatherBinds (zipWith simpleBind ks xs)
+    let jxsa = foldOf (each . assumptions) jxs
+    jxcs <- elimWithBinds (ks `zip` txs) jxsa
+    -- TODO: any remaining assumptions should be errors at this point
+    pure jxcs
+
+elimWithBinds :: [(PsName, Type PsName)]
+              -> Assumptions
+              -> HM [Constraint]
+elimWithBinds bs jxsa = fmap concat . for bs $ \ (k,t) ->
+    elimAssumptions' jxsa k t
+
+simpleBind :: b -> a -> Binding b a
+simpleBind k v = VarB (VarP k) v
+
+funsToSimpleBinds :: [Decl PsName (RlpExpr PsName)]
+                  -> [(PsName, RlpExpr PsName)]
+funsToSimpleBinds = mapMaybe \case
+    d@(FunD n _ _) -> Just (n, etaExpand' d)
+    _              -> Nothing
+
+simpleBindsToFuns :: [(PsName, TypedRlpExpr PsName)]
+                  -> [Decl PsName (TypedRlpExpr PsName)]
+simpleBindsToFuns = fmap \ (n,e) -> FunD n [] e
+
+wrapLetrec :: [(PsName, RlpExpr PsName)] -> RlpExpr PsName
+wrapLetrec ds = ds & each . _1 %~ VarP
+                   & each %~ review _VarB
+                   & \bs -> Finr $ LetEF Rec bs (Finl . LitF . IntL $ 123)
+
+unwrapLetrec :: TypedRlpExpr PsName -> [(PsName, TypedRlpExpr PsName)]
+unwrapLetrec (_ :< InR (LetEF _ bs _))
+    = bs ^.. each . _VarB
+    & each . _1 %~ view (singular _VarP)
+
+etaExpand' :: Decl b (RlpExpr b) -> RlpExpr b
+etaExpand' (FunD _ [] e) = e
+etaExpand' (FunD _ as e) = Finl . LamF as' $ e
+    where as' = as ^.. each . singular _VarP
 
 etaExpand :: Decl b (RlpExpr b) -> Decl b (RlpExpr b)
 etaExpand (FunD n [] e) = FunD n [] e
@@ -348,8 +425,8 @@ etaExpand (FunD n as e)
     allVarP = traverse (matching _VarP)
 etaExpand a = a
 
-liftHM :: (Monad m) => HM a -> RLPCT m a
-liftHM = liftEither . runHM'
+liftHM :: (Monad m) => Context -> HM a -> RLPCT m a
+liftHM g = liftEither . runHM g
 
 freeVariables :: Type PsName -> HashSet PsName
 freeVariables = cata \case
@@ -362,31 +439,17 @@ boundVariables = cata \case
     ForallTF x m -> S.singleton x <> m
     vs -> fold vs
 
--- | rename all free variables for aesthetic purposes
-
-prettyVars' :: Type PsName -> Type PsName
-prettyVars' = join prettyVars
-
 freeVariablesLTR :: Type PsName -> [PsName]
 freeVariablesLTR = nub . cata \case
     VarTF x -> [x]
     ForallTF x m -> m \\ [x]
     vs -> concat vs
 
--- | for some type, compute a substitution which will rename all free variables
--- for aesthetic purposes
-
-prettyVars :: Type PsName -> Type PsName -> Type PsName
-prettyVars root = appEndo (foldMap Endo subs)
-    where
-        alphabetNames = [ T.pack [c] | c <- ['a'..'z'] ]
-        names = alphabetNames \\ S.toList (boundVariables root)
-        subs = zipWith (\k v -> subst k (VarT v))
-                       (freeVariablesLTR root)
-                       names
-
 renamePrettily' :: Type PsName -> Type PsName
 renamePrettily' = join renamePrettily
+
+-- | for some type, compute a substitution which will rename all free variables
+-- for aesthetic purposes
 
 renamePrettily :: Type PsName -> Type PsName -> Type PsName
 renamePrettily root = (`evalState` alphabetNames) . (renameFree <=< renameBound)
@@ -407,19 +470,6 @@ renamePrettily root = (`evalState` alphabetNames) . (renameFree <=< renameBound)
 
     getName :: State [PsName] PsName
     getName = state (fromJust . uncons)
-
--- renamePrettily :: Type PsName -> Type PsName
--- renamePrettily
---     = (`evalState` alphabetNames)
---     . (renameFrees <=< renameForalls)
---   where
---     -- TODO:
---     renameFrees root = pure root
---     renameForalls = cata \case
---         ForallTF x m -> do
---             n <- getName
---             ForallT n <$> (subst x (VarT n) <$> m)
---         t -> embed <$> sequenceA t
 
 alphabetNames :: [PsName]
 alphabetNames = alphabet ++ concatMap appendAlphabet alphabetNames

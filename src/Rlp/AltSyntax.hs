@@ -4,8 +4,8 @@ module Rlp.AltSyntax
     -- * AST
       Program(..), Decl(..), ExprF(..), Pat(..)
     , RlpExprF, RlpExpr, Binding(..), Alter(..)
-    , DataCon(..), Type(..)
-    , pattern IntT
+    , DataCon(..), Type(..), Kind
+    , pattern IntT, pattern TypeT
     , Core.Rec(..)
 
     , AnnotatedRlpExpr, TypedRlpExpr
@@ -18,6 +18,8 @@ module Rlp.AltSyntax
     , programDecls
     , _VarP, _FunB, _VarB
     , _TySigD, _FunD
+    , _LetEF
+    , Core.applicants1, Core.arrowStops
 
     -- * Functor-related tools
     , Fix(..), Cofree(..), Sum(..), pattern Finl, pattern Finr
@@ -60,8 +62,10 @@ type PsName = T.Text
 newtype Program b a = Program [Decl b a]
     deriving (Show, Functor, Foldable, Traversable)
 
-programDecls :: Lens' (Program b a) [Decl b a]
-programDecls = lens (\ (Program ds) -> ds) (const Program)
+programDecls :: Iso (Program b a) (Program b' a') [Decl b a] [Decl b' a']
+programDecls = iso sa bt where
+    sa (Program ds) = ds
+    bt = Program
 
 data Decl b a = FunD b [Pat b] a
               | DataD Core.Name [Core.Name] [DataCon b]
@@ -78,10 +82,19 @@ data Type b = VarT Core.Name
             | ForallT b (Type b)
             deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
 
+instance Core.HasApplicants1 (Type b) (Type b) (Type b) (Type b) where
+    applicants1 k (AppT f x) = AppT <$> Core.applicants1 k f <*> k x
+    applicants1 k t          = k t
+
 instance (Hashable b) => Hashable (Type b)
 
 pattern IntT :: (IsString b, Eq b) => Type b
 pattern IntT = ConT "Int#"
+
+type Kind = Type
+
+pattern TypeT :: (IsString b, Eq b) => Type b
+pattern TypeT = ConT "Type"
 
 instance Core.HasArrowSyntax (Type b) (Type b) (Type b) where
     _arrowSyntax = prism make unmake where
@@ -205,6 +218,7 @@ instance (Out a, Out b) => Out (Program b a) where
 instance (Out b) => Out1 (Program b) where
     liftOutPrec pr p (Program ds) = vsep $ liftOutPrec pr p <$> ds
 
+makePrisms ''ExprF
 makePrisms ''Pat
 makePrisms ''Binding
 makePrisms ''Decl
