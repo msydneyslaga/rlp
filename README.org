@@ -5,9 +5,11 @@
 heavily imitating Haskell.
 
 * Architecture
+
 [[file:rlpc.drawio.svg]]
 
 * Build Info
+
 - ~rlpc~ is built using [[https://www.haskell.org/ghcup/][Cabal]]
 - ~rlpc~'s documentation is built using
   [[https://www.sphinx-doc.org/en/master/][Sphinx]]
@@ -23,6 +25,7 @@ $ cabal test --test-show-details=direct
 #+END_SRC
 
 * Use
+
 ** TLDR
 #+begin_src sh
 # Compile and evaluate examples/rlp/QuickSort.rl
@@ -34,6 +37,7 @@ $ rlpc -ddump-desugared t.rl
 # Compile and evaluate t.rl with all compiler messages enabled
 $ rlpc -dALL t.rl
 #+end_src
+
 ** Options
 #+begin_src sh
 Usage: rlpc [-l|--log FILE] [-d DEBUG FLAG] [-f COMPILATION FLAG]
@@ -49,12 +53,25 @@ Available debug flags include:
 - ~-dALL~: disable debug message filtering. enables *all* debug messages
 
 * Demos
-[]
+
+[TODO: add hmvis video here]
 
 * To-do List
+
 ** TODO rlp to core desugaring                                         :feature:
 
-** TODO README.md -> README.org                                           :docs:
+** TODO [#A] HM memoisation prevents shadowing                             :bug:
+#+begin_src haskell
+-- >>> runHM' $ infer1 [rlpExpr|let f = \x -> x in f (let f = 2 in f)|]
+-- Left [TyErrCouldNotUnify
+--         (ConT "Int#")
+--         (AppT (AppT FunT (ConT "Int#")) (VarT "$a2"))]
+-- >>> :t let f = \x -> x in f (let f = 2 in f)
+-- let f = \x -> x in f (let f = 2 in f) :: Int
+#+end_src
+
+** DONE README.md -> README.org                                           :docs:
+   CLOSED: [2024-03-28 Thu 10:44]
 
 ** TODO ~case~ inference                                               :feature:
 
@@ -81,6 +98,7 @@ Available debug flags include:
 - [ ] factorial (core and rlp)
 
 * Releases
+
 ** +December Release+
 - [X] Tests
     - [ ] Core lexer
