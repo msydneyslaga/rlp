@@ -360,16 +360,18 @@ inferProg p = do
     g0 <- ask
     -- we only wipe the memo here as a temporary solution to the memo shadowing
     -- problem
-    p' <- (\e -> (hmMemo .= mempty) *> annotate e) `traverse` etaExpandAll p
+    -- p' <- (thenWipeMemo . annotate) `traverse` etaExpandAll p
+    (p',csroot) <- annotateProg (etaExpandAll p)
     traceM $ "p' : " <> show p'
     let (cs,as) = foldMap finalJudgement p' ^. lensProduct constraints assumptions
-    cs' <- (cs <>) <$> elimAssumptionsG g0 as
+    cs' <- (\a -> csroot <> cs <> a) <$> elimAssumptionsG g0 as
     traceM $ "cs' : " <> show cs'
     sub <- solve cs'
     pure $ p' & programDecls . traversed . _FunD . _3
                 %~ ((_extract %~ generaliseG g0) . fmap (sub . view _1))
   where
     etaExpandAll = programDecls . each %~ etaExpand
+    thenWipeMemo a = (hmMemo .= mempty) *> a
 
 annotateProg :: Program PsName (RlpExpr PsName)
              -> HM ( Program PsName
@@ -383,9 +385,13 @@ annotateProg p = do
         txs = xs' ^.. each . _extract . _1
     cs <- elimWithBinds (ks `zip` txs) (jxs ^. assumptions)
     -- let p' = annotateDecls (ks `zip` xs') p
-    p' <- annotate `traverse` p
+    -- we only wipe the memo here as a temporary solution to the memo shadowing
+    -- problem
+    p' <- (thenWipeMemo . annotate) `traverse` p
     -- TODO: any remaining assumptions should be errors at this point
     pure (p',cs)
+  where
+    thenWipeMemo a = (hmMemo .= mempty) *> a
 
 -- this sucks! FunDs should probably be stored as a hashmap in Program...
 annotateDecls :: [( PsName
