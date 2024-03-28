@@ -130,18 +130,6 @@ gather' = \case
                        & assumptions .~ as
         pure (te,j)
 
-    -- Finr (LetEF Rec [VarB (VarP k) x] e) -> do
-    --     ((tx,jx),frees) <- listenFreshTvNames $ gather x
-    --     jxcs <- elimAssumptions' (jx ^. assumptions) k tx
-    --     let tx' = generalise frees tx
-    --     (te,je) <- gather e
-    --     (cs,m) <- elimAssumptionsMap (je ^. assumptions) k tx'
-    --     let as = H.delete k (je ^. assumptions)
-    --           <> H.delete k (jx ^. assumptions)
-    --         j = mempty & constraints .~ je ^. constraints <> jxcs <> cs
-    --                    & assumptions .~ as
-    --     pure (te,j)
-
 deleteKeys :: (Eq k, Hashable k) => [k] -> HashMap k v -> HashMap k v
 deleteKeys ks h = foldr H.delete h ks
 
@@ -202,10 +190,10 @@ unify [] = pure mempty
 unify (Equality (sx :-> sy) (tx :-> ty) : cs) =
     unify $ Equality sx tx : Equality sy ty : cs
 
--- unify (Equality a@(ConT ca `AppT` as) b@(ConT cb `AppT` bs) : cs)
---   | ca == cb = do
---     cs' <- liftA2 (zipWith Equality) (saturated a) (saturated b)
---     unify $ cs' ++ cs
+unify (Equality a@(ConT ca `AppT` as) b@(ConT cb `AppT` bs) : cs)
+  | ca == cb = do
+    cs' <- liftA2 (zipWith Equality) (saturated a) (saturated b)
+    unify $ cs' ++ cs
 
 -- elim
 unify (Equality (ConT s) (ConT t) : cs) | s == t = unify cs
@@ -342,7 +330,7 @@ contextOfData n as cs = kindCtx <> consCtx where
         mempty & contextVars . at c ?~ ty
       where ty = foralls $ foldr (:->) base as 
 
-    base = foldl (\f x -> AppT f (VarT x)) (VarT n) as
+    base = foldl (\f x -> AppT f (VarT x)) (ConT n) as
 
     foralls t = foldr ForallT t as
 
@@ -358,14 +346,13 @@ inferProg :: Program PsName (RlpExpr PsName)
           -> HM (Program PsName (TypedRlpExpr PsName))
 inferProg p = do
     g0 <- ask
+    traceM $ "g0 : " <> show g0
     -- we only wipe the memo here as a temporary solution to the memo shadowing
     -- problem
     -- p' <- (thenWipeMemo . annotate) `traverse` etaExpandAll p
     (p',csroot) <- annotateProg (etaExpandAll p)
-    traceM $ "p' : " <> show p'
     let (cs,as) = foldMap finalJudgement p' ^. lensProduct constraints assumptions
     cs' <- (\a -> cs <> csroot <> a) <$> elimAssumptionsG g0 as
-    traceM $ "cs' : " <> show cs'
     sub <- solve cs'
     pure $ p' & programDecls . traversed . _FunD . _3
                 %~ ((_extract %~ generaliseG g0) . fmap (sub . view _1))

@@ -77,7 +77,8 @@ For the time being, I just disabled the memoisation. This is very, very bad.
 
 ** TODO ~case~ inference                                               :feature:
 
-** TODO ADT support in Rlp/HindleyMilner.hs                            :feature:
+** DONE ADT support in Rlp/HindleyMilner.hs                            :feature:
+   CLOSED: [2024-03-28 Thu 11:55]
 
 ** DONE whole-program inference (wrap top-level in a ~letrec~)         :feature:
    CLOSED: [2024-03-28 Thu 11:33]
@@ -93,6 +94,19 @@ For the time being, I just disabled the memoisation. This is very, very bad.
 ** TODO G-machine visualiser                                              :docs:
 
 ** TODO lambda calculus visualiser                                        :docs:
+
+** TODO hmvis does not reload when redefining expressions                  :bug:
+   To recreate:
+   1. enter
+      #+begin_src haskell
+      x = 2
+      #+end_src
+   2. hit "type-check"
+   3. edit source to
+      #+begin_src haskell
+      x = \x -> x
+      #+end_src
+   4. hit "type-check"
 
 ** TODO in Rlp/HindleyMilner.hs, fix ~listenFreshTvNames~         :housekeeping:
    it /does/ work in its current state, however it captures an unreasonably
