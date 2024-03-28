@@ -79,7 +79,10 @@ For the time being, I just disabled the memoisation. This is very, very bad.
 
 ** TODO ADT support in Rlp/HindleyMilner.hs                            :feature:
 
-** TODO whole-program inference (wrap top-level in a ~letrec~)         :feature:
+** DONE whole-program inference (wrap top-level in a ~letrec~)         :feature:
+   CLOSED: [2024-03-28 Thu 11:33]
+   shadowing issue sucks. i'm going to have to rewrite the whole type inference
+   system later. and i never learn, so i'm gonna use a chronomorphism :3.
 
 ** TODO user-supplied annotation support in Rlp/HindleyMilner.hs       :feature:
 
